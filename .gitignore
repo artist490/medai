@@ -1,0 +1,25 @@
+# --- Python / backend ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.env
+backend/.env
+backend/medai.db
+*.db-wal
+*.db-shm
+
+# --- Node / frontend ---
+node_modules/
+dist/
+*.local
+npm-debug.log*
+
+# --- Прочее ---
+.DS_Store
+Thumbs.db
+tools/input/
+
+# TypeScript incremental build
+*.tsbuildinfo
