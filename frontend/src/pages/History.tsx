@@ -5,6 +5,7 @@ import {
 } from 'recharts'
 import * as api from '../api'
 import { Icon } from '../components/Icon'
+import { Summary } from '../components/Summary'
 import type { IconName } from '../components/Icon'
 import type { Measurement, Stats } from '../types'
 import type { RiskLevel } from '../types'
@@ -33,19 +34,6 @@ function humanDate(iso: string): string {
 function humanTime(iso: string): string {
   const d = new Date(iso.replace(' ', 'T'))
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function summaryOf(m: Measurement): string {
-  const parts: string[] = []
-  if (m.systolic != null) parts.push(`${m.systolic}/${m.diastolic ?? '—'}`)
-  if (m.pulse != null) parts.push(`❤ ${m.pulse}`)
-  if (m.temperature != null) parts.push(`🌡 ${m.temperature}°`)
-  if (m.spo2 != null) parts.push(`💨 ${m.spo2}%`)
-  if (m.weight_kg != null) parts.push(`⚖ ${m.weight_kg} кг`)
-  if (m.sleep_hours != null) parts.push(`😴 ${m.sleep_hours} ч`)
-  if (m.steps != null) parts.push(`👟 ${m.steps}`)
-  if (m.water_ml != null) parts.push(`💧 ${m.water_ml}`)
-  return parts.join('  ·  ')
 }
 
 function Chart({ title, subtitle, icon, data, series }: {
@@ -110,7 +98,6 @@ export default function History() {
     return items.filter((m) => {
       const haystack = [
         m.recorded_at,
-        summaryOf(m),
         m.analysis?.risk_level ?? '',
         String(m.systolic ?? ''), String(m.diastolic ?? ''), String(m.pulse ?? ''),
         String(m.temperature ?? ''), String(m.spo2 ?? ''), String(m.weight_kg ?? ''),
@@ -179,7 +166,7 @@ export default function History() {
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={3} className="text-center text-sm text-teal-dark/60 py-8">
-                    {query ? `Ничего не найдено по «${query}»` : 'Замеров пока нет — сделайте первый во вкладке «Замер» 🩺'}
+                    {query ? `Ничего не найдено по «${query}»` : (<span className="inline-flex items-center gap-1">Замеров пока нет — сделайте первый во вкладке «Замер» <Icon name="stethoscope" size={14} /></span>)}
                   </td>
                 </tr>
               )}
@@ -192,7 +179,7 @@ export default function History() {
                       </span>
                       <div className="min-w-0">
                         <div className="font-extrabold">{humanDate(m.recorded_at)}</div>
-                        <div className="text-xs text-teal-dark/60 truncate max-w-[420px]">{summaryOf(m)}</div>
+                        <div className="text-xs text-teal-dark/60 truncate max-w-[420px]"><Summary m={m} /></div>
                       </div>
                     </div>
                   </td>
@@ -218,7 +205,7 @@ export default function History() {
                         setItems((prev) => prev.filter((x) => x.id !== m.id))
                       }}
                     >
-                      🗑
+                      <Icon name="trash" size={14} />
                     </button>
                   </td>
                 </tr>

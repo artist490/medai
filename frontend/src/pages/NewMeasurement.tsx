@@ -90,7 +90,7 @@ export default function NewMeasurement() {
     <div className="flex flex-col gap-5">
       <div className="mb-1">
         <div className="eyebrow">Новые данные</div>
-        <h1 className="text-4xl mt-1.5" style={{ fontSize: 36 }}>Новый замер 🩺</h1>
+        <h1 className="text-4xl mt-1.5" style={{ fontSize: 36 }}>Новый замер <Icon name="stethoscope" size={26} className="inline-block align-[-4px]" /></h1>
         <p className="text-sm text-teal-dark/60 mt-1.5">
           Заполните только то, что измерили — остальное можно пропустить.
         </p>
@@ -144,7 +144,7 @@ export default function NewMeasurement() {
         )}
 
         <button className="btn btn-gold w-full text-base" disabled={busy || !hasAnyValue(form)}>
-          {busy ? 'ИИ анализирует…' : 'Проанализировать ✨'}
+          {busy ? 'ИИ анализирует…' : (<span className="inline-flex items-center gap-2">Проанализировать <Icon name="sparkle" size={16} /></span>)}
         </button>
       </form>
     </div>

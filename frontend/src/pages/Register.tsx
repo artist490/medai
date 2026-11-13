@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as api from '../api'
 import { useAuth } from '../auth'
+import { Icon } from '../components/Icon'
 import { brand } from '../brand'
 
 export default function Register() {
@@ -39,7 +40,7 @@ export default function Register() {
         onSubmit={submit}
         className="w-full max-w-sm bg-white rounded-xl p-6 glow-teal flex flex-col gap-4"
       >
-        <h1 className="text-2xl text-center">Регистрация ✨</h1>
+        <h1 className="text-2xl text-center">Регистрация <Icon name="sparkle" size={20} className="inline-block align-[-3px]" /></h1>
 
         {error && (
           <div className="badge badge-red justify-center normal-case tracking-normal">
@@ -99,7 +100,7 @@ export default function Register() {
         </div>
 
         <button className="btn btn-gold w-full" disabled={busy}>
-          {busy ? 'Создаём…' : 'Создать аккаунт 🎉'}
+          {busy ? 'Создаём…' : (<span className="inline-flex items-center gap-2">Создать аккаунт <Icon name="party" size={16} /></span>)}
         </button>
 
         <p className="text-center text-sm text-teal-dark/70">

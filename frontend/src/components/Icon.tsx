@@ -16,6 +16,22 @@ import steps from '../assets/icons/steps.png'
 import water from '../assets/icons/water.png'
 import robot from '../assets/icons/robot.png'
 import warning from '../assets/icons/warning.png'
+import cross from '../assets/icons/cross.png'
+import check from '../assets/icons/check.png'
+import alarm from '../assets/icons/alarm.png'
+import trash from '../assets/icons/trash.png'
+import bulb from '../assets/icons/bulb.png'
+import run from '../assets/icons/run.png'
+import salad from '../assets/icons/salad.png'
+import clock from '../assets/icons/clock.png'
+import lock from '../assets/icons/lock.png'
+import wave from '../assets/icons/wave.png'
+import rocket from '../assets/icons/rocket.png'
+import sparkle from '../assets/icons/sparkle.png'
+import party from '../assets/icons/party.png'
+import male from '../assets/icons/male.png'
+import female from '../assets/icons/female.png'
+import care from '../assets/icons/care.png'
 
 export type IconName =
   | 'home' | 'stethoscope' | 'chart' | 'profile'
@@ -23,6 +39,10 @@ export type IconName =
   | 'pressure' | 'pulse' | 'temperature' | 'lungs'
   | 'scale' | 'sleep' | 'steps' | 'water'
   | 'robot' | 'warning'
+  | 'cross' | 'check' | 'alarm' | 'trash'
+  | 'bulb' | 'run' | 'salad' | 'clock'
+  | 'lock' | 'wave' | 'rocket' | 'sparkle'
+  | 'party' | 'male' | 'female' | 'care'
 
 const sources: Record<IconName, string> = {
   home, stethoscope, chart, profile,
@@ -30,6 +50,10 @@ const sources: Record<IconName, string> = {
   pressure, pulse, temperature, lungs,
   scale, sleep, steps, water,
   robot, warning,
+  cross, check, alarm, trash,
+  bulb, run, salad, clock,
+  lock, wave, rocket, sparkle,
+  party, male, female, care,
 }
 
 export function Icon({ name, size = 20, className }: {

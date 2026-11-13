@@ -6,6 +6,7 @@ import IndicatorCard from '../components/IndicatorCard'
 import Disclaimer from '../components/Disclaimer'
 import Confetti from '../components/Confetti'
 import { Icon } from '../components/Icon'
+import type { IconName } from '../components/Icon'
 import { brand } from '../brand'
 import type { Measurement } from '../types'
 
@@ -23,7 +24,7 @@ export default function Result() {
   if (error) {
     return (
       <div className="bg-white rounded-xl p-8 text-center glow-coral">
-        <div className="text-4xl mb-2" aria-hidden>🤔</div>
+        <div className="mb-2" aria-hidden><Icon name="help" size={40} /></div>
         <p className="font-bold text-coral-dark mb-4">{error}</p>
         <Link to="/" className="btn btn-teal">На главную</Link>
       </div>
@@ -111,7 +112,7 @@ export default function Result() {
               <ul className="flex flex-col gap-2">
                 {a.llm_items!.map((item, i) => (
                   <li key={i} className="flex gap-2 text-sm text-teal-dark/90">
-                    <span className="emoji-box !w-6 !h-6 text-xs" aria-hidden>{['💡', '🏃', '💧', '🥗', '😴', '⏰'][i % 6]}</span>
+                    <span className="emoji-box !w-6 !h-6" aria-hidden><Icon name={(['bulb', 'run', 'water', 'salad', 'sleep', 'clock'] as IconName[])[i % 6]} size={12} /></span>
                     {item}
                   </li>
                 ))}
@@ -121,13 +122,13 @@ export default function Result() {
         ) : (
           <div className="flex flex-col gap-3">
             <div className="badge badge-sky normal-case tracking-normal w-fit">
-              🔒 ИИ-текст недоступен — показаны рекомендации на основе медицинских норм
+              <Icon name="lock" size={12} className="inline-block align-[-1px] mr-1" />ИИ-текст недоступен — показаны рекомендации на основе медицинских норм
             </div>
             <div className="bg-white rounded-xl p-4 glow-soft">
               <ul className="flex flex-col gap-2">
                 {a.recommendations.map((rec, i) => (
                   <li key={i} className="flex gap-2 text-sm text-teal-dark/90">
-                    <span className="emoji-box !w-6 !h-6 text-xs" aria-hidden>{['💡', '🏃', '💧', '🥗', '😴', '⏰'][i % 6]}</span>
+                    <span className="emoji-box !w-6 !h-6" aria-hidden><Icon name={(['bulb', 'run', 'water', 'salad', 'sleep', 'clock'] as IconName[])[i % 6]} size={12} /></span>
                     {rec}
                   </li>
                 ))}

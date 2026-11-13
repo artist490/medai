@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as api from '../api'
 import { useAuth } from '../auth'
+import { Icon } from '../components/Icon'
 import { brand } from '../brand'
 
 export default function Login() {
@@ -38,7 +39,7 @@ export default function Login() {
         onSubmit={submit}
         className="w-full max-w-sm bg-white rounded-xl p-6 glow-teal flex flex-col gap-4"
       >
-        <h1 className="text-2xl text-center">Вход 👋</h1>
+        <h1 className="text-2xl text-center">Вход <Icon name="wave" size={22} className="inline-block align-[-3px]" /></h1>
 
         {error && (
           <div className="badge badge-red justify-center normal-case tracking-normal">
@@ -73,7 +74,7 @@ export default function Login() {
         </div>
 
         <button className="btn btn-gold w-full" disabled={busy}>
-          {busy ? 'Входим…' : 'Войти 🚀'}
+          {busy ? 'Входим…' : (<span className="inline-flex items-center gap-2">Войти <Icon name="rocket" size={16} /></span>)}
         </button>
 
         <p className="text-center text-sm text-teal-dark/70">

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import * as api from '../api'
 import IndicatorCard from '../components/IndicatorCard'
+import { Summary } from '../components/Summary'
 import RiskBadge from '../components/RiskBadge'
 import { Icon } from '../components/Icon'
 import type { Measurement, User, DoctorNote } from '../types'
@@ -22,19 +23,6 @@ const riskLabels = {
 function shortDate(iso: string): string {
   const d = new Date(iso.replace(' ', 'T'))
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function summaryOf(m: Measurement): string {
-  const parts: string[] = []
-  if (m.systolic != null) parts.push(`${m.systolic}/${m.diastolic ?? '—'}`)
-  if (m.pulse != null) parts.push(`❤ ${m.pulse}`)
-  if (m.temperature != null) parts.push(`🌡 ${m.temperature}°`)
-  if (m.spo2 != null) parts.push(`💨 ${m.spo2}%`)
-  if (m.weight_kg != null) parts.push(`⚖ ${m.weight_kg} кг`)
-  if (m.sleep_hours != null) parts.push(`😴 ${m.sleep_hours} ч`)
-  if (m.steps != null) parts.push(`👟 ${m.steps}`)
-  if (m.water_ml != null) parts.push(`💧 ${m.water_ml}`)
-  return parts.join('  ·  ')
 }
 
 function sexLabel(sex: User['sex']): string {
@@ -167,7 +155,7 @@ export default function DoctorPatient() {
                       </span>
                       <div className="min-w-0">
                         <div className="font-extrabold">{shortDate(m.recorded_at)}</div>
-                        <div className="text-xs text-teal-dark/60 truncate max-w-[420px]">{summaryOf(m)}</div>
+                        <div className="text-xs text-teal-dark/60 truncate max-w-[420px]"><Summary m={m} /></div>
                       </div>
                     </div>
                   </td>

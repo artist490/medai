@@ -5,6 +5,7 @@ import * as api from '../api'
 import type { Finding, Measurement, Stats } from '../types'
 import type { RiskLevel, Status } from '../types'
 import { Icon } from '../components/Icon'
+import { Summary } from '../components/Summary'
 import type { IconName } from '../components/Icon'
 
 // Цвета риска / статуса (Flip7-палитра)
@@ -76,20 +77,6 @@ function humanDate(iso: string): string {
 function humanTime(iso: string): string {
   const d = new Date(iso.replace(' ', 'T'))
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-// Краткое описание замера для таблицы
-function summaryOf(m: Measurement): string {
-  const parts: string[] = []
-  if (m.systolic != null) parts.push(`${m.systolic}/${m.diastolic ?? '—'}`)
-  if (m.pulse != null) parts.push(`❤ ${m.pulse}`)
-  if (m.temperature != null) parts.push(`🌡 ${m.temperature}°`)
-  if (m.spo2 != null) parts.push(`💨 ${m.spo2}%`)
-  if (m.weight_kg != null) parts.push(`⚖ ${m.weight_kg} кг`)
-  if (m.sleep_hours != null) parts.push(`😴 ${m.sleep_hours} ч`)
-  if (m.steps != null) parts.push(`👟 ${m.steps}`)
-  if (m.water_ml != null) parts.push(`💧 ${m.water_ml}`)
-  return parts.join('  ·  ')
 }
 
 export default function Dashboard() {
@@ -216,7 +203,7 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full grid place-items-center text-sm text-teal-dark/50 font-bold">
-                    Нужно минимум 2 замера с давлением 📈
+                    Нужно минимум 2 замера с давлением <Icon name="chart" size={14} className="inline-block align-[-2px]" />
                   </div>
                 )}
               </div>
@@ -286,7 +273,7 @@ export default function Dashboard() {
                           </span>
                           <div className="min-w-0">
                             <div className="font-extrabold">{humanDate(m.recorded_at)}</div>
-                            <div className="text-xs text-teal-dark/60 truncate max-w-[420px]">{summaryOf(m)}</div>
+                            <div className="text-xs text-teal-dark/60 truncate max-w-[420px]"><Summary m={m} /></div>
                           </div>
                         </div>
                       </td>
@@ -311,7 +298,7 @@ export default function Dashboard() {
           </section>
 
       <p className="text-[10px] font-extrabold uppercase tracking-[2px] text-teal-dark/35 text-center">
-        ⚕️ Спектр-Диагностика не ставит диагнозы — при тревожных показателях обратитесь к врачу, при критических 103
+        <Icon name="cross" size={12} className="inline-block align-[-1px] mr-1" />Спектр-Диагностика не ставит диагнозы — при тревожных показателях обратитесь к врачу, при критических 103
       </p>
         </>
       ) : (

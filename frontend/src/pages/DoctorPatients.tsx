@@ -162,9 +162,9 @@ export default function DoctorPatients() {
                         ) : '—'}
                       </td>
                       <td className="text-xs text-teal-dark/70 whitespace-nowrap">
-                        <span className="mr-2">✅ {p.counts.green}</span>
-                        <span className="mr-2">⚠️ {p.counts.yellow}</span>
-                        <span>🚨 {p.counts.red}</span>
+                        <span className="mr-2 inline-flex items-center gap-1"><Icon name="check" size={12} />{p.counts.green}</span>
+                        <span className="mr-2 inline-flex items-center gap-1"><Icon name="warning" size={12} />{p.counts.yellow}</span>
+                        <span className="inline-flex items-center gap-1"><Icon name="alarm" size={12} />{p.counts.red}</span>
                       </td>
                       <td className="!text-right">
                         <Link
@@ -182,7 +182,7 @@ export default function DoctorPatients() {
           </section>
 
           <p className="text-[10px] font-extrabold uppercase tracking-[2px] text-teal-dark/35 text-center">
-            ⚕️ Данные пациентов конфиденциальны — доступ только у врачей {brand.name}
+            <Icon name="cross" size={12} className="inline-block align-[-1px] mr-1" />Данные пациентов конфиденциальны — доступ только у врачей {brand.name}
           </p>
         </>
       )}

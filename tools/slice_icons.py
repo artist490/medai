@@ -17,18 +17,20 @@ OUT_DIR = Path(sys.argv[2])
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Имена в порядке чтения сетки: строка за строкой, слева направо
+# Сетка 2 (замена эмодзи): 4x4, от Recraft «emoji replacements»
 NAMES = [
-    "home", "stethoscope", "chart", "profile",        # ряд 1
-    "search", "bell", "help",                          # ряд 2
-    "pressure", "pulse", "temperature", "lungs",       # ряд 3
-    "scale", "sleep", "steps",                         # ряд 4
-    "water", "robot", "warning",                       # ряд 5
+    "cross", "check", "alarm", "trash",                # ряд 1
+    "bulb", "run", "salad", "clock",                   # ряд 2
+    "lock", "wave", "rocket", "sparkle",               # ряд 3
+    "party", "male", "female", "care",                 # ряд 4
 ]
 
-MERGE_GAP = 26      # расстояние слияния компонентов одной иконки, px
-ROW_GAP = 115       # порог разбиения на ряды по Y, px
+MERGE_GAP = 60      # расстояние слияния компонентов одной иконки, px
+ROW_GAP = 115       # порог разбиения на ряды по Y, px (без полос)
 MIN_SIZE = 36       # отсев мелкого шума
 PAD = 6             # поля кропа
+BANDS = 4           # число рядов в сетке: компоненты сливаются только внутри полосы
+                    # (0 — авто-разбиение по ROW_GAP, как раньше)
 
 
 def main():
@@ -62,39 +64,69 @@ def main():
         return not (b1[2] + gap < b2[0] or b2[2] + gap < b1[0]
                     or b1[3] + gap < b2[1] or b2[3] + gap < b1[1])
 
-    changed = True
-    while changed:
-        changed = False
-        merged = []
-        while boxes:
-            b = boxes.pop()
-            for i, m in enumerate(merged):
-                if overlaps(b, m):
-                    merged[i] = [min(b[0], m[0]), min(b[1], m[1]),
-                                 max(b[2], m[2]), max(b[3], m[3])]
-                    changed = True
-                    break
-            else:
-                merged.append(b)
-        boxes = merged
+    if BANDS > 1:
+        # Сетка с фиксированным числом рядов: компоненты группируются
+        # по горизонтальной полосе, слияние — только внутри полосы.
+        # Порядок: полосы сверху вниз, внутри полосы — слева направо.
+        band_h = h / BANDS
+        bands: list[list] = [[] for _ in range(BANDS)]
+        for b in boxes:
+            cy = (b[1] + b[3]) / 2
+            bands[min(BANDS - 1, int(cy / band_h))].append(b)
+        ordered = []
+        for bi, band in enumerate(bands):
+            changed = True
+            while changed:
+                changed = False
+                next_round = []
+                while band:
+                    b = band.pop()
+                    for i, m in enumerate(next_round):
+                        if overlaps(b, m):
+                            next_round[i] = [min(b[0], m[0]), min(b[1], m[1]),
+                                             max(b[2], m[2]), max(b[3], m[3])]
+                            changed = True
+                            break
+                    else:
+                        next_round.append(b)
+                band = next_round
+            bands[bi] = [b for b in band if (b[2] - b[0]) >= MIN_SIZE and (b[3] - b[1]) >= MIN_SIZE]
+            ordered.extend(sorted(bands[bi], key=lambda b: b[0]))
+        boxes = [b for band in bands for b in band]
+    else:
+        changed = True
+        while changed:
+            changed = False
+            merged = []
+            while boxes:
+                b = boxes.pop()
+                for i, m in enumerate(merged):
+                    if overlaps(b, m):
+                        merged[i] = [min(b[0], m[0]), min(b[1], m[1]),
+                                     max(b[2], m[2]), max(b[3], m[3])]
+                        changed = True
+                        break
+                else:
+                    merged.append(b)
+            boxes = merged
 
-    boxes = [b for b in boxes if (b[2] - b[0]) >= MIN_SIZE and (b[3] - b[1]) >= MIN_SIZE]
+        boxes = [b for b in boxes if (b[2] - b[0]) >= MIN_SIZE and (b[3] - b[1]) >= MIN_SIZE]
 
-    # Группировка в ряды по Y, сортировка по X
-    boxes.sort(key=lambda b: (b[1] + b[3]) / 2)
-    rows, current = [], [boxes[0]]
-    for b in boxes[1:]:
-        if (b[1] + b[3]) / 2 - (current[-1][1] + current[-1][3]) / 2 > ROW_GAP:
-            rows.append(current)
-            current = []
-        current.append(b)
-    rows.append(current)
+        # Группировка в ряды по Y, сортировка по X
+        boxes.sort(key=lambda b: (b[1] + b[3]) / 2)
+        rows, current = [], [boxes[0]]
+        for b in boxes[1:]:
+            if (b[1] + b[3]) / 2 - (current[-1][1] + current[-1][3]) / 2 > ROW_GAP:
+                rows.append(current)
+                current = []
+            current.append(b)
+        rows.append(current)
 
-    ordered = []
-    for row in rows:
-        ordered.extend(sorted(row, key=lambda b: b[0]))
+        ordered = []
+        for row in rows:
+            ordered.extend(sorted(row, key=lambda b: b[0]))
 
-    print(f"Компонентов после слияния: {len(boxes)}; ожидается {len(NAMES)}")
+    print(f"Компонентов после слияния: {len(ordered)}; ожидается {len(NAMES)}")
     if len(ordered) != len(NAMES):
         for i, b in enumerate(ordered):
             print(i, b)

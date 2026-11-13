@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react'
 import { useAuth } from '../auth'
 import * as api from '../api'
+import { Icon } from '../components/Icon'
 
 // Профиль: имя, возраст, пол, рост — нужны движку правил для норм и ИМТ.
 export default function Profile() {
@@ -38,7 +39,7 @@ export default function Profile() {
     <div className="flex flex-col gap-5">
       <div className="mb-1">
         <div className="eyebrow">Настройки аккаунта</div>
-        <h1 className="text-4xl mt-1.5" style={{ fontSize: 36 }}>Профиль 👤</h1>
+        <h1 className="text-4xl mt-1.5" style={{ fontSize: 36 }}>Профиль <Icon name="profile" size={26} className="inline-block align-[-4px]" /></h1>
       </div>
 
       <form onSubmit={submit} className="bg-white rounded-xl p-6 glow-soft flex flex-col gap-4 max-w-md">
@@ -64,14 +65,17 @@ export default function Profile() {
         <div>
           <label className="flip-label">Пол</label>
           <div className="flex gap-2">
-            {([['male', '👨 Мужской'], ['female', '👩 Женский']] as const).map(([value, label]) => (
+            {(['male', 'female'] as const).map((value) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setSex(value)}
                 className={`btn btn-sm flex-1 ${sex === value ? 'btn-teal' : 'btn-ghost'}`}
               >
-                {label}
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <Icon name={value} size={14} />
+                  {value === 'male' ? 'Мужской' : 'Женский'}
+                </span>
               </button>
             ))}
           </div>
@@ -82,7 +86,7 @@ export default function Profile() {
         </div>
 
         {error && <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>}
-        {saved && <div className="badge badge-green normal-case tracking-normal w-fit">✅ Сохранено</div>}
+        {saved && <div className="badge badge-green normal-case tracking-normal w-fit"><Icon name="check" size={12} className="inline-block align-[-1px] mr-1" />Сохранено</div>}
 
         <button className="btn btn-gold" disabled={busy}>
           {busy ? 'Сохраняем…' : 'Сохранить'}
