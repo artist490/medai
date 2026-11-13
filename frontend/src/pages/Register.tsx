@@ -2,11 +2,13 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as api from '../api'
 import { useAuth } from '../auth'
+import { brand } from '../brand'
 
 export default function Register() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
@@ -17,7 +19,7 @@ export default function Register() {
     setError('')
     setBusy(true)
     try {
-      const user = await api.register(email.trim(), password, name.trim())
+      const user = await api.register(email.trim(), password, name.trim(), inviteCode.trim() || undefined)
       setUser(user)
       navigate('/')
     } catch (err) {
@@ -30,10 +32,7 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4 py-10">
       <div className="text-center mb-8">
-        <div className="wordmark" style={{ fontSize: 42 }}>
-          Med<span className="text-gold-dark">AI</span>
-        </div>
-        <div className="wordmark-sub">Показатели под контролем</div>
+        <img src={brand.logo} alt={brand.name} style={{ maxWidth: 340, width: '100%' }} />
       </div>
 
       <form
@@ -86,6 +85,19 @@ export default function Register() {
           />
         </div>
 
+        <div>
+          <label className="flip-label" htmlFor="invite">Код приглашения (для сотрудников)</label>
+          <input
+            id="invite"
+            type="text"
+            className="flip-input"
+            placeholder="Выдаёт администратор клиники"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value)}
+          />
+          <div className="flip-hint">Есть у врачей клиники — превращает аккаунт в кабинет врача.</div>
+        </div>
+
         <button className="btn btn-gold w-full" disabled={busy}>
           {busy ? 'Создаём…' : 'Создать аккаунт 🎉'}
         </button>
@@ -97,6 +109,10 @@ export default function Register() {
           </Link>
         </p>
       </form>
+
+      <p className="text-center text-xs text-teal-dark/50 font-bold mt-4">
+        {brand.name} · {brand.site} · не заменяет консультацию врача
+      </p>
     </div>
   )
 }

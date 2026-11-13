@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as api from '../api'
 import { useAuth } from '../auth'
+import { brand } from '../brand'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -28,12 +29,9 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4 py-10">
-      {/* Hero: вордмарк в стиле Flip7 SaaS */}
+      {/* Hero: логотип клиники */}
       <div className="text-center mb-8">
-        <div className="wordmark" style={{ fontSize: 42 }}>
-          Med<span className="text-gold-dark">AI</span>
-        </div>
-        <div className="wordmark-sub">Показатели под контролем</div>
+        <img src={brand.logo} alt={brand.name} style={{ maxWidth: 340, width: '100%' }} />
       </div>
 
       <form
@@ -85,6 +83,10 @@ export default function Login() {
           </Link>
         </p>
       </form>
+
+      <p className="text-center text-xs text-teal-dark/50 font-bold mt-4">
+        {brand.name} · {brand.site} · не заменяет консультацию врача
+      </p>
     </div>
   )
 }

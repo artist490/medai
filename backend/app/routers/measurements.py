@@ -26,10 +26,10 @@ def _parse_llm_text(raw: Optional[str]) -> tuple[Optional[str], Optional[list]]:
 
 
 def analysis_payload(row: sqlite3.Row, id_key: str = "id", mid_key: str = "measurement_id",
-                     created_key: str = "created_at") -> dict:
+                     created_key: str = "created_at", notes: Optional[list] = None) -> dict:
     """Собирает analysis из строки analyses или из joined-строки списка."""
     llm_summary, llm_items = _parse_llm_text(row["llm_text"])
-    return {
+    payload = {
         "id": row[id_key],
         "measurement_id": row[mid_key],
         "created_at": row[created_key],
@@ -41,6 +41,29 @@ def analysis_payload(row: sqlite3.Row, id_key: str = "id", mid_key: str = "measu
         "llm_items": llm_items,
         "bmi": row["bmi"],
     }
+    if notes is not None:
+        payload["notes"] = notes
+    return payload
+
+
+def _notes_map(db: sqlite3.Connection, user_id: int) -> dict[int, list[dict]]:
+    """Комментарии врачей по всем анализам пользователя: {analysis_id: [note]}."""
+    rows = db.execute(
+        """
+        SELECT n.id, n.analysis_id, n.doctor_name, n.text, n.created_at
+        FROM doctor_notes n
+        JOIN analyses a ON a.id = n.analysis_id
+        WHERE a.user_id = ?
+        ORDER BY n.id
+        """,
+        (user_id,),
+    ).fetchall()
+    grouped: dict[int, list[dict]] = {}
+    for r in rows:
+        grouped.setdefault(r["analysis_id"], []).append(
+            {k: r[k] for k in ("id", "doctor_name", "text", "created_at")}
+        )
+    return grouped
 
 
 def measurement_payload(m: sqlite3.Row, analysis: Optional[dict]) -> dict:
@@ -103,6 +126,7 @@ def create_measurement(
     analysis = db.execute(
         "SELECT * FROM analyses WHERE measurement_id = ?", (measurement_id,)
     ).fetchone()
+    db.commit()  # см. комментарий в routers/auth.py register
     return measurement_payload(measurement, analysis)
 
 
@@ -129,11 +153,13 @@ def list_measurements(
         "SELECT COUNT(*) AS c FROM measurements WHERE user_id = ?", (user["id"],)
     ).fetchone()["c"]
 
+    notes = _notes_map(db, user["id"])
     items = []
     for row in rows:
         analysis = None
         if row["a_id"] is not None:
-            analysis = analysis_payload(row, id_key="a_id", mid_key="a_mid", created_key="a_created")
+            analysis = analysis_payload(row, id_key="a_id", mid_key="a_mid", created_key="a_created",
+                                        notes=notes.get(row["a_id"], []))
         items.append(measurement_payload(row, analysis))
     return {"items": items, "total": total}
 
@@ -153,7 +179,10 @@ def get_measurement(
     analysis_row = db.execute(
         "SELECT * FROM analyses WHERE measurement_id = ?", (measurement_id,)
     ).fetchone()
-    analysis = analysis_payload(analysis_row) if analysis_row is not None else None
+    analysis = None
+    if analysis_row is not None:
+        notes = _notes_map(db, user["id"])
+        analysis = analysis_payload(analysis_row, notes=notes.get(analysis_row["id"], []))
     return measurement_payload(m, analysis)
 
 
@@ -169,4 +198,5 @@ def delete_measurement(
     )
     if cursor.rowcount == 0:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Измерение не найдено")
+    db.commit()  # см. комментарий в routers/auth.py register
     return None

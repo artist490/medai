@@ -32,11 +32,12 @@ def stats(
         LEFT JOIN analyses a ON a.measurement_id = m.id
         JOIN users u ON u.id = m.user_id
         WHERE m.user_id = ?
-        ORDER BY m.recorded_at ASC, m.id ASC
+        ORDER BY m.recorded_at DESC, m.id DESC
         LIMIT ?
         """,
         (user["id"], limit),
     ).fetchall()
+    rows = list(reversed(rows))  # БД отдаёт последние N — разворачиваем для графика
 
     points = []
     bmi_points = []

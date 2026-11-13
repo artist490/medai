@@ -3,6 +3,8 @@
 export type RiskLevel = 'green' | 'yellow' | 'red'
 export type Status = 'ok' | 'warn' | 'alarm'
 
+export type Role = 'patient' | 'doctor'
+
 export interface User {
   id: number
   email: string
@@ -10,6 +12,7 @@ export interface User {
   age: number | null
   sex: 'male' | 'female' | null
   height_cm: number | null
+  role: Role
 }
 
 export interface Finding {
@@ -20,6 +23,13 @@ export interface Finding {
   status: Status
   message: string
   norm: string
+}
+
+export interface DoctorNote {
+  id: number
+  doctor_name: string
+  text: string
+  created_at: string
 }
 
 export interface Analysis {
@@ -33,6 +43,7 @@ export interface Analysis {
   llm_summary: string | null
   llm_items: string[] | null
   bmi: number | null
+  notes?: DoctorNote[]
 }
 
 export interface Measurement {
@@ -53,4 +64,20 @@ export interface Measurement {
 export interface Stats {
   points: Array<{ recorded_at: string } & Partial<Record<string, number>>>
   bmi_points: Array<{ recorded_at: string; bmi: number }>
+}
+
+// Пациент в списке врача
+export interface PatientRow {
+  id: number
+  email: string
+  name: string
+  age: number | null
+  sex: 'male' | 'female' | null
+  height_cm: number | null
+  created_at: string
+  last_measurement_at: string | null
+  last_risk: RiskLevel | null
+  requires_attention: boolean
+  counts: { green: number; yellow: number; red: number }
+  total: number
 }

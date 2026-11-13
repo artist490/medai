@@ -14,7 +14,15 @@ CREATE TABLE IF NOT EXISTS users (
     age           INTEGER,
     sex           TEXT CHECK (sex IN ('male', 'female') OR sex IS NULL),
     height_cm     REAL,
+    role          TEXT NOT NULL DEFAULT 'patient' CHECK (role IN ('patient', 'doctor')),
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS invite_codes (
+    code       TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    used_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    used_at    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -54,7 +62,23 @@ CREATE TABLE IF NOT EXISTS analyses (
     llm_text       TEXT,                            -- текстовые рекомендации LLM (или NULL)
     bmi            REAL
 );
+
+CREATE TABLE IF NOT EXISTS doctor_notes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id INTEGER NOT NULL REFERENCES analyses(id) ON DELETE CASCADE,
+    doctor_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    doctor_name TEXT NOT NULL DEFAULT '',
+    text        TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
 """
+
+
+def _migrate(db: sqlite3.Connection) -> None:
+    """Лёгкие миграции для БД, созданных до версии для клиники."""
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
+    if "role" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'patient'")
 
 
 def connect() -> sqlite3.Connection:
@@ -89,3 +113,4 @@ def init_db() -> None:
     config.DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with db_session() as db:
         db.executescript(SCHEMA)
+        _migrate(db)

@@ -72,3 +72,12 @@ def get_current_user(
     if row is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Сессия недействительна")
     return row
+
+
+def get_current_doctor(
+    user: sqlite3.Row = Depends(get_current_user),
+) -> sqlite3.Row:
+    """Зависимость FastAPI: только пользователь с ролью doctor."""
+    if user["role"] != "doctor":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Доступ только для врачей")
+    return user

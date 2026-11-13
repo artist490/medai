@@ -8,6 +8,7 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
     name: str = Field(default="", max_length=64)
+    invite_code: Optional[str] = Field(default=None, max_length=64)  # код приглашения для врачей
 
 
 class LoginIn(BaseModel):
@@ -34,3 +35,8 @@ class MeasurementIn(BaseModel):
     water_ml: Optional[int] = Field(default=None, ge=0, le=10000)
     weight_kg: Optional[float] = Field(default=None, ge=20, le=400)
     recorded_at: Optional[str] = None  # ISO-строка; по умолчанию — сейчас
+
+
+class NoteIn(BaseModel):
+    """Комментарий врача к анализу."""
+    text: str = Field(min_length=1, max_length=1000)

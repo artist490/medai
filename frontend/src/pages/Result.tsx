@@ -6,6 +6,7 @@ import IndicatorCard from '../components/IndicatorCard'
 import Disclaimer from '../components/Disclaimer'
 import Confetti from '../components/Confetti'
 import { Icon } from '../components/Icon'
+import { brand } from '../brand'
 import type { Measurement } from '../types'
 
 export default function Result() {
@@ -57,8 +58,9 @@ export default function Result() {
             <Icon name="warning" size={20} /> Обратитесь к врачу
           </div>
           <p className="text-sm text-teal-dark/85">
-            Есть тревожные показатели. Не ждите ухудшения — запишитесь к терапевту,
-            при критических значениях вызывайте 103.
+            Есть тревожные показатели. Не ждите ухудшения — запишитесь к терапевту
+            или позвоните в клинику: <span className="font-extrabold">{brand.phone}</span>.
+            При критических значениях вызывайте 103.
           </p>
         </div>
       )}
@@ -74,6 +76,25 @@ export default function Result() {
           ))}
         </div>
       </section>
+
+      {/* Комментарий врача (если оставил в кабинете) */}
+      {a.notes && a.notes.length > 0 && (
+        <section>
+          <div className="section-title mb-3">
+            <span className="emoji-box"><Icon name="stethoscope" size={20} /></span> Комментарий врача
+          </div>
+          <div className="flex flex-col gap-2">
+            {a.notes.map((n) => (
+              <div key={n.id} className="flip-card flip-card--gold">
+                <div className="text-xs font-extrabold text-teal-dark/60">
+                  {n.doctor_name} · {n.created_at.slice(0, 16)}
+                </div>
+                <p className="text-sm text-teal-dark/90 mt-1">{n.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ИИ-блок: текст от LLM или честный fallback */}
       <section>

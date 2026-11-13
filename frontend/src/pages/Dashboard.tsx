@@ -310,9 +310,9 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <p className="text-[10px] font-extrabold uppercase tracking-[2px] text-teal-dark/35 text-center">
-            ⚕️ MedAI не ставит диагнозы — при тревожных показателях обратитесь к врачу, при критических 103
-          </p>
+      <p className="text-[10px] font-extrabold uppercase tracking-[2px] text-teal-dark/35 text-center">
+        ⚕️ Спектр-Диагностика не ставит диагнозы — при тревожных показателях обратитесь к врачу, при критических 103
+      </p>
         </>
       ) : (
         <div className="bg-white rounded-[20px] p-10 text-center" style={{ boxShadow: '0 6px 24px rgba(23,46,42,.06)' }}>

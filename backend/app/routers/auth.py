@@ -19,6 +19,7 @@ def user_payload(user: sqlite3.Row) -> dict:
         "age": user["age"],
         "sex": user["sex"],
         "height_cm": user["height_cm"],
+        "role": user["role"],
     }
 
 
@@ -27,12 +28,35 @@ def register(data: RegisterIn, db: sqlite3.Connection = Depends(get_db)):
     exists = db.execute("SELECT id FROM users WHERE email = ?", (data.email.lower(),)).fetchone()
     if exists:
         raise HTTPException(status.HTTP_409_CONFLICT, "Пользователь с таким email уже есть")
+
+    # Врачом можно стать только по одноразовому коду приглашения клиники
+    role = "patient"
+    invite = None
+    if data.invite_code:
+        code = data.invite_code.strip()
+        invite = db.execute("SELECT * FROM invite_codes WHERE code = ?", (code,)).fetchone()
+        if invite is None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Код приглашения не найден")
+        if invite["used_by"] is not None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Код приглашения уже использован")
+        role = "doctor"
+
     cursor = db.execute(
-        "INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)",
-        (data.email.lower(), auth.hash_password(data.password), data.name.strip()),
+        "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+        (data.email.lower(), auth.hash_password(data.password), data.name.strip(), role),
     )
     user_id = cursor.lastrowid
+
+    if invite is not None:
+        db.execute(
+            "UPDATE invite_codes SET used_by = ?, used_at = datetime('now', 'localtime') WHERE code = ?",
+            (user_id, invite["code"]),
+        )
+
     token = auth.create_session(db, user_id)
+    # Коммит до отправки ответа: teardown-коммит yield-зависимости выполняется
+    # после ответа, и клиент успевает сделать следующий запрос без этих данных
+    db.commit()
     user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     return {"token": token, "user": user_payload(user)}
 
@@ -43,6 +67,7 @@ def login(data: LoginIn, db: sqlite3.Connection = Depends(get_db)):
     if user is None or not auth.verify_password(data.password, user["password_hash"]):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный email или пароль")
     token = auth.create_session(db, user["id"])
+    db.commit()  # см. комментарий в register
     return {"token": token, "user": user_payload(user)}
 
 
@@ -69,5 +94,6 @@ def update_me(
         return user_payload(user)
     sets = ", ".join(f"{k} = ?" for k in updates)
     db.execute(f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), user["id"]))
+    db.commit()  # см. комментарий в register
     fresh = db.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
     return user_payload(fresh)

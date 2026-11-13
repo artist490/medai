@@ -1,15 +1,22 @@
 // Каркас в стиле Flip7 SaaS: сайдбар слева, топбар с поиском, контент, футер.
 // На мобильных сайдбар скрывается — остаётся нижняя pill-навигация.
+// Навигация зависит от роли: пациент — личные вкладки, врач — кабинет пациентов.
 import { FormEvent, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
+import { brand } from '../brand'
 import { Icon } from './Icon'
 import type { IconName } from './Icon'
 
-const navItems: Array<{ to: string; label: string; icon: IconName }> = [
+const patientNav: Array<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: 'Обзор', icon: 'home' },
   { to: '/new', label: 'Замер', icon: 'stethoscope' },
   { to: '/history', label: 'История', icon: 'chart' },
+  { to: '/profile', label: 'Профиль', icon: 'profile' },
+]
+
+const doctorNav: Array<{ to: string; label: string; icon: IconName }> = [
+  { to: '/patients', label: 'Пациенты', icon: 'chart' },
   { to: '/profile', label: 'Профиль', icon: 'profile' },
 ]
 
@@ -27,6 +34,8 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
+  const isDoctor = user?.role === 'doctor'
+  const navItems = isDoctor ? doctorNav : patientNav
 
   async function handleLogout() {
     await logout()
@@ -36,7 +45,7 @@ export default function Layout() {
   function submitSearch(e: FormEvent) {
     e.preventDefault()
     const q = query.trim()
-    navigate(q ? `/history?q=${encodeURIComponent(q)}` : '/history')
+    navigate(q ? `${isDoctor ? '/patients' : '/history'}?q=${encodeURIComponent(q)}` : (isDoctor ? '/patients' : '/history'))
   }
 
   return (
@@ -45,8 +54,10 @@ export default function Layout() {
       <aside className="hidden lg:flex flex-col justify-between sticky top-0 h-screen bg-surface border-r-4 border-white px-5 py-7">
         <div>
           <NavLink to="/" className="block px-2">
-            <div className="wordmark">Med<span className="text-gold-dark">AI</span></div>
-            <div className="wordmark-sub">Показатели под контролем</div>
+            <div className="wordmark" style={{ color: 'var(--color-teal)' }}>
+              Спектр<span className="text-coral">-</span>Диагностика
+            </div>
+            <div className="wordmark-sub" style={{ color: '#e23a3a' }}>{brand.subtitle}</div>
           </NavLink>
 
           <nav className="mt-10 flex flex-col gap-1.5">
@@ -54,7 +65,7 @@ export default function Layout() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.to === '/'}
+                end={item.to === '/' || item.to === '/patients'}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
                 <span className="sidebar-icon"><Icon name={item.icon} size={22} /></span>
@@ -64,9 +75,15 @@ export default function Layout() {
           </nav>
         </div>
 
-        <button className="btn btn-teal w-full" onClick={() => navigate('/new')}>
-          + Новый замер
-        </button>
+        {isDoctor ? (
+          <div className="text-xs font-extrabold text-teal-dark/60 px-2 leading-relaxed">
+            Кабинет врача{user?.name ? ` · ${user.name}` : ''}
+          </div>
+        ) : (
+          <button className="btn btn-teal w-full" onClick={() => navigate('/new')}>
+            + Новый замер
+          </button>
+        )}
       </aside>
 
       {/* ---- Правая колонка ---- */}
@@ -75,18 +92,18 @@ export default function Layout() {
           <div className="px-5 sm:px-8 h-16 flex items-center gap-3 sm:gap-5">
             {/* Мобильный логотип */}
             <NavLink to="/" className="lg:hidden">
-              <span className="wordmark !text-lg">Med<span className="text-gold-dark">AI</span></span>
+              <span className="wordmark !text-lg" style={{ color: 'var(--color-teal)' }}>Спектр-Диагностика</span>
             </NavLink>
 
-            {/* Поиск по замерам */}
+            {/* Поиск по замерам / пациентам */}
             <form className="search-pill" onSubmit={submitSearch}>
               <Icon name="search" size={18} className="opacity-45" />
               <input
                 type="text"
-                placeholder="Поиск по замерам…"
+                placeholder={isDoctor ? 'Имя или email пациента…' : 'Поиск по замерам…'}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                aria-label="Поиск по замерам"
+                aria-label="Поиск"
               />
             </form>
 
@@ -115,22 +132,22 @@ export default function Layout() {
 
         <footer className="hidden lg:flex px-5 sm:px-8 py-7 flex-wrap items-center justify-between gap-2">
           <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-teal-dark/40">
-            © 2026 MedAI · не заменяет консультацию врача
+            © 2026 {brand.name} · не заменяет консультацию врача
           </span>
           <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-teal-dark/40">
-            правила · приватность · api
+            {brand.site} · {brand.phone}
           </span>
         </footer>
       </div>
 
       {/* ---- Мобильная нижняя навигация ---- */}
       <nav className="lg:hidden fixed bottom-4 left-0 right-0 z-40 px-4">
-        <div className="max-w-md mx-auto bg-white rounded-full px-2 py-2 flex justify-between glow-teal">
+        <div className="max-w-md mx-auto bg-white rounded-full px-2 py-2 flex justify-around glow-teal">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/'}
+              end={item.to === '/' || item.to === '/patients'}
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center rounded-full min-w-[70px] py-1.5 px-3 transition-quick text-[11px] font-extrabold tracking-wide ${
                   isActive

@@ -1,5 +1,5 @@
 // API-клиент: bearer-токен в localStorage, единая обработка ошибок.
-import type { Measurement, Stats, User } from './types'
+import type { DoctorNote, Measurement, PatientRow, Stats, User } from './types'
 
 const TOKEN_KEY = 'medai_token'
 
@@ -45,10 +45,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // ---------- auth ----------
 
-export async function register(email: string, password: string, name: string) {
+export async function register(email: string, password: string, name: string, inviteCode?: string) {
   const data = await request<{ token: string; user: User }>('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify({
+      email,
+      password,
+      name,
+      ...(inviteCode ? { invite_code: inviteCode } : {}),
+    }),
   })
   setToken(data.token)
   return data.user
@@ -117,4 +122,21 @@ export async function fetchStats(): Promise<Stats> {
 
 export async function fetchHealth(): Promise<{ ok: boolean; llm_enabled: boolean }> {
   return request('/api/health')
+}
+
+// ---------- кабинет врача ----------
+
+export async function fetchPatients(): Promise<{ items: PatientRow[] }> {
+  return request('/api/doctor/patients')
+}
+
+export async function fetchPatient(id: number | string): Promise<{ patient: User; items: Measurement[] }> {
+  return request(`/api/doctor/patients/${id}`)
+}
+
+export async function addDoctorNote(analysisId: number, text: string): Promise<DoctorNote> {
+  return request(`/api/doctor/analyses/${analysisId}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  })
 }
