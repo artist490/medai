@@ -8,25 +8,26 @@
 @import "tailwindcss";
 
 @theme {
-  /* --- Палитра: бренд «Спектр-Диагностика» --- */
-  --color-teal: #2ba8a2;
-  --color-teal-light: #3cc4bd;
-  --color-teal-dark: #1e6f6a;
-  --color-teal-bg: #eef6f5;
-  --color-gold: #ffd23f;
+  /* --- Палитра: бренд «Спектр-Диагностика» — снят с реального spdmed.ru
+         (их Next.js CSS: teal #00b8a9 / #007b83, фон #f9fbfb, ink #161a1d) --- */
+  --color-teal: #00b8a9;
+  --color-teal-light: #2fd0c2;
+  --color-teal-dark: #007b83;
+  --color-teal-bg: #e9f7f6;
+  --color-gold: #facc15;
   --color-gold-light: #ffe47a;
-  --color-gold-dark: #e6b800;
-  --color-coral: #ef6c4a;
-  --color-coral-light: #ff8a6a;
-  --color-coral-dark: #c34a2c;
+  --color-gold-dark: #eab308;
+  --color-coral: #dc2626;
+  --color-coral-light: #f87171;
+  --color-coral-dark: #b91c1c;
   --color-cream: #fff8e7;
   --color-sky: #5dade2;
-  --color-surface: #fafcfb;
-  --color-line: #e4ebe9;
-  --color-success: #27ae60;
-  --color-danger: #e74c3c;
-  --color-ink: #1b2622;
-  --color-ink-soft: #5b6b68;
+  --color-surface: #f9fbfb;
+  --color-line: #e5e7eb;
+  --color-success: #16a34a;
+  --color-danger: #dc2626;
+  --color-ink: #161a1d;
+  --color-ink-soft: #4b5563;
 
   /* --- Радиусы --- */
   --radius-sm: 4px;
@@ -34,9 +35,9 @@
   --radius-lg: 12px;
   --radius-xl: 14px;
 
-  /* --- Шрифт --- */
-  --font-sans: "Golos Text", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, "Microsoft YaHei", sans-serif;
+  /* --- Шрифт: как на spdmed.ru --- */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
 }
 
 /* ---------- База ---------- */
@@ -309,9 +310,9 @@ h1, h2, h3, h4 {
   font-weight: 700;
   flex-shrink: 0;
 }
-.row-avatar--green { background: rgba(43, 168, 162, 0.15); color: var(--color-teal-dark); }
-.row-avatar--yellow { background: rgba(255, 210, 63, 0.25); color: #9a7a00; }
-.row-avatar--red { background: rgba(239, 108, 74, 0.16); color: var(--color-coral-dark); }
+.row-avatar--green { background: rgba(0, 184, 169, 0.15); color: var(--color-teal-dark); }
+.row-avatar--yellow { background: rgba(250, 204, 21, 0.25); color: #9a7a00; }
+.row-avatar--red { background: rgba(220, 38, 38, 0.16); color: var(--color-coral-dark); }
 
 /* --- Заголовки секций --- */
 .section-title {
@@ -459,8 +460,8 @@ h1, h2, h3, h4 {
   letter-spacing: 0.1px;
 }
 .badge-green { background: rgba(39, 174, 96, 0.12); color: #1e8e5a; }
-.badge-gold  { background: rgba(255, 210, 63, 0.22); color: #9a7a00; }
-.badge-red   { background: rgba(231, 76, 60, 0.12); color: var(--color-danger); }
+.badge-gold  { background: rgba(250, 204, 21, 0.22); color: #9a7a00; }
+.badge-red   { background: rgba(220, 38, 38, 0.12); color: var(--color-danger); }
 .badge-teal  { background: var(--color-teal-bg); color: var(--color-teal-dark); }
 .badge-sky   { background: rgba(93, 173, 226, 0.15); color: #2f7fb5; }
 
@@ -484,3 +485,14 @@ h1, h2, h3, h4 {
 
 /* Micro-interactions ≤ 500ms */
 .transition-quick { transition: all 0.2s ease; }
+
+/* ---------- Печать карточки пациента ---------- */
+@media print {
+  aside, header, footer, nav { display: none !important; }
+  .no-print { display: none !important; }
+  main { padding: 0 !important; max-width: none !important; }
+  .panel, .bg-white {
+    box-shadow: none !important;
+    border: 1px solid var(--color-line) !important;
+  }
+}

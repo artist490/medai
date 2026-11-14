@@ -13,7 +13,9 @@ from .routers import auth as auth_router
 from .routers import chat as chat_router
 from .routers import doctor as doctor_router
 from .routers import measurements as measurements_router
+from .routers import medcard as medcard_router
 from .routers import stats as stats_router
+from .routers import visits as visits_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -38,7 +40,9 @@ app.include_router(auth_router.router)
 app.include_router(chat_router.router)
 app.include_router(doctor_router.router)
 app.include_router(measurements_router.router)
+app.include_router(medcard_router.router)
 app.include_router(stats_router.router)
+app.include_router(visits_router.router)
 
 
 @app.get("/api/health")

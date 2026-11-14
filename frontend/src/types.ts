@@ -95,3 +95,49 @@ export interface PatientRow {
   counts: { green: number; yellow: number; red: number }
   total: number
 }
+
+// Медкарта: анкета-анамнез пациента (заполняют пациент и врач)
+export interface MedCard {
+  blood_type: string
+  allergies: string
+  chronic: string
+  medications: string
+  surgeries: string
+  smoking: string
+  alcohol: string
+  activity: string
+  survey: string | null   // JSON ответов опросника Минздрава (404н)
+  updated_by: 'patient' | 'doctor' | null
+  updated_at: string | null
+}
+
+export interface MedCardInput {
+  blood_type?: string
+  allergies?: string
+  chronic?: string
+  medications?: string
+  surgeries?: string
+  smoking?: string
+  alcohol?: string
+  activity?: string
+  survey?: string | null
+}
+
+export type VisitStatus = 'planned' | 'completed' | 'cancelled'
+
+// Приём: пациент описывает жалобы, врач пишет заключение
+export interface Visit {
+  id: number
+  patient_id: number
+  doctor_id: number | null
+  doctor_name?: string | null
+  branch_id: number | null
+  visit_date: string
+  reason: string
+  complaints: string
+  status: VisitStatus
+  conclusion: string
+  recommendations: string
+  created_at: string
+  updated_at: string | null
+}

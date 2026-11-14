@@ -42,3 +42,41 @@ class MeasurementIn(BaseModel):
 class NoteIn(BaseModel):
     """Комментарий врача к анализу."""
     text: str = Field(min_length=1, max_length=1000)
+
+
+HabitValue = Literal["нет", "бросил", "курирует"]
+AlcoholValue = Literal["нет", "редко", "регулярно"]
+ActivityValue = Literal["низкая", "средняя", "высокая"]
+
+
+class MedCardIn(BaseModel):
+    """Анкета-анамнез медкарты. Пустая строка = «не указано»."""
+    blood_type: str = Field(default="", max_length=16)
+    allergies: str = Field(default="", max_length=1000)
+    chronic: str = Field(default="", max_length=2000)
+    medications: str = Field(default="", max_length=1000)
+    surgeries: str = Field(default="", max_length=1000)
+    smoking: Optional[HabitValue] = None
+    alcohol: Optional[AlcoholValue] = None
+    activity: Optional[ActivityValue] = None
+    survey: Optional[str] = Field(default=None, max_length=12000)  # JSON опросника МЗ 404н
+
+
+class VisitIn(BaseModel):
+    """Новый приём: пациент описывает, с чем идёт к врачу."""
+    visit_date: str = Field(default="", max_length=10)   # YYYY-MM-DD или пусто
+    reason: str = Field(default="", max_length=200)
+    complaints: str = Field(min_length=1, max_length=2000)
+
+
+class VisitPatchIn(BaseModel):
+    """Правка планового приёма пациентом."""
+    visit_date: Optional[str] = Field(default=None, max_length=10)
+    reason: Optional[str] = Field(default=None, max_length=200)
+    complaints: Optional[str] = Field(default=None, min_length=1, max_length=2000)
+
+
+class VisitCloseIn(BaseModel):
+    """Заключение врача по приёму."""
+    conclusion: str = Field(min_length=1, max_length=2000)
+    recommendations: str = Field(default="", max_length=2000)

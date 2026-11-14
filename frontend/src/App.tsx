@@ -11,6 +11,7 @@ import NewMeasurement from './pages/NewMeasurement'
 import Result from './pages/Result'
 import History from './pages/History'
 import Profile from './pages/Profile'
+import MedCard from './pages/MedCard'
 
 function RequireAuth({ children }: { children: React.ReactElement }) {
   const { user, loading } = useAuth()
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="new" element={<NewMeasurement />} />
         <Route path="result/:id" element={<Result />} />
         <Route path="history" element={<History />} />
+        <Route path="medcard" element={<MedCard />} />
         <Route path="chat" element={<Chat />} />
         <Route path="profile" element={<Profile />} />
         <Route path="patients" element={<RequireDoctor><DoctorPatients /></RequireDoctor>} />

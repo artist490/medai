@@ -1,5 +1,5 @@
 // API-клиент: bearer-токен в localStorage, единая обработка ошибок.
-import type { Branch, ChatMessage, DoctorNote, Measurement, PatientRow, Stats, User } from './types'
+import type { Branch, ChatMessage, DoctorNote, Measurement, MedCard, MedCardInput, PatientRow, Stats, User, Visit } from './types'
 
 const TOKEN_KEY = 'medai_token'
 
@@ -149,6 +149,72 @@ export async function addDoctorNote(analysisId: number, text: string): Promise<D
     method: 'POST',
     body: JSON.stringify({ text }),
   })
+}
+
+// ---------- медкарта ----------
+
+export async function fetchMedCard(): Promise<MedCard> {
+  return request('/api/medcard')
+}
+
+export async function updateMedCard(patch: MedCardInput): Promise<MedCard> {
+  return request('/api/medcard', { method: 'PUT', body: JSON.stringify(patch) })
+}
+
+export async function fetchPatientMedCard(patientId: number | string): Promise<MedCard> {
+  return request(`/api/medcard/patient/${patientId}`)
+}
+
+export async function updatePatientMedCard(
+  patientId: number | string, patch: MedCardInput,
+): Promise<MedCard> {
+  return request(`/api/medcard/patient/${patientId}`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  })
+}
+
+// ---------- приёмы ----------
+
+export interface VisitInput {
+  visit_date?: string
+  reason?: string
+  complaints: string
+}
+
+export async function createVisit(input: VisitInput): Promise<Visit> {
+  return request('/api/visits', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export async function fetchMyVisits(): Promise<{ items: Visit[] }> {
+  return request('/api/visits/mine')
+}
+
+export async function patchVisit(id: number, patch: Partial<VisitInput>): Promise<Visit> {
+  return request(`/api/visits/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+}
+
+export async function cancelVisit(id: number): Promise<Visit> {
+  return request(`/api/visits/${id}/cancel`, { method: 'POST' })
+}
+
+export async function fetchPatientVisits(patientId: number | string): Promise<{ items: Visit[] }> {
+  return request(`/api/doctor/patients/${patientId}/visits`)
+}
+
+export async function completeVisit(
+  id: number, conclusion: string, recommendations: string,
+): Promise<Visit> {
+  return request(`/api/doctor/visits/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ conclusion, recommendations }),
+  })
+}
+
+// ---------- ИИ-сводка пациента ----------
+
+export async function fetchPatientSummary(patientId: number | string): Promise<{ summary: string }> {
+  return request(`/api/doctor/patients/${patientId}/summary`, { method: 'POST' })
 }
 
 // ---------- чат с ИИ-ассистентом ----------

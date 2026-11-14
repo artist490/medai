@@ -11,6 +11,7 @@ import type { IconName } from './Icon'
 const patientNav: Array<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: 'Обзор', icon: 'home' },
   { to: '/new', label: 'Замер', icon: 'stethoscope' },
+  { to: '/medcard', label: 'Медкарта', icon: 'care' },
   { to: '/chat', label: 'Чат ИИ', icon: 'robot' },
   { to: '/history', label: 'История', icon: 'chart' },
   { to: '/profile', label: 'Профиль', icon: 'profile' },
@@ -53,12 +54,12 @@ export default function Layout() {
   return (
     <div className="min-h-screen lg:grid" style={{ gridTemplateColumns: '250px 1fr' }}>
       {/* ---- Сайдбар (desktop) ---- */}
-      <aside className="hidden lg:flex flex-col justify-between sticky top-0 h-screen bg-white border-r border-[#e4ebe9] px-5 py-7">
+      <aside className="hidden lg:flex flex-col justify-between sticky top-0 h-screen bg-white border-r border-[#e5e7eb] px-5 py-7">
         <div>
           <NavLink to="/" className="block px-2">
             <div className="flex items-center gap-2">
               <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden className="shrink-0">
-                <rect width="26" height="26" rx="7" fill="#eef6f5" stroke="#e4ebe9" />
+                <rect width="26" height="26" rx="7" fill="#e9f7f6" stroke="#e5e7eb" />
                 <circle cx="13" cy="13" r="7" fill="#E23A3A" />
               </svg>
               <div>
@@ -96,7 +97,7 @@ export default function Layout() {
 
       {/* ---- Правая колонка ---- */}
       <div className="min-w-0 flex flex-col">
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-[#e4ebe9]">
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-[#e5e7eb]">
           <div className="px-5 sm:px-8 h-16 flex items-center gap-3 sm:gap-5">
             {/* Мобильный логотип */}
             <NavLink to="/" className="lg:hidden">
@@ -157,7 +158,7 @@ export default function Layout() {
               to={item.to}
               end={item.to === '/' || item.to === '/patients'}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center rounded-[10px] min-w-[56px] py-1.5 px-2 transition-quick text-[11px] font-bold ${
+                `flex flex-col items-center justify-center rounded-[10px] min-w-[48px] py-1.5 px-1.5 transition-quick text-[11px] font-bold ${
                   isActive
                     ? 'bg-teal-dark text-white shadow-sm'
                     : 'text-teal-dark hover:bg-teal-bg'

@@ -30,7 +30,7 @@ SYSTEM_PROMPT = """Ты — дружелюбный медицинский асс
 В items — 3–6 коротких конкретных рекомендаций."""
 
 
-def chat_completion(payload: dict) -> Optional[dict]:
+def chat_completion(payload: dict, timeout: Optional[float] = None) -> Optional[dict]:
     """Единый вызов /chat/completions PlusVibe. Возвращает сообщение-ответ
     (dict с role/content/tool_calls) или None при любой ошибке."""
     if not config.llm_enabled():
@@ -44,7 +44,7 @@ def chat_completion(payload: dict) -> Optional[dict]:
             f"{config.LLM_BASE_URL}/chat/completions",
             json=payload,
             headers=headers,
-            timeout=config.LLM_TIMEOUT,
+            timeout=timeout or config.LLM_TIMEOUT,
         )
         # 401 ключ / 402 баланс / 403 IP / 429 лимит — всё ведёт к fallback
         resp.raise_for_status()
@@ -53,6 +53,39 @@ def chat_completion(payload: dict) -> Optional[dict]:
     except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
         logger.warning("LLM недоступен: %s", exc)
         return None
+
+
+SUMMARY_SYSTEM_PROMPT = """Ты — медицинский ассистент сети клиник «Спектр-Диагностика».
+Готовишь краткую справку ДЛЯ ВРАЧА перед очным приёмом пациента.
+
+ЖЁСТКИЕ ПРАВИЛА:
+1. Ты НЕ ставишь диагнозы и НЕ назначаешь лечение — только структурируешь данные.
+2. Не приуменьшай тревожные показатели: если риск red/тревога — обязательно выдели это.
+3. Пиши по-русски, сжато и по делу, без вводных фраз вроде «конечно» или «итак».
+4. Ответ — связный текст до 250 слов: кто пациент, анамнез, жалобы к приёму,
+динамика показателей, на что обратить внимание врачу."""
+
+
+def patient_summary(payload: str) -> Optional[str]:
+    """Справка о пациенте для врача. None, если LLM недоступен."""
+    message = chat_completion({
+        "model": config.LLM_MODEL,
+        "messages": [
+            {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
+            {"role": "user", "content": payload},
+        ],
+        "temperature": 0.3,
+        # DeepSeek-модели — reasoning: сначала думают в reasoning_content,
+        # только потом пишут ответ; 600 токенов съедалось рассуждениями,
+        # а стандартного таймаута не хватало на размышление.
+        "max_tokens": 1500,
+    }, timeout=90.0)
+    if not message:
+        return None
+    content = str(message.get("content") or "").strip()
+    if content.startswith("```"):  # модели иногда оборачивают текст в ```...```
+        content = content.strip("`").lstrip("markdown").strip()
+    return content or None
 
 
 def _build_user_prompt(profile: dict, indicators: dict, rule_result: dict) -> str:

@@ -93,6 +93,13 @@ DOCTOR_TOOLS = [
             "patient_id": {"type": "integer", "description": "ID пациента из get_patients_overview"},
         }, "required": ["patient_id"]},
     }},
+    {"type": "function", "function": {
+        "name": "get_patient_medcard",
+        "description": "Медкарта пациента (анкета-анамнез): группа крови, аллергии, хронические заболевания, лекарства, операции, привычки",
+        "parameters": {"type": "object", "properties": {
+            "patient_id": {"type": "integer", "description": "ID пациента из get_patients_overview"},
+        }, "required": ["patient_id"]},
+    }},
 ]
 
 # ---------- Исполнение инструментов (только данные текущего пользователя) ----------
@@ -217,10 +224,23 @@ def _exec_patient_last_analysis(db: sqlite3.Connection, doctor: sqlite3.Row, arg
     return _last_analysis(db, patient["id"], args)
 
 
+def _exec_patient_medcard(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
+    patient = _doctor_guard(db, doctor, int(args.get("patient_id") or 0))
+    if patient is None:
+        return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
+    row = db.execute(
+        "SELECT * FROM patient_cards WHERE user_id = ?", (patient["id"],)
+    ).fetchone()
+    if row is None:
+        return json.dumps({"error": "медкарта не заполнена"}, ensure_ascii=False)
+    return json.dumps(dict(row), ensure_ascii=False)
+
+
 DOCTOR_EXECUTORS: dict[str, Callable] = {
     "get_patients_overview": _exec_patients_overview,
     "get_patient_measurements": _exec_patient_measurements,
     "get_patient_last_analysis": _exec_patient_last_analysis,
+    "get_patient_medcard": _exec_patient_medcard,
 }
 
 # ---------- Агентный цикл ----------

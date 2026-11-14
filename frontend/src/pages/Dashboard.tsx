@@ -5,16 +5,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import * as api from '../api'
-import type { Finding, Measurement, Stats } from '../types'
+import type { Finding, Measurement, Stats, Visit } from '../types'
 import type { RiskLevel, Status } from '../types'
 import { Icon } from '../components/Icon'
 import type { IconName } from '../components/Icon'
 import { Summary } from '../components/Summary'
 
 const riskColors: Record<RiskLevel, string> = {
-  green: '#2ba8a2',
-  yellow: '#ffd23f',
-  red: '#ef6c4a',
+  green: '#00b8a9',
+  yellow: '#facc15',
+  red: '#dc2626',
 }
 const riskLabels: Record<RiskLevel, string> = {
   green: 'Норма',
@@ -81,10 +81,15 @@ function StripSegment(props: {
 export default function Dashboard() {
   const [items, setItems] = useState<Measurement[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
+  const [nextVisit, setNextVisit] = useState<Visit | null>(null)
 
   useEffect(() => {
     api.listMeasurements(10).then((d) => setItems(d.items)).catch(() => {})
     api.fetchStats().then(setStats).catch(() => {})
+    // Ближайший запланированный приём — сверху списка
+    api.fetchMyVisits()
+      .then((d) => setNextVisit(d.items.find((v) => v.status === 'planned') ?? null))
+      .catch(() => {})
   }, [])
 
   const latest = items[0] ?? null
@@ -145,6 +150,20 @@ export default function Dashboard() {
           <Link to="/new" className="btn btn-gold">+ Новый замер</Link>
         </div>
       </div>
+
+      {/* Ближайший приём */}
+      {nextVisit && (
+        <Link to="/medcard" className="flip-card flip-card--sky flex flex-wrap items-center gap-2 hover:opacity-90 transition-quick">
+          <span className="badge badge-teal normal-case tracking-normal">Вы записаны</span>
+          <span className="text-sm font-extrabold text-teal-dark">
+            {nextVisit.visit_date
+              ? `приём ${nextVisit.visit_date.slice(8, 10)}.${nextVisit.visit_date.slice(5, 7)}.${nextVisit.visit_date.slice(0, 4)}`
+              : 'приём без даты'}
+            {nextVisit.reason ? ` · ${nextVisit.reason}` : ''}
+          </span>
+          <span className="text-xs font-bold text-teal-dark/55">подробнее в медкарте →</span>
+        </Link>
+      )}
 
       {latest && a ? (
         <>
@@ -243,8 +262,8 @@ export default function Dashboard() {
                   <p className="text-xs text-[#8aa09c] mt-0.5">Систолическое и диастолическое по замерам</p>
                 </div>
                 <div className="flex gap-2">
-                  <span className="legend-pill"><span className="legend-dot" style={{ background: '#ef6c4a' }} />Систолическое</span>
-                  <span className="legend-pill"><span className="legend-dot" style={{ background: '#2ba8a2' }} />Диастолическое</span>
+                  <span className="legend-pill"><span className="legend-dot" style={{ background: '#dc2626' }} />Систолическое</span>
+                  <span className="legend-pill"><span className="legend-dot" style={{ background: '#00b8a9' }} />Диастолическое</span>
                 </div>
               </div>
               <div className="chart-box" style={{ height: 300 }}>
@@ -253,9 +272,9 @@ export default function Dashboard() {
                     <LineChart data={bpData} margin={{ top: 10, right: 16, bottom: 0, left: -12 }}>
                       <XAxis dataKey="t" tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} tickLine={false} axisLine={false} />
                       <YAxis tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} domain={['auto', 'auto']} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e4ebe9', fontSize: 12 }} />
-                      <Line type="monotone" dataKey="systolic" name="Систолическое" stroke="#ef6c4a" strokeWidth={3} dot={{ r: 4, strokeWidth: 0, fill: '#ef6c4a' }} />
-                      <Line type="monotone" dataKey="diastolic" name="Диастолическое" stroke="#2ba8a2" strokeWidth={3} dot={{ r: 4, strokeWidth: 0, fill: '#2ba8a2' }} />
+                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 12 }} />
+                      <Line type="monotone" dataKey="systolic" name="Систолическое" stroke="#dc2626" strokeWidth={3} dot={{ r: 4, strokeWidth: 0, fill: '#dc2626' }} />
+                      <Line type="monotone" dataKey="diastolic" name="Диастолическое" stroke="#00b8a9" strokeWidth={3} dot={{ r: 4, strokeWidth: 0, fill: '#00b8a9' }} />
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (

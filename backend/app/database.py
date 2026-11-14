@@ -88,6 +88,39 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     content    TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
+
+-- Медкарта: анамнез, заполняется пациентом и врачом (1:1 к пользователю)
+CREATE TABLE IF NOT EXISTS patient_cards (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    blood_type  TEXT NOT NULL DEFAULT '',   -- группа крови, резус
+    allergies   TEXT NOT NULL DEFAULT '',   -- аллергии (особенно лекарственные)
+    chronic     TEXT NOT NULL DEFAULT '',   -- хронические заболевания
+    medications TEXT NOT NULL DEFAULT '',   -- постоянные лекарства
+    surgeries   TEXT NOT NULL DEFAULT '',   -- операции, госпитализации
+    smoking     TEXT NOT NULL DEFAULT '',   -- нет | бросил | курирует
+    alcohol     TEXT NOT NULL DEFAULT '',   -- нет | редко | регулярно
+    activity    TEXT NOT NULL DEFAULT '',   -- низкая | средняя | высокая
+    survey      TEXT,                       -- JSON ответов опросника МЗ (приказ 404н)
+    updated_by  TEXT NOT NULL DEFAULT 'patient',  -- кто правил последним
+    updated_at  TEXT
+);
+
+-- Приёмы: пациент описывает жалобы к визиту, врач пишет заключение
+CREATE TABLE IF NOT EXISTS visits (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    doctor_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    branch_id       INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+    visit_date      TEXT NOT NULL DEFAULT '',      -- YYYY-MM-DD планируемой даты
+    reason          TEXT NOT NULL DEFAULT '',      -- цель визита
+    complaints      TEXT NOT NULL DEFAULT '',      -- жалобы пациента
+    status          TEXT NOT NULL DEFAULT 'planned'
+                    CHECK (status IN ('planned', 'completed', 'cancelled')),
+    conclusion      TEXT NOT NULL DEFAULT '',      -- заключение врача
+    recommendations TEXT NOT NULL DEFAULT '',      -- рекомендации врача
+    created_at      TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at      TEXT
+);
 """
 
 # Федеральная сеть «Спектр-диагностика»: города и телефоны с spdmed.ru
@@ -117,10 +150,17 @@ def _migrate(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'patient'")
     if "branch_id" not in columns:
         db.execute("ALTER TABLE users ADD COLUMN branch_id INTEGER REFERENCES branches(id)")
+    card_columns = {row["name"] for row in db.execute("PRAGMA table_info(patient_cards)").fetchall()}
+    if card_columns and "survey" not in card_columns:
+        db.execute("ALTER TABLE patient_cards ADD COLUMN survey TEXT")
 
 
 def connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(config.DATABASE_PATH, timeout=10)
+    # check_same_thread=False: FastAPI исполняет teardown yield-зависимости
+    # (commit/close в db_session) в другом потоке threadpool — без этого флага
+    # параллельные запросы дают sqlite3.ProgrammingError (см. uvicorn-логи).
+    # Соединение живёт в пределах одного запроса, межзапросного шаринга нет.
+    conn = sqlite3.connect(config.DATABASE_PATH, timeout=10, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
