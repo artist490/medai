@@ -8,7 +8,7 @@ export default function Confetti({ fire }: { fire: boolean }) {
 
   useEffect(() => {
     if (!fire) return
-    const next = Array.from({ length: 24 }, (_, id) => ({
+    const next = Array.from({ length: 14 }, (_, id) => ({
       id,
       left: Math.random() * 100,
       delay: Math.random() * 1.2,

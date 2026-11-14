@@ -57,9 +57,9 @@ function StatCard(props: {
         <StatusPill status={props.status} />
       </div>
       <div className="stat-label mt-4">{props.label}</div>
-      <div className="stat-value mt-1">
-        {props.value}
-        {props.unit && <span className="text-xs font-bold text-teal-dark/50 ml-1">{props.unit}</span>}
+      <div className="stat-value mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+        <span className="whitespace-nowrap">{props.value}</span>
+        {props.unit && <span className="stat-unit text-xs font-bold whitespace-nowrap">{props.unit}</span>}
       </div>
     </div>
   )
@@ -205,7 +205,9 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full grid place-items-center text-sm text-teal-dark/50 font-bold">
-                    Нужно минимум 2 замера с давлением <Icon name="chart" size={14} className="inline-block align-[-2px]" />
+                    <span className="inline-flex items-center gap-1.5">
+                      Нужно минимум 2 замера с давлением <Icon name="chart" size={14} className="inline-block align-[-2px]" />
+                    </span>
                   </div>
                 )}
               </div>

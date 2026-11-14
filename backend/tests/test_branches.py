@@ -64,6 +64,15 @@ class TestBranches:
         })
         assert resp.status_code == 422
 
+    def test_login_returns_branch(self, client):
+        branches = client.get("/api/auth/branches").json()["items"]
+        vrn = next(b for b in branches if b["city"] == "Воронеж")["id"]
+        _register(client, "p5@test.ru", branch_id=vrn)
+        login = client.post("/api/auth/login", json={
+            "email": "p5@test.ru", "password": "secret1",
+        }).json()
+        assert login["user"]["branch"]["city"] == "Воронеж"
+
     def test_register_without_branch_ok(self, client):
         p = _register(client, "p3@test.ru")
         assert p["user"]["branch"] is None

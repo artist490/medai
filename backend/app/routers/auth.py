@@ -93,7 +93,7 @@ def login(data: LoginIn, db: sqlite3.Connection = Depends(get_db)):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный email или пароль")
     token = auth.create_session(db, user["id"])
     db.commit()  # см. комментарий в register
-    return {"token": token, "user": user_payload(user)}
+    return {"token": token, "user": user_payload(user, _branch_of(db, user["branch_id"]))}
 
 
 @router.post("/logout")

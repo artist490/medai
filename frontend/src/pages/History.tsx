@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import * as api from '../api'
 import { Icon } from '../components/Icon'
@@ -68,7 +68,6 @@ function Chart({ title, subtitle, icon, data, series }: {
             <XAxis dataKey="t" tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} tickLine={false} axisLine={false} />
             <YAxis tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} domain={['auto', 'auto']} tickLine={false} axisLine={false} />
             <Tooltip contentStyle={{ borderRadius: 12, border: '2px solid #2ba8a2', fontSize: 12 }} />
-            {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12, fontWeight: 700 }} />}
             {series.map((s) => (
               <Line key={s.key} type="monotone" dataKey={s.key} name={s.name}
                     stroke={s.color} strokeWidth={3.5} dot={{ r: 4, strokeWidth: 0, fill: s.color }} connectNulls />

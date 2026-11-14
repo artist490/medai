@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import * as api from '../api'
 import { useAuth } from '../auth'
 import { Icon } from '../components/Icon'
@@ -11,7 +11,12 @@ export default function Login() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
-  const { setUser } = useAuth()
+  const { user, loading, setUser } = useAuth()
+
+  if (loading) {
+    return <div className="min-h-screen grid place-items-center text-teal-dark font-extrabold">Загрузка…</div>
+  }
+  if (user) return <Navigate to="/" replace />
 
   async function submit(e: FormEvent) {
     e.preventDefault()

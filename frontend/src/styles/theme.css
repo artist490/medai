@@ -73,7 +73,7 @@ h1, h2, h3, h4 {
   font-weight: 700;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--color-coral);
+  color: #bd4a26;
 }
 
 /* Логотип-вордмарк */
@@ -115,11 +115,13 @@ h1, h2, h3, h4 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  font-size: 16px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
   line-height: 1;
 }
+.sidebar-link.active .sidebar-icon { background: rgba(30, 140, 134, 0.12); }
 
 /* --- Топбар --- */
 .search-pill {
@@ -215,7 +217,9 @@ h1, h2, h3, h4 {
 }
 .stat-card--hero .stat-label { color: rgba(255, 255, 255, 0.55); }
 .stat-card--hero .stat-value { color: #ffffff; }
-.stat-card--hero .stat-value span { color: rgba(255, 255, 255, 0.5) !important; }
+.stat-unit { color: color-mix(in srgb, var(--color-teal-dark) 55%, white); }
+.stat-card--hero .stat-value { color: #ffffff; }
+.stat-card--hero .stat-value .stat-unit { color: rgba(255, 255, 255, 0.5); }
 .stat-card--hero .badge { background: rgba(255, 255, 255, 0.14); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.22); }
 .stat-card--hero .icon-tile { background: rgba(255, 255, 255, 0.10); }
 .stat-value {
@@ -536,7 +540,7 @@ h1, h2, h3, h4 {
   width: 10px;
   height: 14px;
   border-radius: 2px;
-  z-index: 60;
+  z-index: 30;
   animation: confetti-fall 3.6s ease-in forwards;
   pointer-events: none;
 }
