@@ -28,6 +28,32 @@ const DOCTOR_CHIPS = [
   'Какие риски у моих пациентов?',
 ]
 
+
+// Безопасный рендер markdown-ответа модели (только жирный и пункты;
+// React экранирует текст — XSS от содержимого модели исключён).
+function Md({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <>
+      {lines.map((line, i) => {
+        if (line.trim() === "") return <div key={i} className="h-2" />;
+        const bullet = /^-\s/.test(line);
+        const clean = line.replace(/^\s*-\s/, "");
+        const parts = clean.split(/\*\*([^*]+)\*\*/g);
+        const body = parts.map((seg, j) =>
+          j % 2 === 1 ? <strong key={j}>{seg}</strong> : seg,
+        );
+        return (
+          <div key={i} className={bullet ? "flex gap-2 items-start" : ""}>
+            {bullet && <span className="opacity-50" aria-hidden>•</span>}
+            <span>{body}</span>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 export default function Chat() {
   const { user } = useAuth()
   const [items, setItems] = useState<ChatMessage[]>([])
@@ -119,13 +145,13 @@ export default function Chat() {
         {items.map((m) => (
           <div
             key={m.id}
-            className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+            className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
               m.role === 'user'
                 ? 'self-end bg-teal-dark text-white'
                 : 'self-start bg-[#f4f8f7] border border-[#e6eeec] text-[#2c3e3b]'
             }`}
           >
-            {m.content}
+            <Md text={m.content} />
             <div className={`mt-1 text-[10px] font-bold ${m.role === 'user' ? 'text-white/60' : 'text-teal-dark/45'}`}>
               {m.created_at.slice(5, 16)}
             </div>
