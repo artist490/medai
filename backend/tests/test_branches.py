@@ -15,6 +15,7 @@ from app.main import app
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
+    monkeypatch.setattr(config, "LLM_API_KEY", "")  # без сети: анализ только по правилам
     database.init_db()
     with TestClient(app) as c:
         yield c

@@ -61,7 +61,9 @@ if config.FRONTEND_DIST.is_dir():
         """SPA-fallback: всё, что не /api, отдаёт index.html."""
         if full_path.startswith("api"):
             return JSONResponse({"detail": "Not found"}, status_code=404)
-        candidate = config.FRONTEND_DIST / full_path
-        if candidate.is_file():
+        # Защита от path traversal (/..%2f..%2fbackend%2f.env): отдаём только
+        # файлы, реально лежащие внутри dist; всё остальное — index.html.
+        candidate = (config.FRONTEND_DIST / full_path).resolve()
+        if candidate.is_file() and candidate.is_relative_to(config.FRONTEND_DIST):
             return FileResponse(candidate)
         return FileResponse(config.FRONTEND_DIST / "index.html")

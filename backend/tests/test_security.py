@@ -16,6 +16,7 @@ from app.main import app
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
+    monkeypatch.setattr(config, "LLM_API_KEY", "")  # без сети: анализ только по правилам
     database.init_db()
     with TestClient(app) as c:
         yield c
@@ -155,3 +156,38 @@ class TestStatsLimitBounds:
         p = _register(client, "v6@test.ru")
         r = client.get("/api/stats?limit=10", headers=_auth(p))
         assert r.status_code == 200
+
+
+@pytest.mark.skipif(not config.FRONTEND_DIST.is_dir(),
+                    reason="SPA-раздача монтируется только при наличии frontend/dist")
+class TestStaticPathTraversal:
+    """Регрессия: SPA-fallback не должен отдавать файлы вне frontend/dist.
+
+    До правки GET /..%2f..%2fbackend%2f.env возвращал содержимое .env
+    (ключ LLM), а /..%2fmedai.db — базу пациентов.
+    """
+
+    def test_traversal_serves_index_not_secret(self, client, tmp_path, monkeypatch):
+        dist = tmp_path / "dist"
+        dist.mkdir()
+        (dist / "index.html").write_text("SAFE-INDEX-HTML", encoding="utf-8")
+        secret = tmp_path / "secret.txt"
+        secret.write_text("TOP-SECRET-VALUE", encoding="utf-8")
+        monkeypatch.setattr(config, "FRONTEND_DIST", dist)
+
+        for path in ("/..%2fsecret.txt", "/..%2f..%2fsecret.txt", "/../secret.txt"):
+            r = client.get(path)
+            assert r.status_code == 200
+            assert "TOP-SECRET-VALUE" not in r.text
+            assert "SAFE-INDEX-HTML" in r.text  # SPA-fallback отдал index.html
+
+    def test_real_file_inside_dist_served(self, client, tmp_path, monkeypatch):
+        dist = tmp_path / "dist"
+        dist.mkdir()
+        (dist / "index.html").write_text("SAFE-INDEX-HTML", encoding="utf-8")
+        (dist / "app.js").write_text("console.log(1)", encoding="utf-8")
+        monkeypatch.setattr(config, "FRONTEND_DIST", dist)
+
+        r = client.get("/app.js")
+        assert r.status_code == 200
+        assert r.text == "console.log(1)"  # легитимные файлы внутри dist доступны

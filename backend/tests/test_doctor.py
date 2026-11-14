@@ -15,6 +15,7 @@ from app.main import app
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
+    monkeypatch.setattr(config, "LLM_API_KEY", "")  # без сети: анализ только по правилам
     database.init_db()
     with TestClient(app) as c:
         yield c
@@ -184,6 +185,31 @@ class TestAttentionFlagAndNotes:
                            json={"text": "x"}, headers=_auth(d))
         assert resp.status_code == 404
         assert created["analysis"]["notes"] == [] if "notes" in created["analysis"] else True
+
+    def test_note_on_other_branch_analysis_404(self, client):
+        """Врач филиала А не может комментировать анализ пациента филиала Б."""
+        db = sqlite3.connect(config.DATABASE_PATH)
+        db.execute("INSERT INTO branches (city, phone) VALUES ('Тест-А', '+7 000'), ('Тест-Б', '+7 001')")
+        db.commit()
+        db.close()
+
+        d = self._doctor(client)
+        p = _register(client, "p6b@test.ru")
+        # переводим врача в филиал А, пациента — в филиал Б
+        for email, branch in (("doc6@test.ru", 1), ("p6b@test.ru", 2)):
+            db = sqlite3.connect(config.DATABASE_PATH)
+            db.execute("UPDATE users SET branch_id = ? WHERE email = ?", (branch, email))
+            db.commit()
+            db.close()
+
+        created = client.post("/api/measurements", json={"pulse": 70}, headers=_auth(p)).json()
+        analysis_id = created["analysis"]["id"]
+
+        resp = client.post(f"/api/doctor/analyses/{analysis_id}/notes",
+                           json={"text": "чужой филиал"}, headers=_auth(d))
+        assert resp.status_code == 404
+        detail = client.get(f"/api/measurements/{created['id']}", headers=_auth(p)).json()
+        assert detail["analysis"]["notes"] == []
 
 
 class TestStatsRegression:

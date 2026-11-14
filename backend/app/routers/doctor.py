@@ -155,7 +155,16 @@ def add_note(
     user: sqlite3.Row = Depends(auth.get_current_doctor),
     db: sqlite3.Connection = Depends(get_db),
 ):
-    analysis = db.execute("SELECT id FROM analyses WHERE id = ?", (analysis_id,)).fetchone()
+    # Гвард филиала: комментировать можно только анализ пациента своего филиала
+    analysis = db.execute(
+        """
+        SELECT a.id FROM analyses a
+        JOIN measurements m ON m.id = a.measurement_id
+        JOIN users u ON u.id = m.user_id
+        WHERE a.id = ? AND u.role = 'patient' AND u.branch_id IS ?
+        """,
+        (analysis_id, user["branch_id"]),
+    ).fetchone()
     if analysis is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Анализ не найден")
 
