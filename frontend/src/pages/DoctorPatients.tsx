@@ -42,7 +42,7 @@ function AttentionCard({ p }: { p: PatientRow }) {
   return (
     <Link
       to={`/patients/${p.id}`}
-      className="flip-card flip-card--danger block hover:scale-[1.01] transition-quick"
+      className="flip-card flip-card--danger block"
     >
       <div className="flex items-center justify-between gap-2 mb-1">
         <span className="font-extrabold text-teal-dark flex items-center gap-2">

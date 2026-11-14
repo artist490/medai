@@ -151,7 +151,7 @@ export default function Layout() {
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center rounded-full min-w-[70px] py-1.5 px-3 transition-quick text-[11px] font-extrabold tracking-wide ${
                   isActive
-                    ? 'bg-teal text-white glow-teal scale-105'
+                    ? 'bg-teal text-white shadow-sm'
                     : 'text-teal-dark hover:bg-teal-bg'
                 }`
               }
