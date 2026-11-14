@@ -1,3 +1,6 @@
+// Дашборд пациента — композиция направления A «Клинический свет»:
+// hero-карточка давления + donut, полоса показателей с хайрлайнами,
+// график + комментарий врача, таблица последних замеров.
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -5,14 +8,13 @@ import * as api from '../api'
 import type { Finding, Measurement, Stats } from '../types'
 import type { RiskLevel, Status } from '../types'
 import { Icon } from '../components/Icon'
-import { Summary } from '../components/Summary'
 import type { IconName } from '../components/Icon'
+import { Summary } from '../components/Summary'
 
-// Цвета риска / статуса (Flip7-палитра)
 const riskColors: Record<RiskLevel, string> = {
-  green: '#2BA8A2',
-  yellow: '#FFD23F',
-  red: '#EF6C4A',
+  green: '#2ba8a2',
+  yellow: '#ffd23f',
+  red: '#ef6c4a',
 }
 const riskLabels: Record<RiskLevel, string> = {
   green: 'Норма',
@@ -39,32 +41,6 @@ function StatusPill({ status }: { status?: Status }) {
   return <span className={`${statusBadgeClass[status]} badge`}>{statusText[status]}</span>
 }
 
-// Stat-карточка как в референсе: полоса слева, кружок-иконка, бейдж справа сверху
-function StatCard(props: {
-  tile: 'gold' | 'teal' | 'coral' | 'sky'
-  icon: IconName
-  accent: string
-  label: string
-  value: string
-  unit?: string
-  status?: Status
-  featured?: boolean
-}) {
-  return (
-    <div className={`stat-card ${props.featured ? 'stat-card--hero' : ''}`} style={{ borderLeftColor: props.accent }}>
-      <div className="flex items-start justify-between gap-2">
-        <span className={`icon-tile icon-tile--${props.tile}`}><Icon name={props.icon} size={24} /></span>
-        <StatusPill status={props.status} />
-      </div>
-      <div className="stat-label mt-4">{props.label}</div>
-      <div className="stat-value mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-        <span className="whitespace-nowrap">{props.value}</span>
-        {props.unit && <span className="stat-unit text-xs font-bold whitespace-nowrap">{props.unit}</span>}
-      </div>
-    </div>
-  )
-}
-
 function shortDate(iso: string): string {
   const d = new Date(iso.replace(' ', 'T'))
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -75,9 +51,31 @@ function humanDate(iso: string): string {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
 }
 
-function humanTime(iso: string): string {
-  const d = new Date(iso.replace(' ', 'T'))
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+// Сегмент полосы показателей
+function StripSegment(props: {
+  icon: IconName
+  label: string
+  value: string
+  unit?: string
+  status?: Status
+  hint?: string
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="stat-label flex items-center gap-2">
+          <Icon name={props.icon} size={16} className="opacity-60" />
+          {props.label}
+        </span>
+        <StatusPill status={props.status} />
+      </div>
+      <div className="stat-value mt-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+        <span className="whitespace-nowrap">{props.value}</span>
+        {props.unit && <span className="stat-unit text-xs font-bold whitespace-nowrap">{props.unit}</span>}
+      </div>
+      {props.hint && <div className="mt-1 text-xs text-[#8aa09c]">{props.hint}</div>}
+    </div>
+  )
 }
 
 export default function Dashboard() {
@@ -107,7 +105,6 @@ export default function Dashboard() {
     { name: 'Тревога', value: riskCounts.red, color: riskColors.red },
   ].filter((d) => d.value > 0)
 
-  // График давления
   const bpData = useMemo(
     () => (stats?.points ?? [])
       .filter((p) => p.systolic != null)
@@ -115,33 +112,34 @@ export default function Dashboard() {
     [stats],
   )
 
-  const bpStatus = findingByKey(a?.findings, 'blood_pressure')?.status
-  const pulseStatus = findingByKey(a?.findings, 'pulse')?.status
-  const sleepStatus = findingByKey(a?.findings, 'sleep')?.status
-  const bmiStatus = findingByKey(a?.findings, 'bmi')?.status
-
-  // Последний замер, где показатель вообще измерялся (для карточек)
   const bpItem = items.find((m) => m.systolic != null)
-  const pulseItem = items.find((m) => m.pulse != null)
-  const sleepItem = items.find((m) => m.sleep_hours != null)
-  const bmiItem = items.find((m) => m.analysis?.bmi != null)
   const bpFinding = findingByKey(bpItem?.analysis?.findings, 'blood_pressure')
+  const pulseItem = items.find((m) => m.pulse != null)
   const pulseFinding = findingByKey(pulseItem?.analysis?.findings, 'pulse')
+  const sleepItem = items.find((m) => m.sleep_hours != null)
   const sleepFinding = findingByKey(sleepItem?.analysis?.findings, 'sleep')
+  const bmiItem = items.find((m) => m.analysis?.bmi != null)
   const bmiFinding = findingByKey(bmiItem?.analysis?.findings, 'bmi')
+
+  // Последний комментарий врача
+  const lastNote = useMemo(() => {
+    const all = items.flatMap((m) => (m.analysis?.notes ?? []).map((n) => ({ ...n })))
+    all.sort((x, y) => (x.created_at < y.created_at ? 1 : -1))
+    return all[0] ?? null
+  }, [items])
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Hero: надзаголовок + заголовок + действия */}
+      {/* Шапка страницы */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="eyebrow">Обзор здоровья</div>
-          <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>Медицинский дашборд</h1>
+          <h1 className="mt-1" style={{ fontSize: 30, letterSpacing: '-0.02em' }}>Медицинский дашборд</h1>
         </div>
         <div className="flex items-center gap-3">
           {latest && (
             <Link to={`/result/${latest.id}`} className="btn btn-ghost">
-              <Icon name="pulse" size={18} /> Последний замер
+              <Icon name="pulse" size={16} /> Последний замер
             </Link>
           )}
           <Link to="/new" className="btn btn-gold">+ Новый замер</Link>
@@ -150,73 +148,32 @@ export default function Dashboard() {
 
       {latest && a ? (
         <>
-          {/* Stat-карточки: последнее доступное значение каждого показателя */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <StatCard
-              tile="coral" icon="pressure" accent="#EF6C4A" label="Давление"
-              value={bpItem ? `${bpItem.systolic}/${bpItem.diastolic ?? '—'}` : '—'}
-              unit={bpItem ? 'мм рт. ст.' : undefined}
-              status={bpFinding?.status}
-              featured
-            />
-            <StatCard
-              tile="teal" icon="pulse" accent="#2BA8A2" label="Пульс"
-              value={pulseItem ? String(pulseItem.pulse) : '—'}
-              unit={pulseItem ? 'уд/мин' : undefined}
-              status={pulseFinding?.status}
-            />
-            <StatCard
-              tile="sky" icon="sleep" accent="#5DADE2" label="Сон"
-              value={sleepItem ? String(sleepItem.sleep_hours) : '—'}
-              unit={sleepItem ? 'ч' : undefined}
-              status={sleepFinding?.status}
-            />
-            <StatCard
-              tile="gold" icon="scale" accent="#FFD23F" label="ИМТ"
-              value={bmiItem ? String(bmiItem.analysis!.bmi) : '—'}
-              unit={bmiItem ? 'кг/м²' : undefined}
-              status={bmiFinding?.status}
-            />
-          </div>
-
-          {/* График + donut */}
-          <div className="grid lg:grid-cols-[2fr_1fr] gap-5">
-            <section className="panel">
-              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                <div>
-                  <h2 className="text-xl">Давление в динамике</h2>
-                  <p className="text-sm text-teal-dark/60 mt-0.5">Систолическое и диастолическое по замерам</p>
-                </div>
-                <div className="flex gap-2">
-                  <span className="legend-pill"><span className="legend-dot" style={{ background: '#EF6C4A' }} />Систолическое</span>
-                  <span className="legend-pill"><span className="legend-dot" style={{ background: '#2BA8A2' }} />Диастолическое</span>
-                </div>
+          {/* Ряд 1: hero давления + donut */}
+          <div className="grid lg:grid-cols-[2fr_1fr] gap-4 items-stretch">
+            <div className="stat-card stat-card--hero flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-3">
+                <span className="stat-label flex items-center gap-2">
+                  <Icon name="pressure" size={16} className="opacity-60" />
+                  Давление
+                </span>
+                <StatusPill status={bpFinding?.status} />
               </div>
-              <div className="chart-box" style={{ height: 300 }}>
-                {bpData.length >= 2 ? (
-                  <ResponsiveContainer>
-                    <LineChart data={bpData} margin={{ top: 10, right: 16, bottom: 0, left: -12 }}>
-                      <XAxis dataKey="t" tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} domain={['auto', 'auto']} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={{ borderRadius: 12, border: '2px solid #2ba8a2', fontSize: 12 }} />
-                      <Line type="monotone" dataKey="systolic" name="Систолическое" stroke="#EF6C4A" strokeWidth={3.5} dot={{ r: 4, strokeWidth: 0, fill: '#EF6C4A' }} />
-                      <Line type="monotone" dataKey="diastolic" name="Диастолическое" stroke="#2BA8A2" strokeWidth={3.5} dot={{ r: 4, strokeWidth: 0, fill: '#2BA8A2' }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full grid place-items-center text-sm text-teal-dark/50 font-bold">
-                    <span className="inline-flex items-center gap-1.5">
-                      Нужно минимум 2 замера с давлением <Icon name="chart" size={14} className="inline-block align-[-2px]" />
-                    </span>
-                  </div>
-                )}
+              <div className="stat-value mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="whitespace-nowrap">{bpItem ? `${bpItem.systolic}/${bpItem.diastolic ?? '—'}` : '—'}</span>
+                {bpItem && <span className="stat-unit text-sm font-bold whitespace-nowrap">мм рт. ст.</span>}
               </div>
-            </section>
+              {bpFinding && <p className="mt-2 text-sm text-[#5b6b68] max-w-md">{bpFinding.message}</p>}
+              {bpItem && (
+                <div className="mt-4 text-xs text-[#8aa09c]">
+                  Последний замер с давлением: {shortDate(bpItem.recorded_at)}
+                </div>
+              )}
+            </div>
 
-            <section className="panel">
-              <h2 className="text-xl">Структура замеров</h2>
-              <p className="text-sm text-teal-dark/60 mt-0.5 mb-4">Распределение по уровню риска</p>
-              <div className="chart-box relative" style={{ height: 230 }}>
+            <section className="panel flex flex-col">
+              <h2 className="text-lg">Структура замеров</h2>
+              <p className="text-xs text-[#8aa09c] mt-0.5 mb-3">Распределение по уровню риска</p>
+              <div className="chart-box relative flex-1" style={{ minHeight: 190 }}>
                 {totalMeasured > 0 ? (
                   <>
                     <ResponsiveContainer>
@@ -229,21 +186,21 @@ export default function Dashboard() {
                     </ResponsiveContainer>
                     <div className="absolute inset-0 grid place-items-center pointer-events-none">
                       <div className="text-center">
-                        <div className="text-2xl font-extrabold text-[#1b2622]">{totalMeasured}</div>
-                        <div className="text-[10px] font-extrabold tracking-[2px] uppercase text-teal-dark/50">замеров</div>
+                        <div className="text-2xl font-bold text-[#1b2622]">{totalMeasured}</div>
+                        <div className="text-[10px] font-bold uppercase tracking-[1.5px] text-[#8aa09c]">замеров</div>
                       </div>
                     </div>
                   </>
                 ) : (
-                  <div className="h-full grid place-items-center text-sm text-teal-dark/50 font-bold">Нет данных</div>
+                  <div className="h-full grid place-items-center text-sm text-[#8aa09c] font-bold">Нет данных</div>
                 )}
               </div>
-              <div className="mt-4 flex flex-col gap-2">
+              <div className="mt-3 flex flex-col gap-1.5">
                 {donutData.map((d) => (
-                  <div key={d.name} className="flex items-center gap-2.5 text-sm font-bold text-[#1b2622]">
+                  <div key={d.name} className="flex items-center gap-2.5 text-sm font-semibold text-[#1b2622]">
                     <span className="legend-dot" style={{ background: d.color }} />
                     {d.name}
-                    <span className="ml-auto text-teal-dark/60">
+                    <span className="ml-auto text-[#8aa09c]">
                       {totalMeasured ? Math.round((d.value / totalMeasured) * 100) : 0}%
                     </span>
                   </div>
@@ -252,10 +209,89 @@ export default function Dashboard() {
             </section>
           </div>
 
-          {/* Последние замеры */}
-          <section className="bg-white rounded-[20px] p-6" style={{ boxShadow: '0 6px 24px rgba(23,46,42,.06)' }}>
+          {/* Ряд 2: полоса показателей с хайрлайнами */}
+          <div className="stat-strip">
+            <StripSegment
+              icon="pulse" label="Пульс"
+              value={pulseItem ? String(pulseItem.pulse) : '—'}
+              unit={pulseItem ? 'уд/мин' : undefined}
+              status={pulseFinding?.status}
+              hint={pulseFinding ? 'Норма 60–100' : undefined}
+            />
+            <StripSegment
+              icon="sleep" label="Сон"
+              value={sleepItem ? String(sleepItem.sleep_hours) : '—'}
+              unit={sleepItem ? 'ч' : undefined}
+              status={sleepFinding?.status}
+              hint={sleepFinding ? 'Норма 7–9' : 'Здесь появится продолжительность сна'}
+            />
+            <StripSegment
+              icon="scale" label="ИМТ"
+              value={bmiItem ? String(bmiItem.analysis!.bmi) : '—'}
+              unit={bmiItem ? 'кг/м²' : undefined}
+              status={bmiFinding?.status}
+              hint={bmiFinding ? 'Норма 18.5–24.9' : 'Норма 18.5–24.9, нужен рост в профиле'}
+            />
+          </div>
+
+          {/* Ряд 3: график + комментарий врача */}
+          <div className="grid lg:grid-cols-[2fr_1fr] gap-4 items-stretch">
+            <section className="panel">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-lg">Давление в динамике</h2>
+                  <p className="text-xs text-[#8aa09c] mt-0.5">Систолическое и диастолическое по замерам</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="legend-pill"><span className="legend-dot" style={{ background: '#ef6c4a' }} />Систолическое</span>
+                  <span className="legend-pill"><span className="legend-dot" style={{ background: '#2ba8a2' }} />Диастолическое</span>
+                </div>
+              </div>
+              <div className="chart-box" style={{ height: 300 }}>
+                {bpData.length >= 2 ? (
+                  <ResponsiveContainer>
+                    <LineChart data={bpData} margin={{ top: 10, right: 16, bottom: 0, left: -12 }}>
+                      <XAxis dataKey="t" tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} domain={['auto', 'auto']} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e4ebe9', fontSize: 12 }} />
+                      <Line type="monotone" dataKey="systolic" name="Систолическое" stroke="#ef6c4a" strokeWidth={3} dot={{ r: 4, strokeWidth: 0, fill: '#ef6c4a' }} />
+                      <Line type="monotone" dataKey="diastolic" name="Диастолическое" stroke="#2ba8a2" strokeWidth={3} dot={{ r: 4, strokeWidth: 0, fill: '#2ba8a2' }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full grid place-items-center text-sm text-[#8aa09c] font-bold">
+                    <span className="inline-flex items-center gap-1.5">
+                      Нужно минимум 2 замера с давлением <Icon name="chart" size={14} className="inline-block align-[-2px]" />
+                    </span>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="panel flex flex-col">
+              <h2 className="text-lg">Комментарий врача</h2>
+              {lastNote ? (
+                <div className="flip-card flip-card--gold mt-3">
+                  <div className="text-xs font-bold text-[#8aa09c]">
+                    {lastNote.doctor_name} · {lastNote.created_at.slice(0, 16)}
+                  </div>
+                  <p className="text-sm text-[#2c3e3b] mt-1">{lastNote.text}</p>
+                </div>
+              ) : (
+                <p className="text-sm text-[#8aa09c] mt-3 font-semibold">
+                  Заметок пока нет — врач оставит их после разбора замеров.
+                </p>
+              )}
+              <p className="mt-auto pt-3 text-xs text-[#8aa09c]">
+                Заметки появляются в разборе замера и в чате с ИИ не дублируются.
+              </p>
+            </section>
+          </div>
+
+          {/* Ряд 4: последние замеры */}
+          <section className="panel">
             <div className="flex items-center justify-between gap-3 mb-2">
-              <h2 className="text-xl">Последние замеры</h2>
+              <h2 className="text-lg">Последние замеры</h2>
               <Link to="/history" className="btn btn-ghost btn-sm">Вся история →</Link>
             </div>
             <div className="overflow-x-auto">
@@ -276,8 +312,8 @@ export default function Dashboard() {
                             {m.recorded_at.slice(8, 10)}
                           </span>
                           <div className="min-w-0">
-                            <div className="font-extrabold">{humanDate(m.recorded_at)}</div>
-                            <div className="text-xs text-teal-dark/60 truncate max-w-[420px]"><Summary m={m} /></div>
+                            <div className="font-bold">{humanDate(m.recorded_at)}</div>
+                            <div className="text-xs text-[#8aa09c]"><Summary m={m} /></div>
                           </div>
                         </div>
                       </td>
@@ -289,8 +325,8 @@ export default function Dashboard() {
                         )}
                       </td>
                       <td className="!text-right">
-                        <span className="text-sm text-teal-dark/60 mr-4">{humanTime(m.recorded_at)}</span>
-                        <Link to={`/result/${m.id}`} className="font-extrabold text-teal hover:text-teal-light whitespace-nowrap">
+                        <span className="text-sm text-[#8aa09c] mr-4">{shortDate(m.recorded_at).slice(-5)}</span>
+                        <Link to={`/result/${m.id}`} className="font-bold text-teal-dark hover:underline whitespace-nowrap">
                           Открыть →
                         </Link>
                       </td>
@@ -301,22 +337,20 @@ export default function Dashboard() {
             </div>
           </section>
 
-      <p className="text-[10px] font-extrabold uppercase tracking-[2px] text-teal-dark/35 text-center">
-        <Icon name="cross" size={12} className="inline-block align-[-1px] mr-1" />Спектр-Диагностика не ставит диагнозы — при тревожных показателях обратитесь к врачу, при критических 103
-      </p>
+          <p className="text-xs text-[#8aa09c] text-center">
+            Спектр-Диагностика не ставит диагнозы — при тревожных показателях обратитесь к врачу, при критических 103
+          </p>
         </>
       ) : (
-        <div className="bg-white rounded-[20px] p-10 text-center" style={{ boxShadow: '0 6px 24px rgba(23,46,42,.06)' }}>
-          <Icon name="stethoscope" size={52} className="mb-3" />
+        <div className="panel p-10 text-center">
+          <span className="icon-tile icon-tile--teal mb-3"><Icon name="stethoscope" size={30} /></span>
           <h2 className="text-xl mb-2">Пока нет замеров</h2>
-          <p className="text-sm text-teal-dark/70 mb-5">
-            Внесите первый замер — давление, пульс, сон или шаги — и MedAI разберёт показатели и даст рекомендации.
+          <p className="text-sm text-[#5b6b68] mb-5 max-w-sm mx-auto">
+            Внесите первый замер — давление, пульс, сон или шаги — и система разберёт показатели и даст рекомендации.
           </p>
           <Link to="/new" className="btn btn-gold">Сделать первый замер</Link>
         </div>
       )}
-
-      {/* Пустое состояние — иконка стетоскопа */}
     </div>
   )
 }

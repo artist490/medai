@@ -53,13 +53,19 @@ export default function Layout() {
   return (
     <div className="min-h-screen lg:grid" style={{ gridTemplateColumns: '250px 1fr' }}>
       {/* ---- Сайдбар (desktop) ---- */}
-      <aside className="hidden lg:flex flex-col justify-between sticky top-0 h-screen bg-panel-dark px-5 py-7">
+      <aside className="hidden lg:flex flex-col justify-between sticky top-0 h-screen bg-white border-r border-[#e4ebe9] px-5 py-7">
         <div>
           <NavLink to="/" className="block px-2">
-            <div className="wordmark" style={{ color: '#8fd6d0' }}>
-              Спектр<span className="text-coral">-</span>Диагностика
+            <div className="flex items-center gap-2">
+              <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden className="shrink-0">
+                <rect width="26" height="26" rx="7" fill="#eef6f5" stroke="#e4ebe9" />
+                <circle cx="13" cy="13" r="7" fill="#E23A3A" />
+              </svg>
+              <div>
+                <div className="wordmark" style={{ fontSize: 19 }}>Спектр-Диагностика</div>
+                <div className="wordmark-sub">{brand.subtitle}</div>
+              </div>
             </div>
-            <div className="wordmark-sub" style={{ color: '#ff8a70' }}>{brand.subtitle}</div>
           </NavLink>
 
           <nav className="mt-10 flex flex-col gap-1.5">
@@ -78,11 +84,11 @@ export default function Layout() {
         </div>
 
         {isDoctor ? (
-          <div className="text-xs font-bold text-white/50 px-2 leading-relaxed">
+          <div className="text-xs font-bold text-[#8aa09c] px-2 leading-relaxed">
             Кабинет врача{user?.name ? ` · ${user.name}` : ''}
           </div>
         ) : (
-          <button className="btn btn-on-dark w-full" onClick={() => navigate('/new')}>
+          <button className="btn btn-gold w-full" onClick={() => navigate('/new')}>
             + Новый замер
           </button>
         )}
@@ -90,11 +96,11 @@ export default function Layout() {
 
       {/* ---- Правая колонка ---- */}
       <div className="min-w-0 flex flex-col">
-        <header className="sticky top-0 z-40 bg-[#f4f7f6]/85 backdrop-blur border-b border-[#e8eeed]">
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-[#e4ebe9]">
           <div className="px-5 sm:px-8 h-16 flex items-center gap-3 sm:gap-5">
             {/* Мобильный логотип */}
             <NavLink to="/" className="lg:hidden">
-              <span className="wordmark !text-lg" style={{ color: 'var(--color-teal)' }}>Спектр-Диагностика</span>
+              <span className="wordmark !text-lg">Спектр-Диагностика</span>
             </NavLink>
 
             {/* Поиск по замерам / пациентам */}
@@ -153,7 +159,7 @@ export default function Layout() {
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center rounded-[10px] min-w-[56px] py-1.5 px-2 transition-quick text-[11px] font-bold ${
                   isActive
-                    ? 'bg-teal text-white shadow-sm'
+                    ? 'bg-teal-dark text-white shadow-sm'
                     : 'text-teal-dark hover:bg-teal-bg'
                 }`
               }
