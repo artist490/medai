@@ -72,7 +72,10 @@ def _tool_call(name: str, call_id: str, args: dict | None = None) -> dict:
 
 
 class TestChatAgent:
-    def test_no_key_polite_fallback(self, client):
+    def test_no_key_polite_fallback(self, client, monkeypatch):
+        # Фолбэк проверяем детерминированно: в .env теперь есть живой ключ,
+        # поэтому на время теста отключаем его (иначе вызов уйдёт в реальный LLM).
+        monkeypatch.setattr(config, "LLM_API_KEY", "")
         p = _register(client, "p1@test.ru")
         client.post("/api/measurements", json={"pulse": 70}, headers=_auth(p))
         resp = client.post("/api/chat/send", json={"message": "Как моё давление?"},
@@ -181,7 +184,9 @@ class TestChatAgent:
         patients = json.loads(tool_msg["content"])
         assert len(patients) == 1
         assert patients[0]["id"] == p_vrn["user"]["id"]
-        assert str(p_bg["user"]["id"]) not in tool_msg["content"]
+        # сравниваем по полю id, а не подстрокой: цифра id может совпасть
+        # с цифрой в таймстампе замера (флейкий тест до правки)
+        assert p_bg["user"]["id"] not in [pt["id"] for pt in patients]
 
     def test_unknown_tool_rejected(self, client, monkeypatch):
         p = _register(client, "p6@test.ru")

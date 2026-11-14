@@ -18,14 +18,16 @@ export default function Register() {
   const navigate = useNavigate()
   const { user, loading, setUser } = useAuth()
 
+  // Хуки — строго до условных выходов (Rules of Hooks): иначе у нового
+  // посетителя (loading: true → false) порядок хуков меняется и React падает.
+  useEffect(() => {
+    api.fetchBranches().then((d) => setBranches(d.items)).catch(() => {})
+  }, [])
+
   if (loading) {
     return <div className="min-h-screen grid place-items-center text-teal-dark font-extrabold">Загрузка…</div>
   }
   if (user) return <Navigate to="/" replace />
-
-  useEffect(() => {
-    api.fetchBranches().then((d) => setBranches(d.items)).catch(() => {})
-  }, [])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
