@@ -9,11 +9,9 @@ import { Icon } from './Icon'
 import type { IconName } from './Icon'
 
 const patientNav: Array<{ to: string; label: string; icon: IconName }> = [
-  { to: '/', label: 'Обзор', icon: 'home' },
-  { to: '/new', label: 'Замер', icon: 'stethoscope' },
+  { to: '/', label: 'Дашборд', icon: 'home' },
   { to: '/medcard', label: 'Медкарта', icon: 'care' },
   { to: '/chat', label: 'Чат ИИ', icon: 'robot' },
-  { to: '/history', label: 'История', icon: 'chart' },
   { to: '/profile', label: 'Профиль', icon: 'profile' },
 ]
 
@@ -48,7 +46,7 @@ export default function Layout() {
   function submitSearch(e: FormEvent) {
     e.preventDefault()
     const q = query.trim()
-    navigate(q ? `${isDoctor ? '/patients' : '/history'}?q=${encodeURIComponent(q)}` : (isDoctor ? '/patients' : '/history'))
+    navigate(q ? `${isDoctor ? '/patients' : '/medcard?tab=meas'}${isDoctor ? '?' : '&'}q=${encodeURIComponent(q)}` : (isDoctor ? '/patients' : '/medcard?tab=meas'))
   }
 
   return (
@@ -149,6 +147,17 @@ export default function Layout() {
         </footer>
       </div>
 
+      {/* ---- FAB замера (мобильный, пациент) ---- */}
+      {!isDoctor && (
+        <button
+          className="fab-mobile fixed bottom-[86px] left-1/2 -translate-x-1/2 z-40 btn btn-gold rounded-full !min-h-[52px] !px-5 shadow-[0_6px_18px_rgba(23,46,42,0.25)]"
+          onClick={() => navigate('/new')}
+          aria-label="Новый замер"
+        >
+          + Новый замер
+        </button>
+      )}
+
       {/* ---- Мобильная нижняя навигация ---- */}
       <nav className="lg:hidden fixed bottom-4 left-0 right-0 z-40 px-4">
         <div className="max-w-md mx-auto bg-white rounded-2xl px-2 py-1.5 flex justify-around glow-soft border border-[#e8eeed]">
@@ -158,7 +167,7 @@ export default function Layout() {
               to={item.to}
               end={item.to === '/' || item.to === '/patients'}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center rounded-[10px] min-w-[48px] py-1.5 px-1.5 transition-quick text-[11px] font-bold ${
+                `flex flex-col items-center justify-center rounded-[10px] min-w-[70px] py-1.5 px-3 transition-quick text-[11px] font-bold ${
                   isActive
                     ? 'bg-teal-dark text-white shadow-sm'
                     : 'text-teal-dark hover:bg-teal-bg'

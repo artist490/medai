@@ -79,7 +79,7 @@ function Chart({ title, subtitle, icon, data, series }: {
   )
 }
 
-export default function History() {
+export default function MeasurementsHistory() {
   const [items, setItems] = useState<Measurement[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [error, setError] = useState('')
@@ -119,11 +119,12 @@ export default function History() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <div className="eyebrow">Динамика показателей</div>
-        <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>
-          История {query && <span className="text-teal-dark/40">· «{query}»</span>}
-        </h1>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="eyebrow">Замеры и динамика</div>
+          {query && <p className="text-xs text-[#8aa09c] mt-0.5">Поиск: «{query}»</p>}
+        </div>
+        <Link to="/new" className="btn btn-gold btn-sm">+ Новый замер</Link>
       </div>
 
       <Chart title="Давление, мм рт. ст." subtitle="Систолическое и диастолическое" icon="pressure"
@@ -152,7 +153,7 @@ export default function History() {
         <div className="flex items-center justify-between gap-3 mb-2">
           <h2 className="text-xl">Все замеры {filtered.length > 0 && <span className="text-teal-dark/40 text-base">· {filtered.length}</span>}</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" data-full-bleed>
           <table className="data-table">
             <thead>
               <tr>

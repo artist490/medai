@@ -483,6 +483,12 @@ h1, h2, h3, h4 {
   pointer-events: none;
 }
 
+/* FAB замера: только на мобильных (unlayered lg:hidden бьётся с .btn) */
+.fab-mobile { display: inline-flex; }
+@media (min-width: 1024px) {
+  .fab-mobile { display: none; }
+}
+
 /* Micro-interactions ≤ 500ms */
 .transition-quick { transition: all 0.2s ease; }
 

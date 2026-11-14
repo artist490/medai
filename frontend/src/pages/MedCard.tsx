@@ -1,5 +1,6 @@
 // Медкарта пациента: анкета-анамнез + приёмы (жалобы пациента, заключения врача).
 import { FormEvent, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import * as api from '../api'
 import { useAuth } from '../auth'
 import { brand, clinicCityUrl } from '../brand'
@@ -8,7 +9,16 @@ import { CardCompleteness, CardFormFields, defaultCardForm } from '../components
 import type { CardFormState } from '../components/CardAnamnesis'
 import RiskSystems from '../components/RiskSystems'
 import AnamnesisSurvey from '../components/AnamnesisSurvey'
+import MeasurementsHistory from '../components/MeasurementsHistory'
 import type { Measurement, MedCard, Visit, VisitStatus } from '../types'
+
+type CardTab = 'overview' | 'anamnesis' | 'meas'
+
+const TABS: Array<{ id: CardTab; label: string; icon: Parameters<typeof Icon>[0]['name'] }> = [
+  { id: 'overview', label: 'Обзор карты', icon: 'home' },
+  { id: 'anamnesis', label: 'Анкета', icon: 'check' },
+  { id: 'meas', label: 'Замеры', icon: 'chart' },
+]
 
 const STATUS_INFO: Record<VisitStatus, { cls: string; label: string }> = {
   planned: { cls: 'badge-teal', label: 'Запланирован' },
@@ -251,6 +261,13 @@ function VisitCard({ visit, onChanged }: { visit: Visit; onChanged: (visit: Visi
 // ---------- Страница ----------
 
 export default function MedCard() {
+  const [params, setParams] = useSearchParams()
+  const tab = (params.get('tab') as CardTab | null) ?? 'overview'
+  function setTab(next: CardTab) {
+    const q = new URLSearchParams(params)
+    q.set('tab', next)
+    setParams(q)
+  }
   const [card, setCard] = useState<MedCard | null>(null)
   const [visits, setVisits] = useState<Visit[]>([])
   const [items, setItems] = useState<Measurement[]>([])
@@ -331,38 +348,21 @@ export default function MedCard() {
         </h1>
       </div>
 
-      <RiskSystems items={items} survey={card.survey} onBook={bookFromRisk} />
+      <div className="flex gap-2 flex-wrap">
+        {TABS.map((tb) => (
+          <button
+            key={tb.id}
+            onClick={() => setTab(tb.id)}
+            className={`btn btn-sm ${tab === tb.id ? 'btn-gold' : 'btn-ghost'}`}
+          >
+            <Icon name={tb.icon} size={14} /> {tb.label}
+          </button>
+        ))}
+      </div>
 
-      <section>
-        <div className="section-title mb-3">
-          <span className="emoji-box"><Icon name="profile" size={20} /></span>
-          Анкета-анамнез
-        </div>
-        {showSurvey ? (
-          <AnamnesisSurvey
-            initial={card.survey}
-            onSaved={onSurveySaved}
-            onCancel={() => setShowSurvey(false)}
-          />
-        ) : (
-          <div className="flex flex-col gap-3">
-            <button className="flip-card flip-card--sky flex items-center gap-3 text-left hover:opacity-90 transition-quick"
-                    onClick={() => setShowSurvey(true)}>
-              <span className="emoji-box"><Icon name="check" size={20} /></span>
-              <span className="min-w-0">
-                <span className="block text-sm font-extrabold text-teal-dark">
-                  {card.survey ? 'Пройти опросник Минздрава заново' : 'Пройти опросник Минздрава (5 минут)'}
-                </span>
-                <span className="block text-xs font-bold text-teal-dark/55">
-                  28 вопросов как на диспансеризации: диагнозы, симптомы, привычки — заполняет форму автоматически
-                </span>
-              </span>
-              <span className="ml-auto text-teal-dark/40">→</span>
-            </button>
-            <AnamnesisForm card={card} />
-          </div>
-        )}
-      </section>
+      {tab === 'overview' && (
+        <>
+      <RiskSystems items={items} survey={card.survey} onBook={bookFromRisk} />
 
       <section id="visits-section">
         <div className="section-title mb-3 flex items-center gap-2">
@@ -417,6 +417,43 @@ export default function MedCard() {
           ))}
         </div>
       </section>
+        </>
+      )}
+
+      {tab === 'anamnesis' && (
+        <section>
+          <div className="section-title mb-3">
+            <span className="emoji-box"><Icon name="check" size={20} /></span>
+            Анкета-анамнез
+          </div>
+          {showSurvey ? (
+            <AnamnesisSurvey
+              initial={card.survey}
+              onSaved={onSurveySaved}
+              onCancel={() => setShowSurvey(false)}
+            />
+          ) : (
+            <div className="flex flex-col gap-3">
+              <button className="flip-card flip-card--sky flex items-center gap-3 text-left hover:opacity-90 transition-quick"
+                      onClick={() => setShowSurvey(true)}>
+                <span className="emoji-box"><Icon name="check" size={20} /></span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-extrabold text-teal-dark">
+                    {card.survey ? 'Пройти опросник Минздрава заново' : 'Пройти опросник Минздрава (5 минут)'}
+                  </span>
+                  <span className="block text-xs font-bold text-teal-dark/55">
+                    28 вопросов как на диспансеризации: диагнозы, симптомы, привычки — заполняет форму автоматически
+                  </span>
+                </span>
+                <span className="ml-auto text-teal-dark/40">→</span>
+              </button>
+              <AnamnesisForm card={card} />
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === 'meas' && <MeasurementsHistory />}
     </div>
   )
 }

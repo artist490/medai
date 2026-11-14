@@ -9,7 +9,7 @@ import Chat from './pages/Chat'
 import DoctorPatient from './pages/DoctorPatient'
 import NewMeasurement from './pages/NewMeasurement'
 import Result from './pages/Result'
-import History from './pages/History'
+
 import Profile from './pages/Profile'
 import MedCard from './pages/MedCard'
 
@@ -48,7 +48,7 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="new" element={<NewMeasurement />} />
         <Route path="result/:id" element={<Result />} />
-        <Route path="history" element={<History />} />
+        <Route path="history" element={<Navigate to="/medcard?tab=meas" replace />} />
         <Route path="medcard" element={<MedCard />} />
         <Route path="chat" element={<Chat />} />
         <Route path="profile" element={<Profile />} />

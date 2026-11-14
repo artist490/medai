@@ -313,7 +313,7 @@ export default function Dashboard() {
               <h2 className="text-lg">Последние замеры</h2>
               <Link to="/history" className="btn btn-ghost btn-sm">Вся история →</Link>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" data-full-bleed>
               <table className="data-table">
                 <thead>
                   <tr>
