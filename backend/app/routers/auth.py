@@ -1,14 +1,36 @@
 """Роутер авторизации и профиля."""
 import sqlite3
+import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+
+from datetime import datetime, timezone
 
 from .. import auth
 from ..database import db_session, get_db
 from ..schemas import LoginIn, ProfileIn, RegisterIn
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# Защита от брутфорса: не более LOGIN_MAX_FAILS неудачных входов
+# на пару «email + IP» за окно LOGIN_WINDOW секунд (in-memory, для локального
+# деплоя достаточно; при масштабировании — Redis).
+LOGIN_MAX_FAILS = 5
+LOGIN_WINDOW = 15 * 60
+_LOGIN_FAILS: dict[str, list[float]] = {}
+
+
+def _login_key(email: str, request: Request) -> str:
+    ip = request.client.host if request.client else "unknown"
+    return f"{email.lower()}|{ip}"
+
+
+def _login_blocked(key: str) -> bool:
+    now = time.time()
+    fresh = [t for t in _LOGIN_FAILS.get(key, []) if now - t < LOGIN_WINDOW]
+    _LOGIN_FAILS[key] = fresh
+    return len(fresh) >= LOGIN_MAX_FAILS
 
 
 def _branch_of(db: sqlite3.Connection, branch_id: Optional[int]) -> Optional[sqlite3.Row]:
@@ -87,10 +109,19 @@ def register(data: RegisterIn, db: sqlite3.Connection = Depends(get_db)):
 
 
 @router.post("/login")
-def login(data: LoginIn, db: sqlite3.Connection = Depends(get_db)):
+def login(data: LoginIn, request: Request, db: sqlite3.Connection = Depends(get_db)):
+    key = _login_key(data.email, request)
+    if _login_blocked(key):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,
+                            "Слишком много попыток входа — подождите 15 минут")
     user = db.execute("SELECT * FROM users WHERE email = ?", (data.email.lower(),)).fetchone()
     if user is None or not auth.verify_password(data.password, user["password_hash"]):
+        _LOGIN_FAILS.setdefault(key, []).append(time.time())
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный email или пароль")
+    _LOGIN_FAILS.pop(key, None)
+    # попутно убираем истёкшие сессии пользователя
+    db.execute("DELETE FROM sessions WHERE user_id = ? AND expires_at <= ?",
+               (user["id"], datetime.now(timezone.utc).isoformat()))
     token = auth.create_session(db, user["id"])
     db.commit()  # см. комментарий в register
     return {"token": token, "user": user_payload(user, _branch_of(db, user["branch_id"]))}

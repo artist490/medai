@@ -15,7 +15,6 @@ CHAT_MODEL: str = os.getenv("CHAT_MODEL", "deepseek-v4.1-flash-1017").strip()
 LLM_TIMEOUT: float = float(os.getenv("LLM_TIMEOUT", "20"))
 
 # --- Приложение ---
-SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret-do-not-use-in-prod")
 DATABASE_PATH: Path = Path(os.getenv("DATABASE_PATH", "medai.db"))
 if not DATABASE_PATH.is_absolute():
     DATABASE_PATH = BACKEND_DIR / DATABASE_PATH

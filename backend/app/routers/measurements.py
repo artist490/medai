@@ -90,7 +90,15 @@ def create_measurement(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                             "Заполните хотя бы один показатель")
 
-    recorded_at = data.recorded_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if data.recorded_at:
+        try:
+            dt = datetime.fromisoformat(data.recorded_at.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                "Некорректная дата замера — ожидается ISO, например 2026-01-31 14:30")
+        recorded_at = dt.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        recorded_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     columns = ", ".join(values.keys())
     placeholders = ", ".join("?" for _ in values)
     cursor = db.execute(

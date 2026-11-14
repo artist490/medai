@@ -1,6 +1,7 @@
 """Авторизация: pbkdf2-хэши паролей и bearer-токены сессий."""
 import hashlib
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 

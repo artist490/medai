@@ -1,6 +1,7 @@
 """SQLite-подключение (WAL) и схема таблиц."""
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from typing import Iterator
 
 from . import config
@@ -155,3 +156,5 @@ def init_db() -> None:
             "INSERT OR IGNORE INTO branches (city, phone) VALUES (?, ?)",
             BRANCHES_SEED,
         )
+        db.execute("DELETE FROM sessions WHERE expires_at <= ?",
+                   (datetime.now(timezone.utc).isoformat(),))

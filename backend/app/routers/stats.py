@@ -2,7 +2,7 @@
 import sqlite3
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from .. import auth
 from ..database import get_db
@@ -15,7 +15,7 @@ CHART_FIELDS = ("systolic", "diastolic", "pulse", "temperature", "spo2",
 
 @router.get("")
 def stats(
-    limit: int = 60,
+    limit: int = Query(default=60, ge=1, le=200),
     user: sqlite3.Row = Depends(auth.get_current_user),
     db: sqlite3.Connection = Depends(get_db),
 ):
