@@ -511,27 +511,30 @@ export default function DoctorPatient() {
         <Link to="/patients" className="btn btn-ghost">← К списку</Link>
       </div>
 
-      {/* Профиль */}
-      <section className="panel">
-        <div className="flex flex-wrap gap-x-10 gap-y-3 text-sm font-bold text-teal-dark/80">
-          <span><span className="text-teal-dark/50">Email:</span> {patient.email}</span>
-          <span><span className="text-teal-dark/50">Возраст:</span> {patient.age ?? '—'}</span>
-          <span><span className="text-teal-dark/50">Пол:</span> {sexLabel(patient.sex)}</span>
-          <span><span className="text-teal-dark/50">Рост:</span> {patient.height_cm ? `${patient.height_cm} см` : '—'}</span>
+      {/* Профиль: аватар + мета-чипы */}
+      <section className="panel flex flex-wrap items-center gap-x-6 gap-y-3">
+        <span className="row-avatar row-avatar--green !w-12 !h-12 text-base">
+          {(patient.name || patient.email || '?').slice(0, 2).toUpperCase()}
+        </span>
+        <div className="flex flex-wrap gap-2 text-sm font-bold">
+          <span className="badge badge-teal normal-case tracking-normal">{patient.email}</span>
+          <span className="badge badge-sky normal-case tracking-normal">возраст: {patient.age ?? '—'}</span>
+          <span className="badge badge-sky normal-case tracking-normal">пол: {sexLabel(patient.sex)}</span>
+          <span className="badge badge-sky normal-case tracking-normal">
+            рост: {patient.height_cm ? `${patient.height_cm} см` : '—'}
+          </span>
         </div>
       </section>
 
-      {/* Вкладки */}
-      <div className="flex gap-1 bg-white rounded-xl p-1 border border-[#e5e7eb] w-fit no-print">
+      {/* Вкладки — пилюли, как в медкарте пациента */}
+      <div className="flex gap-2 flex-wrap no-print">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-4 py-2 rounded-[8px] text-sm font-extrabold transition-quick inline-flex items-center gap-1.5 ${
-              tab === t.key ? 'bg-teal-dark text-white' : 'text-teal-dark hover:bg-teal-bg'
-            }`}
+            className={`btn btn-sm btn-pill ${tab === t.key ? 'btn-gold' : 'btn-ghost'}`}
           >
-            <Icon name={t.icon} size={16} />
+            <Icon name={t.icon} size={14} />
             {t.label}
             {t.key === 'visits' && plannedCount > 0 && (
               <span className={`badge ${tab === t.key ? 'badge-gold' : 'badge-teal'} normal-case tracking-normal !px-1.5`}>{plannedCount}</span>
