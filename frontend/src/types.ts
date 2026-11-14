@@ -91,6 +91,8 @@ export interface PatientRow {
   created_at: string
   last_measurement_at: string | null
   last_risk: RiskLevel | null
+  survey_alarms: number          // тревожные ответы опросника МЗ
+  planned_visits: number         // плановые приёмы
   requires_attention: boolean
   counts: { green: number; yellow: number; red: number }
   total: number

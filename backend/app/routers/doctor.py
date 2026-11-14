@@ -32,6 +32,24 @@ def _notes_for(db: sqlite3.Connection, analysis_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+# Тревожные ответы опросника МЗ (синхронно с ALARM_KEYS в AnamnesisSurvey.tsx)
+ALARM_SURVEY_KEYS = frozenset({
+    "sym_chest_pain", "sym_sudden_weakness", "sym_sudden_numbness", "sym_vision_loss",
+    "sym_hemoptysis", "sym_black_stool", "sym_blood_in_stool", "sym_weight_loss",
+})
+
+
+def _survey_alarm_count(survey_raw: str | None) -> int:
+    """Сколько тревожных пунктов опросника отметил пациент."""
+    if not survey_raw:
+        return 0
+    try:
+        data = json.loads(survey_raw)
+    except (json.JSONDecodeError, TypeError):
+        return 0
+    return sum(1 for key in ALARM_SURVEY_KEYS if data.get(key) is True)
+
+
 @router.get("/patients")
 def list_patients(
     user: sqlite3.Row = Depends(auth.get_current_doctor),
@@ -67,11 +85,23 @@ def list_patients(
                 if last_risk is None:
                     last_risk, last_at = risk, row["recorded_at"]
 
+        # Сигналы вне замеров: тревожные ответы опросника МЗ и плановые приёмы
+        card = db.execute(
+            "SELECT survey FROM patient_cards WHERE user_id = ?", (p["id"],)
+        ).fetchone()
+        survey_alarms = _survey_alarm_count(card["survey"] if card else None)
+        planned_visits = db.execute(
+            "SELECT COUNT(*) FROM visits WHERE patient_id = ? AND status = 'planned'",
+            (p["id"],),
+        ).fetchone()[0]
+
         items.append({
             **_patient_payload(p),
             "last_measurement_at": last_at,
             "last_risk": last_risk,
-            "requires_attention": last_risk == "red",  # urgent всегда даёт red
+            "survey_alarms": survey_alarms,
+            "planned_visits": planned_visits,
+            "requires_attention": last_risk == "red" or survey_alarms > 0,  # urgent всегда даёт red
             "counts": counts,
             "total": len(rows),
         })

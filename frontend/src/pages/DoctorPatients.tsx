@@ -52,8 +52,10 @@ function AttentionCard({ p }: { p: PatientRow }) {
         <span className="badge badge-red">тревога</span>
       </div>
       <p className="text-sm text-teal-dark/85">
-        Последний замер {shortDate(p.last_measurement_at)} — риск «Тревога».
-        Требуется разбор показателей.
+        {(p.survey_alarms ?? 0) > 0
+          ? `Опросник: ${p.survey_alarms} ${p.survey_alarms === 1 ? 'тревожный пункт' : 'тревожных пункта'}. `
+          : `Последний замер ${shortDate(p.last_measurement_at)} — риск «Тревога». `}
+        Требуется разбор.
       </p>
     </Link>
   )
@@ -161,9 +163,21 @@ export default function DoctorPatients() {
                         <div className="text-xs text-teal-dark/60">всего: {p.total}</div>
                       </td>
                       <td>
-                        {p.last_risk ? (
-                          <span className={`${riskBadge[p.last_risk]} badge`}>{riskLabels[p.last_risk]}</span>
-                        ) : '—'}
+                        <div className="flex flex-col gap-1 items-start">
+                          {p.last_risk ? (
+                            <span className={`${riskBadge[p.last_risk]} badge`}>{riskLabels[p.last_risk]}</span>
+                          ) : <span className="text-teal-dark/40">—</span>}
+                          {(p.survey_alarms ?? 0) > 0 && (
+                            <span className="badge badge-red normal-case tracking-normal">
+                              опросник: {p.survey_alarms}
+                            </span>
+                          )}
+                          {(p.planned_visits ?? 0) > 0 && (
+                            <span className="badge badge-teal normal-case tracking-normal">
+                              приём {p.planned_visits === 1 ? 'запланирован' : `× ${p.planned_visits}`}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="text-xs text-teal-dark/70 whitespace-nowrap">
                         <span className="mr-2 inline-flex items-center gap-1"><Icon name="check" size={12} />{p.counts.green}</span>

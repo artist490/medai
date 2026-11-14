@@ -104,6 +104,45 @@ class TestDoctorAccess:
         assert resp.status_code == 404
 
 
+class TestPatientSignals:
+    """Сигналы в списке пациентов: тревожные ответы опросника и плановые приёмы."""
+
+    def _doctor(self, client, code: str, email: str):
+        _make_invite(client, code)
+        return _register(client, email, invite_code=code)
+
+    def test_survey_alarm_raises_attention(self, client):
+        d = self._doctor(client, "invite-sg-1", "sg1@test.ru")
+        p = _register(client, "p-sg1@test.ru")
+        survey = '{"sym_hemoptysis": true, "sym_black_stool": true}'
+        client.put("/api/medcard", json={"survey": survey}, headers=_auth(p))
+
+        items = client.get("/api/doctor/patients", headers=_auth(d)).json()["items"]
+        row = next(i for i in items if i["id"] == p["user"]["id"])
+        assert row["survey_alarms"] == 2
+        assert row["requires_attention"] is True  # тревожный опросник без единого замера
+
+    def test_planned_visit_counted(self, client):
+        d = self._doctor(client, "invite-sg-2", "sg2@test.ru")
+        p = _register(client, "p-sg2@test.ru")
+        client.post("/api/visits", json={"complaints": "Головная боль"}, headers=_auth(p))
+
+        items = client.get("/api/doctor/patients", headers=_auth(d)).json()["items"]
+        row = next(i for i in items if i["id"] == p["user"]["id"])
+        assert row["planned_visits"] == 1
+        assert row["requires_attention"] is False  # приём — сигнал, но не тревога
+
+    def test_no_false_attention_from_clean_survey(self, client):
+        d = self._doctor(client, "invite-sg-3", "sg3@test.ru")
+        p = _register(client, "p-sg3@test.ru")
+        client.put("/api/medcard", json={"survey": '{"dx_hypertension": true}'}, headers=_auth(p))
+
+        items = client.get("/api/doctor/patients", headers=_auth(d)).json()["items"]
+        row = next(i for i in items if i["id"] == p["user"]["id"])
+        assert row["survey_alarms"] == 0  # диагноз без тревожных симптомов не сигнал
+        assert row["requires_attention"] is False
+
+
 class TestAttentionFlagAndNotes:
     def _doctor(self, client):
         _make_invite(client, "invite-doc-6")
