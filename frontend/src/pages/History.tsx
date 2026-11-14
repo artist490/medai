@@ -122,7 +122,7 @@ export default function History() {
     <div className="flex flex-col gap-6">
       <div>
         <div className="eyebrow">Динамика показателей</div>
-        <h1 className="text-4xl mt-1.5" style={{ fontSize: 36 }}>
+        <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>
           История {query && <span className="text-teal-dark/40">· «{query}»</span>}
         </h1>
       </div>

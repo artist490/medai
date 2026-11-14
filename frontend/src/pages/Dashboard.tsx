@@ -135,7 +135,7 @@ export default function Dashboard() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="eyebrow">Обзор здоровья</div>
-          <h1 className="text-4xl mt-1.5" style={{ fontSize: 36 }}>Медицинский дашборд</h1>
+          <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>Медицинский дашборд</h1>
         </div>
         <div className="flex items-center gap-3">
           {latest && (

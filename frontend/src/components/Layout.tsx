@@ -142,14 +142,14 @@ export default function Layout() {
 
       {/* ---- Мобильная нижняя навигация ---- */}
       <nav className="lg:hidden fixed bottom-4 left-0 right-0 z-40 px-4">
-        <div className="max-w-md mx-auto bg-white rounded-full px-2 py-2 flex justify-around glow-teal">
+        <div className="max-w-md mx-auto bg-white rounded-2xl px-2 py-1.5 flex justify-around glow-soft border border-[#e8eeed]">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/' || item.to === '/patients'}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center rounded-full min-w-[70px] py-1.5 px-3 transition-quick text-[11px] font-extrabold tracking-wide ${
+                `flex flex-col items-center justify-center rounded-[10px] min-w-[70px] py-1.5 px-3 transition-quick text-[11px] font-bold ${
                   isActive
                     ? 'bg-teal text-white shadow-sm'
                     : 'text-teal-dark hover:bg-teal-bg'

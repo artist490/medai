@@ -43,7 +43,7 @@ export default function Result() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="eyebrow">Результат анализа</div>
-          <h1 className="text-4xl mt-1.5" style={{ fontSize: 36 }}>Разбор замера</h1>
+          <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>Разбор замера</h1>
           <p className="text-sm text-teal-dark/60 mt-1.5">Анализ от {a.created_at.slice(0, 16)}</p>
         </div>
         <div className="flex items-center gap-3">

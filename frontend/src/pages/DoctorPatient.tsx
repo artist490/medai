@@ -115,7 +115,7 @@ export default function DoctorPatient() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="eyebrow"><Link to="/patients" className="hover:underline">Пациенты</Link> · карточка</div>
-          <h1 className="text-4xl mt-1.5" style={{ fontSize: 36 }}>{patient.name || '(без имени)'}</h1>
+          <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>{patient.name || '(без имени)'}</h1>
         </div>
         <Link to="/patients" className="btn btn-ghost">← К списку</Link>
       </div>

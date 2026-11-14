@@ -39,7 +39,7 @@ export default function Profile() {
     <div className="flex flex-col gap-5">
       <div className="mb-1">
         <div className="eyebrow">Настройки аккаунта</div>
-        <h1 className="text-4xl mt-1.5" style={{ fontSize: 36 }}>Профиль <Icon name="profile" size={26} className="inline-block align-[-4px]" /></h1>
+        <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>Профиль <Icon name="profile" size={26} className="inline-block align-[-4px]" /></h1>
       </div>
 
       <form onSubmit={submit} className="bg-white rounded-xl p-6 glow-soft flex flex-col gap-4 max-w-md">
