@@ -48,9 +48,10 @@ function StatCard(props: {
   value: string
   unit?: string
   status?: Status
+  featured?: boolean
 }) {
   return (
-    <div className="stat-card" style={{ borderLeftColor: props.accent }}>
+    <div className={`stat-card ${props.featured ? 'stat-card--hero' : ''}`} style={{ borderLeftColor: props.accent }}>
       <div className="flex items-start justify-between gap-2">
         <span className={`icon-tile icon-tile--${props.tile}`}><Icon name={props.icon} size={24} /></span>
         <StatusPill status={props.status} />
@@ -156,6 +157,7 @@ export default function Dashboard() {
               value={bpItem ? `${bpItem.systolic}/${bpItem.diastolic ?? '—'}` : '—'}
               unit={bpItem ? 'мм рт. ст.' : undefined}
               status={bpFinding?.status}
+              featured
             />
             <StatCard
               tile="teal" icon="pulse" accent="#2BA8A2" label="Пульс"

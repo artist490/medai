@@ -79,7 +79,7 @@ export default function Chat() {
   const chips = user?.role === 'doctor' ? DOCTOR_CHIPS : PATIENT_CHIPS
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 w-full max-w-3xl mx-auto">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="eyebrow">ИИ-ассистент клиники</div>
