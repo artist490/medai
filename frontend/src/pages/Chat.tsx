@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as api from '../api'
 import { useAuth } from '../auth'
 import { Icon } from '../components/Icon'
+import EmptyArt from '../components/EmptyArt'
 import type { ChatMessage } from '../types'
 
 const TOOL_LABELS: Record<string, string> = {
@@ -135,8 +136,9 @@ export default function Chat() {
       >
         {items.length === 0 && (
           <div className="grid place-items-center py-8 text-center">
-            <span className="icon-tile icon-tile--teal mb-2"><Icon name="sparkle" size={24} /></span>
-            <p className="text-sm text-teal-dark/60 max-w-sm">
+            <EmptyArt className="mx-auto mb-2" />
+            <p className="text-base font-bold text-[#1b2622]">Пока нет сообщений</p>
+            <p className="text-sm text-teal-dark/60 max-w-sm mt-1">
               Задайте вопрос о показателях — ассистент сам посмотрит нужные замеры
               и разборы через инструменты.
             </p>

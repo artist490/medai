@@ -122,10 +122,13 @@ h1, h2, h3, h4 {
   flex-shrink: 0;
   transition: background 0.15s ease, color 0.15s ease;
 }
+/* Цветные акценты пунктов (как у Сбер Здоровья) — нейтральная плитка сохранена */
+.sidebar-icon--coral { color: #d94f43; }
+.sidebar-icon--sky   { color: #3a8fc7; }
+.sidebar-icon--gold  { color: #c29400; }
 .sidebar-link:hover .sidebar-icon { background: #e7efee; }
 .sidebar-link.active .sidebar-icon {
   background: rgba(255, 255, 255, 0.85);
-  color: var(--color-teal-dark);
 }
 
 /* --- Топбар --- */
@@ -465,6 +468,34 @@ h1, h2, h3, h4 {
 .btn-danger:hover { filter: brightness(1.06); transform: translateY(-1px); }
 
 .btn-sm { min-height: 32px; padding: 5px 12px; font-size: 12px; border-radius: 10px; }
+
+/* Кнопка-пилюля (фильтры-табы, как у Сбер Здоровья) */
+.btn-pill { border-radius: 999px !important; }
+
+/* Плавающая кнопка ИИ-помощника (desktop) */
+.ai-fab {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #00b8a9, #007b83);
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 123, 131, 0.30), 0 16px 36px -10px rgba(0, 123, 131, 0.55);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+.ai-fab:hover { transform: translateY(-2px) scale(1.03); filter: brightness(1.05); }
+.ai-fab:active { transform: scale(0.97); }
+@media (max-width: 1023px) {
+  .ai-fab { display: none; }
+}
 
 /* ---------- Карточки с левым маркером (статусы) ---------- */
 

@@ -353,7 +353,7 @@ export default function MedCard() {
           <button
             key={tb.id}
             onClick={() => setTab(tb.id)}
-            className={`btn btn-sm ${tab === tb.id ? 'btn-gold' : 'btn-ghost'}`}
+            className={`btn btn-sm btn-pill ${tab === tb.id ? 'btn-gold' : 'btn-ghost'}`}
           >
             <Icon name={tb.icon} size={14} /> {tb.label}
           </button>

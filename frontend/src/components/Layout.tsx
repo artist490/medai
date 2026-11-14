@@ -1,29 +1,33 @@
 // Каркас в стиле Flip7 SaaS: сайдбар слева, топбар с поиском, контент, футер.
 // На мобильных сайдбар скрывается — остаётся нижняя pill-навигация.
 // Навигация зависит от роли: пациент — личные вкладки, врач — кабинет пациентов.
+// Сайдбар как у Сбер Здоровья: профиль-блок, пункты с подписями и цветными
+// акцентами иконок (teal/коралл/небо/золото — статусная семантика сохранена).
 import { FormEvent, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { brand } from '../brand'
 import { Icon } from './Icon'
 import type { IconName } from './Icon'
 
-const patientNav: Array<{ to: string; label: string; icon: IconName }> = [
-  { to: '/', label: 'Дашборд', icon: 'home' },
-  { to: '/medcard', label: 'Медкарта', icon: 'care' },
-  { to: '/chat', label: 'Чат ИИ', icon: 'robot' },
-  { to: '/profile', label: 'Профиль', icon: 'profile' },
+type NavItem = { to: string; label: string; sub: string; icon: IconName; accent: 'teal' | 'coral' | 'sky' | 'gold' }
+
+const patientNav: NavItem[] = [
+  { to: '/', label: 'Дашборд', sub: 'Обзор здоровья', icon: 'home', accent: 'teal' },
+  { to: '/medcard', label: 'Медкарта', sub: 'Анкета, приёмы, замеры', icon: 'care', accent: 'coral' },
+  { to: '/chat', label: 'Чат ИИ', sub: 'Ассистент клиники', icon: 'robot', accent: 'sky' },
+  { to: '/profile', label: 'Профиль', sub: 'Личные данные', icon: 'profile', accent: 'gold' },
 ]
 
-const doctorNav: Array<{ to: string; label: string; icon: IconName }> = [
-  { to: '/patients', label: 'Пациенты', icon: 'chart' },
-  { to: '/chat', label: 'Чат ИИ', icon: 'robot' },
-  { to: '/profile', label: 'Профиль', icon: 'profile' },
+const doctorNav: NavItem[] = [
+  { to: '/patients', label: 'Пациенты', sub: 'Кабинет врача', icon: 'chart', accent: 'teal' },
+  { to: '/chat', label: 'Чат ИИ', sub: 'Ассистент врача', icon: 'robot', accent: 'sky' },
+  { to: '/profile', label: 'Профиль', sub: 'Личные данные', icon: 'profile', accent: 'gold' },
 ]
 
 function initialsOf(name: string, email: string): string {
   const base = (name || email || '?').trim()
-  if (!base.includes('@')) {
+  if (base.includes('@')) {
     const parts = base.split(/\s+/).filter(Boolean)
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
     return base.slice(0, 2).toUpperCase()
@@ -31,12 +35,23 @@ function initialsOf(name: string, email: string): string {
   return base.slice(0, 2).toUpperCase()
 }
 
+// Русские склонения возраста: 31 год, 34 года, 40 лет
+function ageWord(age: number): string {
+  const mod10 = age % 10
+  const mod100 = age % 100
+  if (mod10 === 1 && mod100 !== 11) return 'год'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'года'
+  return 'лет'
+}
+
 export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [query, setQuery] = useState('')
   const isDoctor = user?.role === 'doctor'
   const navItems = isDoctor ? doctorNav : patientNav
+  const onChat = location.pathname.startsWith('/chat')
 
   async function handleLogout() {
     await logout()
@@ -67,7 +82,20 @@ export default function Layout() {
             </div>
           </NavLink>
 
-          <nav className="mt-10 flex flex-col gap-1.5">
+          {/* Профиль-блок как у Сбер Здоровья: аватар, имя, возраст/роль */}
+          <div className="mt-8 flex items-center gap-3 px-2">
+            <span className="avatar-circle" style={{ width: 44, height: 44, borderRadius: 999, fontSize: 14 }}>
+              {initialsOf(user?.name ?? '', user?.email ?? '')}
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-[#1b2622] truncate">{user?.name || user?.email}</div>
+              <div className="text-xs text-[#8aa09c]">
+                {user?.age ? `${user.age} ${ageWord(user.age)}` : (isDoctor ? 'врач клиники' : 'пациент')}
+              </div>
+            </div>
+          </div>
+
+          <nav className="mt-6 flex flex-col gap-1.5">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -75,8 +103,11 @@ export default function Layout() {
                 end={item.to === '/' || item.to === '/patients'}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="sidebar-icon"><Icon name={item.icon} size={22} /></span>
-                {item.label}
+                <span className={`sidebar-icon sidebar-icon--${item.accent}`}><Icon name={item.icon} size={20} /></span>
+                <span className="flex flex-col leading-tight min-w-0">
+                  <span>{item.label}</span>
+                  <span className="text-[10px] font-semibold text-[#8aa09c] truncate">{item.sub}</span>
+                </span>
               </NavLink>
             ))}
           </nav>
@@ -180,6 +211,13 @@ export default function Layout() {
           ))}
         </div>
       </nav>
+
+      {/* ---- Плавающая кнопка ИИ-помощника (desktop, как у Сбер Здоровья) ---- */}
+      {!onChat && (
+        <button className="ai-fab" onClick={() => navigate('/chat')} aria-label="Открыть чат с ИИ-помощником" title="ИИ-помощник">
+          <Icon name="sparkle" size={22} />
+        </button>
+      )}
     </div>
   )
 }

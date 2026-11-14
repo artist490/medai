@@ -9,6 +9,7 @@ import type { Finding, Measurement, Stats, Visit } from '../types'
 import type { RiskLevel, Status } from '../types'
 import { Icon } from '../components/Icon'
 import type { IconName } from '../components/Icon'
+import EmptyArt from '../components/EmptyArt'
 import { Summary } from '../components/Summary'
 
 const riskColors: Record<RiskLevel, string> = {
@@ -364,7 +365,7 @@ export default function Dashboard() {
         </>
       ) : (
         <div className="panel p-10 text-center">
-          <span className="icon-tile icon-tile--teal mb-3"><Icon name="stethoscope" size={30} /></span>
+          <EmptyArt className="mx-auto mb-2" />
           <h2 className="text-xl mb-2">Пока нет замеров</h2>
           <p className="text-sm text-[#5b6b68] mb-5 max-w-sm mx-auto">
             Внесите первый замер — давление, пульс, сон или шаги — и система разберёт показатели и даст рекомендации.
