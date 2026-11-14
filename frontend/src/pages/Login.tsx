@@ -34,15 +34,15 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4 py-10">
+    <div className="auth-bg min-h-screen flex flex-col items-center justify-center px-4 py-10">
       {/* Hero: логотип клиники */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-8 auth-logo">
         <img src={brand.logo} alt={brand.name} style={{ maxWidth: 340, width: '100%' }} />
       </div>
 
       <form
         onSubmit={submit}
-        className="w-full max-w-sm bg-white rounded-xl p-6 glow-teal flex flex-col gap-4"
+        className="auth-card w-full max-w-sm flex flex-col gap-4"
       >
         <h1 className="text-2xl text-center">Вход <Icon name="wave" size={22} className="inline-block align-[-3px]" /></h1>
 

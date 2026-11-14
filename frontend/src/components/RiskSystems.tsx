@@ -123,8 +123,8 @@ export default function RiskSystems({ items, survey, onBook }: {
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-extrabold text-teal-dark">{r.def.label}</span>
                 {meta ? (
+                  // точку рисует сам .badge (::before) — дублировать не нужно
                   <span className={`badge ${meta.badge} normal-case tracking-normal`}>
-                    <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ background: meta.color }} />
                     {meta.label}
                   </span>
                 ) : (

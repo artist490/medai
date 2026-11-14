@@ -169,21 +169,23 @@ export default function Dashboard() {
         <>
           {/* Ряд 1: hero давления + donut */}
           <div className="grid lg:grid-cols-[2fr_1fr] gap-4 items-stretch">
-            <div className="stat-card stat-card--hero flex flex-col justify-between">
+            <div className="stat-card stat-card--hero stat-card--hero-gradient flex flex-col justify-between">
               <div className="flex items-start justify-between gap-3">
                 <span className="stat-label flex items-center gap-2">
-                  <Icon name="pressure" size={16} className="opacity-60" />
+                  <Icon name="pressure" size={16} className="opacity-70" />
                   Давление
                 </span>
-                <StatusPill status={bpFinding?.status} />
+                <span className={`hero-pill ${bpFinding ? `hero-pill--${bpFinding.status}` : ''}`}>
+                  {bpFinding ? statusText[bpFinding.status] : 'нет данных'}
+                </span>
               </div>
               <div className="stat-value mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <span className="whitespace-nowrap">{bpItem ? `${bpItem.systolic}/${bpItem.diastolic ?? '—'}` : '—'}</span>
                 {bpItem && <span className="stat-unit text-sm font-bold whitespace-nowrap">мм рт. ст.</span>}
               </div>
-              {bpFinding && <p className="mt-2 text-sm text-[#5b6b68] max-w-md">{bpFinding.message}</p>}
+              {bpFinding && <p className="mt-2 text-sm text-white/85 max-w-md">{bpFinding.message}</p>}
               {bpItem && (
-                <div className="mt-4 text-xs text-[#8aa09c]">
+                <div className="mt-4 text-xs text-white/60">
                   Последний замер с давлением: {shortDate(bpItem.recorded_at)}
                 </div>
               )}
