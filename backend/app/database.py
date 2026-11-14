@@ -6,6 +6,13 @@ from typing import Iterator
 from . import config
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS branches (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    city    TEXT NOT NULL UNIQUE,
+    phone   TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     email         TEXT NOT NULL UNIQUE,
@@ -15,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
     sex           TEXT CHECK (sex IN ('male', 'female') OR sex IS NULL),
     height_cm     REAL,
     role          TEXT NOT NULL DEFAULT 'patient' CHECK (role IN ('patient', 'doctor')),
+    branch_id     INTEGER REFERENCES branches(id) ON DELETE SET NULL,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -71,7 +79,34 @@ CREATE TABLE IF NOT EXISTS doctor_notes (
     text        TEXT NOT NULL,
     created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role       TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content    TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
 """
+
+# Федеральная сеть «Спектр-диагностика»: города и телефоны с spdmed.ru
+BRANCHES_SEED = [
+    ("Белая Калитва", "+7 (863) 832-52-55"),
+    ("Белгород", "+7 (930) 451-55-55"),
+    ("Брянск", "+7 (930) 735-88-88"),
+    ("Бутурлиновка", "+7 (930) 429-33-33"),
+    ("Воронеж", "+7 (920) 451-11-11"),
+    ("Вязьма", "+7 (920) 333-77-33"),
+    ("Калининград", "+7 (401) 279-59-00"),
+    ("Калуга", "+7 (920) 095-33-33"),
+    ("Каменск-Шахтинский", "+7 (928) 617-01-16"),
+    ("Клинцы", "+7 (483) 364-09-54"),
+    ("Михайловка", "+7 (937) 555-93-93"),
+    ("Россошь", "+7 (920) 216-07-07"),
+    ("Сочи", "+7 (862) 555-29-45"),
+    ("Таганрог", "+7 (928) 289-23-28"),
+    ("Тамбов", "+7 (920) 230-33-33"),
+]
 
 
 def _migrate(db: sqlite3.Connection) -> None:
@@ -79,6 +114,8 @@ def _migrate(db: sqlite3.Connection) -> None:
     columns = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
     if "role" not in columns:
         db.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'patient'")
+    if "branch_id" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN branch_id INTEGER REFERENCES branches(id)")
 
 
 def connect() -> sqlite3.Connection:
@@ -114,3 +151,7 @@ def init_db() -> None:
     with db_session() as db:
         db.executescript(SCHEMA)
         _migrate(db)
+        db.executemany(
+            "INSERT OR IGNORE INTO branches (city, phone) VALUES (?, ?)",
+            BRANCHES_SEED,
+        )

@@ -6,6 +6,7 @@ import { Icon } from '../components/Icon'
 import type { PatientRow } from '../types'
 import type { RiskLevel } from '../types'
 import { brand } from '../brand'
+import { useAuth } from '../auth'
 
 const riskBadge: Record<RiskLevel, string> = {
   green: 'badge-green',
@@ -59,6 +60,7 @@ function AttentionCard({ p }: { p: PatientRow }) {
 }
 
 export default function DoctorPatients() {
+  const { user } = useAuth()
   const [items, setItems] = useState<PatientRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -86,7 +88,9 @@ export default function DoctorPatients() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="eyebrow">Кабинет врача</div>
-          <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>Пациенты клиники</h1>
+          <h1 className="mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>
+            {user?.branch ? `Пациенты · ${user.branch.city}` : 'Пациенты клиники'}
+          </h1>
         </div>
         <span className="badge badge-teal normal-case tracking-normal w-fit">
           Всего пациентов: {items.length}

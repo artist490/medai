@@ -7,10 +7,11 @@ from dotenv import load_dotenv
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BACKEND_DIR / ".env")
 
-# --- LLM ---
+# --- LLM (PlusVibe API, OpenAI-совместимый: https://plusvibeapi.ru/v1) ---
 LLM_API_KEY: str = os.getenv("LLM_API_KEY", "").strip()
 LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1").strip().rstrip("/")
 LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
+CHAT_MODEL: str = os.getenv("CHAT_MODEL", "deepseek-v4.1-flash-1017").strip()
 LLM_TIMEOUT: float = float(os.getenv("LLM_TIMEOUT", "20"))
 
 # --- Приложение ---

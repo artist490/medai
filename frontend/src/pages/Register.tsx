@@ -1,26 +1,37 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as api from '../api'
 import { useAuth } from '../auth'
 import { Icon } from '../components/Icon'
 import { brand } from '../brand'
+import type { Branch } from '../types'
 
 export default function Register() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [branchId, setBranchId] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
   const { setUser } = useAuth()
 
+  useEffect(() => {
+    api.fetchBranches().then((d) => setBranches(d.items)).catch(() => {})
+  }, [])
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     setError('')
+    if (!branchId) {
+      setError('Выберите филиал клиники')
+      return
+    }
     setBusy(true)
     try {
-      const user = await api.register(email.trim(), password, name.trim(), inviteCode.trim() || undefined)
+      const user = await api.register(email.trim(), password, name.trim(), inviteCode.trim() || undefined, Number(branchId))
       setUser(user)
       navigate('/')
     } catch (err) {
@@ -84,6 +95,23 @@ export default function Register() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+        </div>
+
+        <div>
+          <label className="flip-label" htmlFor="branch">Филиал клиники</label>
+          <select
+            id="branch"
+            required
+            className="flip-input"
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+          >
+            <option value="">Выберите город…</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>{b.city}</option>
+            ))}
+          </select>
+          <div className="flip-hint">Город ближайшего центра «Спектр-Диагностика».</div>
         </div>
 
         <div>

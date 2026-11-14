@@ -1,5 +1,5 @@
 // API-клиент: bearer-токен в localStorage, единая обработка ошибок.
-import type { DoctorNote, Measurement, PatientRow, Stats, User } from './types'
+import type { Branch, ChatMessage, DoctorNote, Measurement, PatientRow, Stats, User } from './types'
 
 const TOKEN_KEY = 'medai_token'
 
@@ -45,7 +45,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // ---------- auth ----------
 
-export async function register(email: string, password: string, name: string, inviteCode?: string) {
+export async function register(
+  email: string, password: string, name: string,
+  inviteCode?: string, branchId?: number,
+) {
   const data = await request<{ token: string; user: User }>('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({
@@ -53,10 +56,19 @@ export async function register(email: string, password: string, name: string, in
       password,
       name,
       ...(inviteCode ? { invite_code: inviteCode } : {}),
+      ...(branchId ? { branch_id: branchId } : {}),
     }),
   })
   setToken(data.token)
   return data.user
+}
+
+export async function fetchBranches(): Promise<{ items: Branch[] }> {
+  return request('/api/auth/branches')
+}
+
+export async function fetchMe(): Promise<User> {
+  return request<User>('/api/auth/me')
 }
 
 export async function login(email: string, password: string) {
@@ -73,11 +85,9 @@ export async function logout() {
   setToken(null)
 }
 
-export async function fetchMe(): Promise<User> {
-  return request<User>('/api/auth/me')
-}
-
-export async function updateProfile(patch: Partial<User>): Promise<User> {
+export async function updateProfile(
+  patch: Partial<User> & { branch_id?: number | null },
+): Promise<User> {
   return request<User>('/api/auth/me', { method: 'PUT', body: JSON.stringify(patch) })
 }
 
@@ -139,4 +149,24 @@ export async function addDoctorNote(analysisId: number, text: string): Promise<D
     method: 'POST',
     body: JSON.stringify({ text }),
   })
+}
+
+// ---------- чат с ИИ-ассистентом ----------
+
+export interface ChatReply {
+  reply: string
+  tools_used: string[]
+  model: string
+}
+
+export async function sendChat(message: string): Promise<ChatReply> {
+  return request('/api/chat/send', { method: 'POST', body: JSON.stringify({ message }) })
+}
+
+export async function fetchChatHistory(): Promise<{ items: ChatMessage[] }> {
+  return request('/api/chat/history')
+}
+
+export async function clearChat(): Promise<void> {
+  return request<void>('/api/chat', { method: 'DELETE' })
 }

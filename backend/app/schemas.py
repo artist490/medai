@@ -9,6 +9,7 @@ class RegisterIn(BaseModel):
     password: str = Field(min_length=6, max_length=128)
     name: str = Field(default="", max_length=64)
     invite_code: Optional[str] = Field(default=None, max_length=64)  # код приглашения для врачей
+    branch_id: Optional[int] = None  # филиал клиники
 
 
 class LoginIn(BaseModel):
@@ -21,6 +22,7 @@ class ProfileIn(BaseModel):
     age: Optional[int] = Field(default=None, ge=1, le=120)
     sex: Optional[Literal["male", "female"]] = None
     height_cm: Optional[float] = Field(default=None, ge=50, le=250)
+    branch_id: Optional[int] = None
 
 
 class MeasurementIn(BaseModel):

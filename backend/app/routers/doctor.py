@@ -33,9 +33,10 @@ def list_patients(
     user: sqlite3.Row = Depends(auth.get_current_doctor),
     db: sqlite3.Connection = Depends(get_db),
 ):
-    """Все пациенты клиники: последний риск, счётчики за 100 замеров, флаг внимания."""
+    """Пациенты филиала врача: последний риск, счётчики за 100 замеров, флаг внимания."""
     patients = db.execute(
-        f"SELECT {PATIENT_FIELDS} FROM users WHERE role = 'patient' ORDER BY id"
+        f"SELECT {PATIENT_FIELDS} FROM users WHERE role = 'patient' AND branch_id IS ? ORDER BY id",
+        (user["branch_id"],),
     ).fetchall()
 
     items = []
@@ -84,8 +85,8 @@ def patient_detail(
     db: sqlite3.Connection = Depends(get_db),
 ):
     p = db.execute(
-        f"SELECT {PATIENT_FIELDS} FROM users WHERE id = ? AND role = 'patient'",
-        (patient_id,),
+        f"SELECT {PATIENT_FIELDS} FROM users WHERE id = ? AND role = 'patient' AND branch_id IS ?",
+        (patient_id, user["branch_id"]),
     ).fetchone()
     if p is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Пациент не найден")

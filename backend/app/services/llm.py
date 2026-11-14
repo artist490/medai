@@ -1,7 +1,8 @@
-"""OpenAI-совместимый LLM-адаптер: персональный текст рекомендаций.
+"""LLM-клиент PlusVibe API (OpenAI-совместимый, https://plusvibeapi.ru/v1).
 
-Ключ — в .env (LLM_API_KEY). Нет ключа, ошибка сети или таймаут →
-возвращаем None, и анализ остаётся на базе правил (см. analyze.py).
+Ключ — в .env (LLM_API_KEY, формат sk-pv-...). Нет ключа, ошибка сети,
+таймаут или нехватка баланса (402) → возвращаем None, и функции честно
+деградируют: рекомендации остаются на базе правил, чат пишет «недоступен».
 LLM никогда не меняет risk_level и не отменяет тревожные статусы.
 """
 import json
@@ -29,6 +30,31 @@ SYSTEM_PROMPT = """Ты — дружелюбный медицинский асс
 В items — 3–6 коротких конкретных рекомендаций."""
 
 
+def chat_completion(payload: dict) -> Optional[dict]:
+    """Единый вызов /chat/completions PlusVibe. Возвращает сообщение-ответ
+    (dict с role/content/tool_calls) или None при любой ошибке."""
+    if not config.llm_enabled():
+        return None
+    headers = {
+        "Authorization": f"Bearer {config.LLM_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    try:
+        resp = httpx.post(
+            f"{config.LLM_BASE_URL}/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=config.LLM_TIMEOUT,
+        )
+        # 401 ключ / 402 баланс / 403 IP / 429 лимит — всё ведёт к fallback
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]
+    except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
+        logger.warning("LLM недоступен: %s", exc)
+        return None
+
+
 def _build_user_prompt(profile: dict, indicators: dict, rule_result: dict) -> str:
     profile_lines = [
         f"- {k}: {v}" for k, v in profile.items() if v not in (None, "", 0)
@@ -48,10 +74,7 @@ def _build_user_prompt(profile: dict, indicators: dict, rule_result: dict) -> st
 
 def enrich(profile: dict, indicators: dict, rule_result: dict) -> Optional[dict]:
     """Возвращает {"summary": str, "items": [str]} или None, если LLM недоступен."""
-    if not config.llm_enabled():
-        return None
-
-    payload = {
+    message = chat_completion({
         "model": config.LLM_MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -59,25 +82,11 @@ def enrich(profile: dict, indicators: dict, rule_result: dict) -> Optional[dict]
         ],
         "temperature": 0.6,
         "max_tokens": 600,
-    }
-    headers = {
-        "Authorization": f"Bearer {config.LLM_API_KEY}",
-        "Content-Type": "application/json",
-    }
-
-    try:
-        resp = httpx.post(
-            f"{config.LLM_BASE_URL}/chat/completions",
-            json=payload,
-            headers=headers,
-            timeout=config.LLM_TIMEOUT,
-        )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"].strip()
-    except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
-        logger.warning("LLM недоступен: %s", exc)
+    })
+    if not message:
         return None
 
+    content = str(message.get("content") or "").strip()
     # Модели иногда оборачивают JSON в ```...``` — срезаем
     if content.startswith("```"):
         content = content.strip("`").lstrip("json").strip()

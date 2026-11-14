@@ -5,6 +5,12 @@ export type Status = 'ok' | 'warn' | 'alarm'
 
 export type Role = 'patient' | 'doctor'
 
+export interface Branch {
+  id: number
+  city: string
+  phone: string
+}
+
 export interface User {
   id: number
   email: string
@@ -13,6 +19,14 @@ export interface User {
   sex: 'male' | 'female' | null
   height_cm: number | null
   role: Role
+  branch: Branch | null
+}
+
+export interface ChatMessage {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
 }
 
 export interface Finding {

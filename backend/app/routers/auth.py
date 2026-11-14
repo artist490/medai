@@ -5,13 +5,25 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from .. import auth
-from ..database import get_db
+from ..database import db_session, get_db
 from ..schemas import LoginIn, ProfileIn, RegisterIn
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-def user_payload(user: sqlite3.Row) -> dict:
+def _branch_of(db: sqlite3.Connection, branch_id: Optional[int]) -> Optional[sqlite3.Row]:
+    if branch_id is None:
+        return None
+    return db.execute("SELECT * FROM branches WHERE id = ?", (branch_id,)).fetchone()
+
+
+def branch_payload(branch: Optional[sqlite3.Row]) -> Optional[dict]:
+    if branch is None:
+        return None
+    return {"id": branch["id"], "city": branch["city"], "phone": branch["phone"]}
+
+
+def user_payload(user: sqlite3.Row, branch: Optional[sqlite3.Row] = None) -> dict:
     return {
         "id": user["id"],
         "email": user["email"],
@@ -20,7 +32,16 @@ def user_payload(user: sqlite3.Row) -> dict:
         "sex": user["sex"],
         "height_cm": user["height_cm"],
         "role": user["role"],
+        "branch": branch_payload(branch),
     }
+
+
+@router.get("/branches")
+def list_branches():
+    """Публичный список филиалов сети — для формы регистрации."""
+    with db_session() as db:
+        rows = db.execute("SELECT id, city, phone FROM branches ORDER BY city").fetchall()
+    return {"items": [dict(r) for r in rows]}
 
 
 @router.post("/register", status_code=201)
@@ -41,9 +62,13 @@ def register(data: RegisterIn, db: sqlite3.Connection = Depends(get_db)):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Код приглашения уже использован")
         role = "doctor"
 
+    branch = _branch_of(db, data.branch_id)
+    if data.branch_id is not None and branch is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Филиал не найден")
+
     cursor = db.execute(
-        "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
-        (data.email.lower(), auth.hash_password(data.password), data.name.strip(), role),
+        "INSERT INTO users (email, password_hash, name, role, branch_id) VALUES (?, ?, ?, ?, ?)",
+        (data.email.lower(), auth.hash_password(data.password), data.name.strip(), role, data.branch_id),
     )
     user_id = cursor.lastrowid
 
@@ -58,7 +83,7 @@ def register(data: RegisterIn, db: sqlite3.Connection = Depends(get_db)):
     # после ответа, и клиент успевает сделать следующий запрос без этих данных
     db.commit()
     user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    return {"token": token, "user": user_payload(user)}
+    return {"token": token, "user": user_payload(user, branch)}
 
 
 @router.post("/login")
@@ -79,8 +104,8 @@ def logout(credentials=Depends(auth.bearer_scheme)):
 
 
 @router.get("/me")
-def me(user: sqlite3.Row = Depends(auth.get_current_user)):
-    return user_payload(user)
+def me(user: sqlite3.Row = Depends(auth.get_current_user), db: sqlite3.Connection = Depends(get_db)):
+    return user_payload(user, _branch_of(db, user["branch_id"]))
 
 
 @router.put("/me")
@@ -89,11 +114,13 @@ def update_me(
     user: sqlite3.Row = Depends(auth.get_current_user),
     db: sqlite3.Connection = Depends(get_db),
 ):
+    if data.branch_id is not None and _branch_of(db, data.branch_id) is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Филиал не найден")
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
-        return user_payload(user)
+        return user_payload(user, _branch_of(db, user["branch_id"]))
     sets = ", ".join(f"{k} = ?" for k in updates)
     db.execute(f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), user["id"]))
     db.commit()  # см. комментарий в register
     fresh = db.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
-    return user_payload(fresh)
+    return user_payload(fresh, _branch_of(db, fresh["branch_id"]))

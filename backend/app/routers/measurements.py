@@ -127,7 +127,8 @@ def create_measurement(
         "SELECT * FROM analyses WHERE measurement_id = ?", (measurement_id,)
     ).fetchone()
     db.commit()  # см. комментарий в routers/auth.py register
-    return measurement_payload(measurement, analysis)
+    payload = analysis_payload(analysis) if analysis is not None else None
+    return measurement_payload(measurement, payload)
 
 
 @router.get("")

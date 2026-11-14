@@ -11,12 +11,14 @@ import type { IconName } from './Icon'
 const patientNav: Array<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: 'Обзор', icon: 'home' },
   { to: '/new', label: 'Замер', icon: 'stethoscope' },
+  { to: '/chat', label: 'Чат ИИ', icon: 'robot' },
   { to: '/history', label: 'История', icon: 'chart' },
   { to: '/profile', label: 'Профиль', icon: 'profile' },
 ]
 
 const doctorNav: Array<{ to: string; label: string; icon: IconName }> = [
   { to: '/patients', label: 'Пациенты', icon: 'chart' },
+  { to: '/chat', label: 'Чат ИИ', icon: 'robot' },
   { to: '/profile', label: 'Профиль', icon: 'profile' },
 ]
 
@@ -149,7 +151,7 @@ export default function Layout() {
               to={item.to}
               end={item.to === '/' || item.to === '/patients'}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center rounded-[10px] min-w-[70px] py-1.5 px-3 transition-quick text-[11px] font-bold ${
+                `flex flex-col items-center justify-center rounded-[10px] min-w-[56px] py-1.5 px-2 transition-quick text-[11px] font-bold ${
                   isActive
                     ? 'bg-teal text-white shadow-sm'
                     : 'text-teal-dark hover:bg-teal-bg'

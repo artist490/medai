@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import DoctorPatients from './pages/DoctorPatients'
+import Chat from './pages/Chat'
 import DoctorPatient from './pages/DoctorPatient'
 import NewMeasurement from './pages/NewMeasurement'
 import Result from './pages/Result'
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="new" element={<NewMeasurement />} />
         <Route path="result/:id" element={<Result />} />
         <Route path="history" element={<History />} />
+        <Route path="chat" element={<Chat />} />
         <Route path="profile" element={<Profile />} />
         <Route path="patients" element={<RequireDoctor><DoctorPatients /></RequireDoctor>} />
         <Route path="patients/:id" element={<RequireDoctor><DoctorPatient /></RequireDoctor>} />

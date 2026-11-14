@@ -8,10 +8,12 @@ import Confetti from '../components/Confetti'
 import { Icon } from '../components/Icon'
 import type { IconName } from '../components/Icon'
 import { brand } from '../brand'
+import { useAuth } from '../auth'
 import type { Measurement } from '../types'
 
 export default function Result() {
   const { id } = useParams()
+  const { user } = useAuth()
   const [m, setM] = useState<Measurement | null>(null)
   const [error, setError] = useState('')
 
@@ -60,7 +62,7 @@ export default function Result() {
           </div>
           <p className="text-sm text-teal-dark/85">
             Есть тревожные показатели. Не ждите ухудшения — запишитесь к терапевту
-            или позвоните в клинику: <span className="font-extrabold">{brand.phone}</span>.
+            или позвоните в клинику: <span className="font-extrabold">{user?.branch?.phone || brand.phone}</span>.
             При критических значениях вызывайте 103.
           </p>
         </div>
@@ -105,6 +107,10 @@ export default function Result() {
 
         {a.llm_summary ? (
           <div className="flex flex-col gap-3">
+            <p className="text-[11px] text-teal-dark/50 font-bold px-1">
+              Рекомендации сгенерированы нейросетью DeepSeek; для этого показатели
+              передаются внешнему провайдеру (хранение данных в РФ).
+            </p>
             <div className="flip-card flip-card--gold">
               <p className="text-sm text-teal-dark/90 leading-relaxed">{a.llm_summary}</p>
             </div>
@@ -138,7 +144,7 @@ export default function Result() {
         )}
       </section>
 
-      <Disclaimer urgent={a.risk_level === 'red'} />
+      <Disclaimer urgent={a.risk_level === 'red'} phone={user?.branch?.phone} />
 
       <p className="text-center text-xs text-teal-dark/50 font-bold">
         Источник анализа: {a.source === 'rules+llm' ? 'база правил + языковая модель' : 'база правил'} · история — во вкладке «История»

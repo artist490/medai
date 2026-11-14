@@ -1,7 +1,8 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { useAuth } from '../auth'
 import * as api from '../api'
 import { Icon } from '../components/Icon'
+import type { Branch } from '../types'
 
 // Профиль: имя, возраст, пол, рост — нужны движку правил для норм и ИМТ.
 export default function Profile() {
@@ -10,9 +11,15 @@ export default function Profile() {
   const [age, setAge] = useState(user?.age?.toString() ?? '')
   const [sex, setSex] = useState<'male' | 'female' | ''>(user?.sex ?? '')
   const [height, setHeight] = useState(user?.height_cm?.toString() ?? '')
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [branchId, setBranchId] = useState(user?.branch?.id ? String(user.branch.id) : '')
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    api.fetchBranches().then((d) => setBranches(d.items)).catch(() => {})
+  }, [])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -25,6 +32,7 @@ export default function Profile() {
         age: age.trim() ? Number(age) : null,
         sex: sex || null,
         height_cm: height.trim() ? Number(height.replace(',', '.')) : null,
+        branch_id: branchId ? Number(branchId) : null,
       })
       setUser(updated)
       setSaved(true)
@@ -79,6 +87,22 @@ export default function Profile() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="flip-label" htmlFor="p-branch">Филиал</label>
+          <select
+            id="p-branch"
+            className="flip-input"
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+          >
+            <option value="">Не выбран</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>{b.city}</option>
+            ))}
+          </select>
+          <div className="flip-hint">Город ближайшего центра сети.</div>
         </div>
 
         <div className="flip-hint">
