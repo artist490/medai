@@ -23,3 +23,6 @@ tools/input/
 
 # TypeScript incremental build
 *.tsbuildinfo
+
+# pmtiles CLI (скачивается с github.com/protomaps/go-pmtiles/releases, 58 МБ)
+tools/bin/

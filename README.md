@@ -54,6 +54,7 @@
 
 - **Backend**: Python 3.13 + FastAPI + SQLite (WAL), pbkdf2-хэши паролей, bearer-сессии
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind 4, графики recharts
+- **Карта филиалов**: векторная, отрисована в палитре сайта — MapLibre GL + PMTiles-экстракты городов (`frontend/public/maps/*.pmtiles`, уже в репо). Перегенерация: скачать [pmtiles CLI](https://github.com/protomaps/go-pmtiles/releases) в `tools/bin/`, затем вырезать ббоксы из дневного билда `build.protomaps.com` (`--bbox=… --maxzoom=14`). Данные © OpenStreetMap contributors
 - **Дизайн**: направление «Клинический свет» — светлая тема с 1px-хайрлайнами вместо теней,
   фирменный тил #00b8a9, шрифт Inter (синхронизировано с фирстилем spdmed.ru)
 
@@ -91,9 +92,10 @@ cd ../backend && python -m uvicorn app.main:app --port 8000
 В `backend/.env`:
 
 ```env
-LLM_API_KEY=sk-...            # OpenAI, OpenRouter, DeepSeek и т.п.
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_MODEL=gpt-4o-mini
+LLM_API_KEY=sk-pv-...              # ключ PlusVibe (plusvibeapi.ru, оплата в рублях)
+LLM_BASE_URL=https://plusvibeapi.ru/v1
+LLM_MODEL=deepseek-v4.1-flash-1017
+CHAT_MODEL=deepseek-v4.1-flash-1017
 ```
 
 После перезапуска бэкенда в анализе появится блок «Рекомендации ИИ» с персональным текстом.
@@ -118,7 +120,7 @@ LLM_MODEL=gpt-4o-mini
 
 ```bash
 cd backend
-python -m pytest tests/ -q    # 124 теста: правила, кабинет врача, медкарта, приёмы, опросник, безопасность
+python -m pytest tests/ -q    # 141 тест: правила, кабинет врача, медкарта, приёмы, опросник, безопасность, чат
 
 Тесты герметичны: LLM-ключ в фикстурах заглушается, так что прогон не бьёт
 в платный API и не зависит от сети.
@@ -135,7 +137,7 @@ medai/
 │   │   ├── database.py           # SQLite WAL: users, branches, patient_cards, visits, measurements…
 │   │   ├── auth.py               # pbkdf2 + bearer-токены
 │   │   ├── schemas.py            # Pydantic-модели с валидацией диапазонов
-│   │   ├── routers/              # auth · measurements · stats · doctor · medcard · visits · chat
+│   │   ├── routers/              # auth · measurements · stats · goals · documents · analytics · doctor · medcard · visits · chat
 │   │   └── services/
 │   │       ├── rules.py          # движок правил (нормы, комбинации, риск)
 │   │       ├── llm.py            # OpenAI-совместимый адаптер + сводка пациента
@@ -167,4 +169,13 @@ medai/
 | GET | `/api/doctor/patients` | пул филиала с сигналами (риск, опросник, приёмы) |
 | POST | `/api/doctor/patients/{id}/summary` | ИИ-сводка пациента к приёму |
 | POST | `/api/chat/send` | агентный чат (пациент/врач) |
+| GET | `/api/chat/history` | история чата |
+| GET/PUT | `/api/goals` | цели пациента: шаги, сон, вода, вес |
+| POST | `/api/measurements/repeat` | быстрый дневник: повтор последнего замера (утро/вечер) |
+| POST/GET | `/api/documents` | загрузка и список документов пациента (PDF/фото до 8 МБ) |
+| GET | `/api/documents/{id}/download` | скачать документ |
+| GET | `/api/stats` | ряды данных для графиков динамики |
+| GET | `/api/doctor/signals` | непрочитанные красные флаги филиала |
+| POST | `/api/doctor/analyses/{id}/seen` | врач отметил разбор разобранным |
+| GET | `/api/analytics` | аналитика филиала: риски, активность, stale-пациенты |
 | GET | `/api/health` | `{ok, llm_enabled}` |
