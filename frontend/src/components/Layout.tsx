@@ -17,13 +17,13 @@ type NavItem = { to: string; label: string; sub: string; icon: IconName; accent:
 const patientNav: NavItem[] = [
   { to: '/', label: 'Дашборд', sub: 'Обзор здоровья', icon: 'home', accent: 'teal' },
   { to: '/medcard', label: 'Медкарта', sub: 'Анкета, приёмы, замеры', icon: 'care', accent: 'coral' },
-  { to: '/chat', label: 'Чат ИИ', sub: 'Ассистент клиники', icon: 'robot', accent: 'sky' },
+  { to: '/chat', label: 'Ассистент', sub: 'ИИ-помощник клиники', icon: 'sparkle', accent: 'sky' },
   { to: '/profile', label: 'Профиль', sub: 'Личные данные', icon: 'profile', accent: 'gold' },
 ]
 
 const doctorNav: NavItem[] = [
   { to: '/patients', label: 'Пациенты', sub: 'Кабинет врача', icon: 'chart', accent: 'teal' },
-  { to: '/chat', label: 'Чат ИИ', sub: 'Ассистент врача', icon: 'robot', accent: 'sky' },
+  { to: '/chat', label: 'Ассистент', sub: 'Помощник врача', icon: 'sparkle', accent: 'sky' },
   { to: '/profile', label: 'Профиль', sub: 'Личные данные', icon: 'profile', accent: 'gold' },
 ]
 
@@ -202,26 +202,64 @@ export default function Layout() {
         </button>
       )}
 
-      {/* ---- Мобильная нижняя навигация ---- */}
+      {/* ---- Мобильная нижняя навигация: Ассистент — приподнятая градиентная кнопка по центру ---- */}
       <nav className="lg:hidden fixed bottom-4 left-0 right-0 z-40 px-4">
-        <div className="max-w-md mx-auto bg-white rounded-2xl px-2 py-1.5 flex justify-around glow-soft border border-[#e8eeed]">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/' || item.to === '/patients'}
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center rounded-[10px] min-w-[70px] py-1.5 px-3 transition-quick text-[11px] font-bold ${
-                  isActive
-                    ? 'bg-teal-dark text-white shadow-sm'
-                    : 'text-teal-dark hover:bg-teal-bg'
-                }`
-              }
-            >
-              <Icon name={item.icon} size={18} />
-              <span className="mt-0.5">{item.label}</span>
-            </NavLink>
-          ))}
+        <div className="relative max-w-md mx-auto bg-white rounded-2xl px-3 py-1.5 flex items-center glow-soft border border-[#e8eeed]">
+          {/* пункты слева */}
+          <div className="flex-1 flex justify-start gap-1.5 mr-[34px]">
+            {navItems.filter((i) => i.to !== '/chat').slice(0, Math.ceil((navItems.length - 1) / 2)).map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/' || item.to === '/patients'}
+                className={({ isActive }) =>
+                  `flex flex-col items-center justify-center rounded-[10px] w-[62px] py-1.5 transition-quick text-[10.5px] font-bold whitespace-nowrap ${
+                    isActive
+                      ? 'bg-teal-dark text-white shadow-sm'
+                      : 'text-teal-dark hover:bg-teal-bg'
+                  }`
+                }
+              >
+                <Icon name={item.icon} size={18} />
+                <span className="mt-0.5">{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+
+          {/* Центральная кнопка Ассистента */}
+          <NavLink
+            to="/chat"
+            className={({ isActive }) =>
+              `absolute left-1/2 -translate-x-1/2 -top-5 flex items-center w-[76px] ${
+                isActive ? 'assistant-fab-active' : ''
+              }`
+            }
+          >
+            <span className="assistant-fab-circle">
+              <Icon name="sparkle" size={24} />
+            </span>
+          </NavLink>
+
+          {/* пункты справа */}
+          <div className="flex-1 flex justify-end gap-1.5 ml-[34px]">
+            {navItems.filter((i) => i.to !== '/chat').slice(Math.ceil((navItems.length - 1) / 2)).map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/' || item.to === '/patients'}
+                className={({ isActive }) =>
+                  `flex flex-col items-center justify-center rounded-[10px] w-[62px] py-1.5 transition-quick text-[10.5px] font-bold whitespace-nowrap ${
+                    isActive
+                      ? 'bg-teal-dark text-white shadow-sm'
+                      : 'text-teal-dark hover:bg-teal-bg'
+                  }`
+                }
+              >
+                <Icon name={item.icon} size={18} />
+                <span className="mt-0.5">{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
         </div>
       </nav>
 

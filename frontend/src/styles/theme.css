@@ -803,6 +803,32 @@ h1, h2, h3, h4 {
   .fab-mobile { display: none; }
 }
 
+/* Центральная кнопка Ассистента в мобильном таб-баре:
+   белый фон бара «разливается» вокруг кнопки белым ореолом */
+.assistant-fab-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #00b8a9, #007b83);
+  color: #ffffff;
+  box-shadow:
+    0 4px 10px rgba(0, 123, 131, 0.30),
+    0 14px 30px -10px rgba(0, 123, 131, 0.50),
+    0 0 0 7px #ffffff;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+.assistant-fab-circle:hover { transform: translateY(-2px); filter: brightness(1.06); }
+.assistant-fab-active .assistant-fab-circle {
+  box-shadow:
+    0 4px 10px rgba(0, 123, 131, 0.40),
+    0 14px 34px -8px rgba(0, 123, 131, 0.60),
+    0 0 0 7px #ffffff,
+    0 0 0 9px rgba(0, 184, 169, 0.30);
+}
+
 /* Micro-interactions ≤ 500ms */
 .transition-quick { transition: all 0.2s ease; }
 

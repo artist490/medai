@@ -111,7 +111,7 @@ export default function Chat() {
         <div>
           <div className="eyebrow">ИИ-ассистент клиники</div>
           <h1 className="mt-1.5" style={{ fontSize: 'clamp(24px, 6vw, 32px)', letterSpacing: '-0.02em' }}>
-            Чат с ИИ <Icon name="robot" size={22} className="inline-block align-[-3px]" />
+            Ассистент <Icon name="sparkle" size={20} className="inline-block align-[-2px] text-teal" />
           </h1>
         </div>
         <button className="btn btn-ghost btn-sm shrink-0" onClick={clear}>
