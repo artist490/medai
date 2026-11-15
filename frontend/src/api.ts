@@ -21,8 +21,12 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // Content-Type ставим только для JSON-тела: браузер сам выставит
+  // multipart/form-data с boundary для FormData (см. TECH_DEBT_AUDIT.md F001 —
+  // раньше JSON-заголовок ломал загрузку документов: 422 «Field required»).
+  const isFormData = options.body instanceof FormData
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   }
   const token = getToken()
@@ -38,7 +42,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       setToken(null)
       window.dispatchEvent(new Event('medai:unauthorized'))
     }
-    throw new ApiError(resp.status, body.detail || `Ошибка ${resp.status}`)
+    // FastAPI 422 отдаёт detail массивом объектов валидации — собираем в строку
+    const detail = (body as { detail?: unknown }).detail
+    const message = typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail)
+        ? detail.map((d) => (d as { msg?: string }).msg).filter(Boolean).join('; ')
+        : `Ошибка ${resp.status}`
+    throw new ApiError(resp.status, message)
   }
   return body as T
 }
