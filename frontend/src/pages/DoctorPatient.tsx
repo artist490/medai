@@ -401,7 +401,7 @@ function VisitsTab({ patientId, visits, onVisits }: {
                   {v.reason && <span className="text-sm font-extrabold text-teal-dark">{v.reason}</span>}
                 </div>
                 <div className="mt-2">
-                  <div className="text-[10px] font-extrabold uppercase tracking-[1.5px] text-teal-dark/45">Жалобы пациента</div>
+                  <div className="text-[11px] font-semibold text-teal-dark/45">Жалобы пациента</div>
                   <p className="text-base text-teal-dark whitespace-pre-wrap mt-0.5">{v.complaints}</p>
                 </div>
                 {openId === v.id ? (
@@ -438,7 +438,7 @@ function VisitsTab({ patientId, visits, onVisits }: {
                 <p className="text-sm text-teal-dark/90 mt-1 whitespace-pre-wrap">{v.complaints}</p>
                 {v.conclusion && (
                   <div className="mt-2 border-t border-[#e5e7eb] pt-2">
-                    <div className="text-[10px] font-extrabold uppercase tracking-[1.5px] text-teal-dark/45">Заключение</div>
+                    <div className="text-[11px] font-semibold text-teal-dark/45">Заключение</div>
                     <p className="text-sm text-teal-dark/90 whitespace-pre-wrap mt-0.5">{v.conclusion}</p>
                     {v.recommendations && (
                       <p className="text-sm text-teal-dark/75 whitespace-pre-wrap mt-1">
@@ -509,7 +509,7 @@ export default function DoctorPatient() {
           <div className="eyebrow"><Link to="/patients" className="hover:underline">Пациенты</Link> · карточка</div>
           <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>{patient.name || '(без имени)'}</h1>
         </div>
-        <Link to="/patients" className="btn btn-ghost">← К списку</Link>
+        <Link to="/patients" className="btn btn-ghost"><Icon name="chevron-left" size={14} /> К списку</Link>
       </div>
 
       {/* Профиль: аватар + мета-строка */}

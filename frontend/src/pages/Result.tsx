@@ -51,7 +51,7 @@ export default function Result() {
         </div>
         <div className="flex items-center gap-3">
           <RiskBadge level={a.risk_level} big />
-          <Link to="/new" className="btn btn-gold">+ Новый замер</Link>
+          <Link to="/new" className="btn btn-gold"><Icon name="pressure" size={16} /> Новый замер</Link>
         </div>
       </div>
 

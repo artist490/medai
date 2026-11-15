@@ -140,8 +140,8 @@ export default function Dashboard() {
       {/* Шапка страницы */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="eyebrow">Обзор здоровья</div>
-          <h1 className="mt-1" style={{ fontSize: 30, letterSpacing: '-0.02em' }}>Медицинский дашборд</h1>
+          <div className="eyebrow">Здоровье под контролем</div>
+          <h1 className="mt-1" style={{ fontSize: 30, letterSpacing: '-0.02em' }}>Обзор здоровья</h1>
         </div>
         <div className="flex items-center gap-3">
           {latest && (
@@ -149,7 +149,7 @@ export default function Dashboard() {
               <Icon name="pulse" size={16} /> Последний замер
             </Link>
           )}
-          <Link to="/new" className="btn btn-gold">+ Новый замер</Link>
+          <Link to="/new" className="btn btn-gold"><Icon name="pressure" size={16} /> Новый замер</Link>
         </div>
       </div>
 
@@ -163,7 +163,7 @@ export default function Dashboard() {
               : 'приём без даты'}
             {nextVisit.reason ? ` · ${nextVisit.reason}` : ''}
           </span>
-          <span className="text-xs font-bold text-teal-dark/55">подробнее в медкарте →</span>
+          <span className="text-xs font-bold text-teal-dark/55 inline-flex items-center gap-1">подробнее в медкарте <Icon name="chevron" size={12} /></span>
         </Link>
       )}
 
@@ -210,7 +210,7 @@ export default function Dashboard() {
                     <div className="absolute inset-0 grid place-items-center pointer-events-none">
                       <div className="text-center">
                         <div className="text-2xl font-bold text-[#1b2622]">{totalMeasured}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-[1.5px] text-[#8aa09c]">замеров</div>
+                        <div className="text-[10px] font-semibold text-[#8aa09c]">замеров</div>
                       </div>
                     </div>
                   </>
@@ -315,7 +315,7 @@ export default function Dashboard() {
           <section className="panel">
             <div className="flex items-center justify-between gap-3 mb-2">
               <h2 className="text-lg">Последние замеры</h2>
-              <Link to="/history" className="btn btn-ghost btn-sm">Вся история →</Link>
+              <Link to="/history" className="btn btn-ghost btn-sm">Вся история <Icon name="chevron" size={13} /></Link>
             </div>
             <div className="overflow-x-auto" data-full-bleed>
               <table className="data-table">
@@ -349,8 +349,8 @@ export default function Dashboard() {
                       </td>
                       <td className="!text-right">
                         <span className="text-sm text-[#8aa09c] mr-4">{shortDate(m.recorded_at).slice(-5)}</span>
-                        <Link to={`/result/${m.id}`} className="font-bold text-teal-dark hover:underline whitespace-nowrap">
-                          Открыть →
+                        <Link to={`/result/${m.id}`} className="font-bold text-teal-dark hover:underline whitespace-nowrap inline-flex items-center gap-1">
+                          Открыть <Icon name="chevron" size={13} />
                         </Link>
                       </td>
                     </tr>

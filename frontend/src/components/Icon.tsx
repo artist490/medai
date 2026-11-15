@@ -13,6 +13,7 @@ export type IconName =
   | 'bulb' | 'run' | 'salad' | 'clock'
   | 'lock' | 'wave' | 'rocket' | 'sparkle'
   | 'party' | 'male' | 'female' | 'care'
+  | 'close' | 'chevron' | 'chevron-left'
 
 // 24×24, stroke 1.7, скруглённые концы — единая пластика всего набора
 const glyphs: Record<IconName, ReactNode> = {
@@ -240,6 +241,15 @@ const glyphs: Record<IconName, ReactNode> = {
       <path d="M12 20.2S4.8 16 3.2 11.4A4.9 4.9 0 0 1 12 7a4.9 4.9 0 0 1 8.8 4.4C19.2 16 12 20.2 12 20.2z" />
       <path d="M7.2 12h2.3l1.2-2 1.8 3.6 1.2-1.6h2.1" />
     </>
+  ),
+  close: (
+    <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
+  ),
+  chevron: (
+    <path d="M9.5 5.5 16 12l-6.5 6.5" />
+  ),
+  'chevron-left': (
+    <path d="M14.5 5.5 8 12l6.5 6.5" />
   ),
 }
 

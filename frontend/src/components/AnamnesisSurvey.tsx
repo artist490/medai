@@ -194,7 +194,7 @@ function HabitsStep({ a, set }: { a: SurveyAnswers; set: (k: string, v: boolean 
       </div>
 
       <div className="rounded-xl border border-[#e5e7eb] p-3.5 flex flex-col gap-3">
-        <div className="text-xs font-extrabold uppercase tracking-[1px] text-teal-dark/50">Алкоголь (шкала AUDIT-C)</div>
+        <div className="text-xs font-semibold text-teal-dark/50">Алкоголь (шкала AUDIT-C)</div>
         <div>
           <div className="text-xs font-bold text-teal-dark/70 mb-1.5">Как часто Вы употребляете алкогольные напитки?</div>
           <div className="flex flex-wrap gap-1.5">

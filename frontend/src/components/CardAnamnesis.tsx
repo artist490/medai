@@ -162,7 +162,7 @@ export function CardView({ card }: { card: MedCard }) {
       <CardCompleteness card={card} />
       {surveyAlarm.length > 0 && (
         <div className="rounded-xl border border-coral/40 bg-[#dc262608] p-3.5">
-          <div className="text-xs font-extrabold uppercase tracking-[1px] text-coral-dark mb-2">
+          <div className="text-xs font-semibold text-coral-dark mb-2">
             Опросник МЗ · требуют осмотра врача
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -188,7 +188,7 @@ export function CardView({ card }: { card: MedCard }) {
         <div className="grid sm:grid-cols-2 gap-x-10 gap-y-3">
           {filled.map((f) => (
             <div key={f.key} className="border-b border-[#e5e7eb] pb-2">
-              <div className="text-[10px] font-extrabold uppercase tracking-[1.5px] text-teal-dark/45">{f.label}</div>
+              <div className="text-[11px] font-semibold text-teal-dark/45">{f.label}</div>
               <div className="text-sm font-bold text-teal-dark whitespace-pre-wrap mt-0.5">{card[f.key]}</div>
             </div>
           ))}

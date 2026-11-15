@@ -108,7 +108,7 @@ function BookingMenu({ reason, onAppBooking, onClose }: {
             Выберите удобный способ — запись ведёт к врачу «Спектр-Диагностики»
           </div>
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Закрыть">✕</button>
+        <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Закрыть"><Icon name="close" size={15} /></button>
       </div>
 
       <a href={clinicCityUrl(branch?.city)} target="_blank" rel="noopener noreferrer"
@@ -120,7 +120,7 @@ function BookingMenu({ reason, onAppBooking, onClose }: {
             {branch ? `${branch.city} · ` : ''}откроется spdmed.ru — выберите врача и время
           </span>
         </span>
-        <span className="ml-auto text-teal-dark/40">→</span>
+        <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />
       </a>
 
       <a href={telHref} className="flip-card flip-card--sky flex items-center gap-3 hover:opacity-90 transition-quick">
@@ -129,7 +129,7 @@ function BookingMenu({ reason, onAppBooking, onClose }: {
           <span className="block text-sm font-extrabold text-teal-dark">Позвонить филиалу</span>
           <span className="block text-xs font-bold text-teal-dark/55">{phone}</span>
         </span>
-        <span className="ml-auto text-teal-dark/40">→</span>
+        <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />
       </a>
 
       <button onClick={onAppBooking}
@@ -139,7 +139,7 @@ function BookingMenu({ reason, onAppBooking, onClose }: {
           <span className="block text-sm font-extrabold text-teal-dark">Оставить жалобу в приложении</span>
           <span className="block text-xs font-bold text-teal-dark/55">врач вашего филиала увидит её до приёма</span>
         </span>
-        <span className="ml-auto text-teal-dark/40">→</span>
+        <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />
       </button>
     </div>
   )
@@ -238,7 +238,7 @@ function VisitCard({ visit, onChanged }: { visit: Visit; onChanged: (visit: Visi
 
       {visit.status === 'completed' && visit.conclusion && (
         <div className="mt-2 border-t border-[#e5e7eb] pt-2 flex flex-col gap-1">
-          <div className="text-xs font-extrabold uppercase tracking-[1px] text-teal-dark/50 flex items-center gap-1.5">
+          <div className="text-xs font-semibold text-teal-dark/50 flex items-center gap-1.5">
             {visit.doctor_name ? (
               <AvatarDoctor size={20} />
             ) : null}
@@ -451,7 +451,7 @@ export default function MedCard() {
                     28 вопросов как на диспансеризации: диагнозы, симптомы, привычки — заполняет форму автоматически
                   </span>
                 </span>
-                <span className="ml-auto text-teal-dark/40">→</span>
+                <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />
               </button>
               <AnamnesisForm card={card} />
             </div>

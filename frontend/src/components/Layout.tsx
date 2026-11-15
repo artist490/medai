@@ -181,10 +181,10 @@ export default function Layout() {
         </main>
 
         <footer className="hidden lg:flex px-5 sm:px-8 py-7 flex-wrap items-center justify-between gap-2">
-          <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-teal-dark/40">
+          <span className="text-[11px] font-semibold text-teal-dark/45">
             © 2026 {brand.name} · не заменяет консультацию врача
           </span>
-          <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-teal-dark/40">
+          <span className="text-[11px] font-semibold text-teal-dark/45">
             {brand.site} · {brand.phone}
           </span>
         </footer>

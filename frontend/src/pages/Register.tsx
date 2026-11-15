@@ -58,7 +58,7 @@ export default function Register() {
         onSubmit={submit}
         className="auth-card w-full max-w-sm flex flex-col gap-4"
       >
-        <h1 className="text-2xl text-center">Регистрация <Icon name="sparkle" size={20} className="inline-block align-[-3px]" /></h1>
+        <h1 className="text-2xl text-center">Регистрация</h1>
 
         {error && (
           <div className="badge badge-red justify-center normal-case tracking-normal">

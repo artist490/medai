@@ -180,9 +180,9 @@ export default function DoctorPatients() {
                       <td className="!text-right">
                         <Link
                           to={`/patients/${p.id}`}
-                          className="font-extrabold text-teal hover:text-teal-light whitespace-nowrap"
+                          className="font-bold text-teal-dark hover:text-teal-dark/80 whitespace-nowrap inline-flex items-center gap-1"
                         >
-                          Открыть →
+                          Открыть <Icon name="chevron" size={13} />
                         </Link>
                       </td>
                     </tr>
@@ -192,7 +192,7 @@ export default function DoctorPatients() {
             </div>
           </section>
 
-          <p className="text-[10px] font-extrabold uppercase tracking-[2px] text-teal-dark/35 text-center">
+          <p className="text-[11px] font-semibold text-teal-dark/40 text-center">
             <Icon name="cross" size={12} className="inline-block align-[-1px] mr-1" />Данные пациентов конфиденциальны — доступ только у врачей {brand.name}
           </p>
         </>
