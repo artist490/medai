@@ -13,7 +13,7 @@ export type IconName =
   | 'bulb' | 'run' | 'salad' | 'clock'
   | 'lock' | 'wave' | 'rocket' | 'sparkle'
   | 'party' | 'male' | 'female' | 'care'
-  | 'close' | 'chevron' | 'chevron-left' | 'doc' | 'download'
+  | 'close' | 'chevron' | 'chevron-left' | 'doc' | 'download' | 'calendar'
 
 // 24×24, stroke 1.7, скруглённые концы — единая пластика всего набора
 const glyphs: Record<IconName, ReactNode> = {
@@ -41,8 +41,11 @@ const glyphs: Record<IconName, ReactNode> = {
   ),
   profile: (
     <>
-      <circle cx="12" cy="8" r="3.8" />
-      <path d="M4.5 20.5c.6-4 3.4-6 7.5-6s6.9 2 7.5 6" />
+      <rect x="3.5" y="5" width="17" height="14" rx="3" />
+      <circle cx="9" cy="10.4" r="2.1" />
+      <path d="M6.5 16.1c.5-1.7 1.6-2.6 3.2-2.6" />
+      <path d="M14 10h3.6" />
+      <path d="M14 13.4h3.6" />
     </>
   ),
   search: (
@@ -253,6 +256,14 @@ const glyphs: Record<IconName, ReactNode> = {
   ),
   doc: (
     <path d="M7 3.5h7l4 4v13H7z M14 3.5v4h4 M9.5 12h5 M9.5 15.5h5" />
+  ),
+  calendar: (
+    <>
+      <rect x="4" y="5.5" width="16" height="14.5" rx="2.6" />
+      <path d="M4 10h16" />
+      <path d="M8.5 3.5v3.5" />
+      <path d="M15.5 3.5v3.5" />
+    </>
   ),
   download: (
     <path d="M12 4v10 M7.5 10.5 12 15l4.5-4.5 M5 18.5h14" />

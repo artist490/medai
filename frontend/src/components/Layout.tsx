@@ -23,8 +23,8 @@ const patientNav: NavItem[] = [
 ]
 
 const doctorNav: NavItem[] = [
-  { to: '/patients', label: 'Пациенты', sub: 'Кабинет врача', icon: 'chart', accent: 'teal' },
-  { to: '/analytics', label: 'Аналитика', sub: 'Статистика филиала', icon: 'help', accent: 'gold' },
+  { to: '/patients', label: 'Пациенты', sub: 'Кабинет врача', icon: 'stethoscope', accent: 'teal' },
+  { to: '/analytics', label: 'Аналитика', sub: 'Статистика филиала', icon: 'chart', accent: 'gold' },
   { to: '/chat', label: 'Ассистент', sub: 'Помощник врача', icon: 'sparkle', accent: 'sky' },
   { to: '/profile', label: 'Профиль', sub: 'Личные данные', icon: 'profile', accent: 'gold' },
 ]
@@ -38,26 +38,60 @@ function ageWord(age: number): string {
   return 'лет'
 }
 
+// Кнопка нижней панели: иконка + подпись, активная — тёмная плашка
+function BarLink({ to, label, icon, end }: {
+  to: string; label: string; icon: IconName; end?: boolean
+}) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        `justify-self-center flex flex-col items-center justify-center rounded-[10px] w-full max-w-[60px] px-0.5 py-1.5 transition-quick text-[10.5px] font-bold whitespace-nowrap ${
+          isActive ? 'bg-teal-dark text-white shadow-sm' : 'text-teal-dark hover:bg-teal-bg'
+        }`
+      }
+    >
+      <Icon name={icon} size={18} />
+      <span className="mt-0.5 hidden min-[360px]:block">{label}</span>
+    </NavLink>
+  )
+}
+
+// Ассистент: кружок в собственной средней ячейке бара, никого не перекрывает
+function AssistantSlot() {
+  return (
+    <NavLink
+      to="/chat"
+      className={({ isActive }) =>
+        `justify-self-center flex items-center ${isActive ? 'assistant-fab-active' : ''}`
+      }
+    >
+      <span className="assistant-fab-circle">
+        <Icon name="sparkle" size={22} />
+      </span>
+    </NavLink>
+  )
+}
+
 export default function Layout() {
   const { user, logout } = useAuth()
   const [signalCount, setSignalCount] = useState(0)
 
   useEffect(() => {
     if (user?.role !== 'doctor') return
-    api.fetchSignals().then((d) => setSignalCount(d.unread)).catch(() => {})
-  }, [user, signalCount])
+    const load = () => api.fetchSignals().then((d) => setSignalCount(d.unread)).catch(() => {})
+    load()
+    // Сигналы врача обновляются сами: новый красный замер появится без перезагрузки
+    const timer = setInterval(load, 60_000)
+    return () => clearInterval(timer)
+  }, [user])
   const navigate = useNavigate()
   const location = useLocation()
   const [query, setQuery] = useState('')
   const isDoctor = user?.role === 'doctor'
   const navItems = isDoctor ? doctorNav : patientNav
   const onChat = location.pathname.startsWith('/chat')
-  // Ровная сетка таб-бара: слоты по бокам от центральной кнопки Ассистента.
-  // Пациент: [Дашборд][Медкарта][—][Профиль], врач: [Пациенты][—][Профиль][—]
-  const side = navItems.filter((i) => i.to !== '/chat')
-  const sideSlots: Array<NavItem | null> = isDoctor
-    ? [side[0] ?? null, null, side[1] ?? null, null]
-    : [side[0] ?? null, side[1] ?? null, null, side[2] ?? null]
 
   async function handleLogout() {
     await logout()
@@ -161,11 +195,13 @@ export default function Layout() {
 
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
               {user?.role === 'doctor' && signalCount > 0 && (
-                <button className="topbar-icon" title="Новые сигналы: требуются разборы"
-                        aria-label="Сигналы" onClick={() => navigate('/patients')}>
-                  <Icon name="bell" size={20} />
-                  <span className="absolute -top-0.5 -right-0.5 bg-coral text-white text-[10px] font-bold rounded-full px-1.5">{signalCount}</span>
-                </button>
+                <span className="hidden lg:flex">
+                  <button className="topbar-icon" title="Новые сигналы: требуются разборы"
+                          aria-label="Сигналы" onClick={() => navigate('/patients')}>
+                    <Icon name="alarm" size={20} />
+                    <span className="absolute -top-0.5 -right-0.5 bg-coral text-white text-[10px] font-bold rounded-full px-1.5">{signalCount}</span>
+                  </button>
+                </span>
               )}
               <button className="topbar-icon" title="Уведомления" aria-label="Уведомления">
                 <Icon name="bell" size={20} /><span className="dot" />
@@ -211,54 +247,48 @@ export default function Layout() {
         </footer>
       </div>
 
-      {/* ---- FAB замера (мобильный, пациент); на странице чата скрыт —
-           освобождает место композеру ввода ---- */}
-      {!isDoctor && !onChat && (
-        <button
-          className="fab-mobile fixed bottom-[86px] left-1/2 -translate-x-1/2 z-40 btn btn-gold rounded-full !min-h-[52px] !px-5 shadow-[0_6px_18px_rgba(23,46,42,0.25)]"
-          onClick={() => navigate('/new')}
-          aria-label="Новый замер"
-        >
-          + Новый замер
-        </button>
-      )}
-
-      {/* ---- Мобильная нижняя навигация: равные колонки, Ассистент строго по центру ---- */}
+      {/* ---- Мобильная нижняя навигация: 5 равных колонок, Ассистент —
+           в собственной средней ячейке, никого не перекрывает ---- */}
       <nav className="lg:hidden fixed bottom-4 left-0 right-0 z-40 px-4">
-        <div className="relative max-w-md mx-auto bg-white rounded-2xl glow-soft border border-[#e8eeed] grid grid-cols-4 items-center h-[64px] px-1.5">
-          {sideSlots.map((item, i) =>
-            item ? (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/' || item.to === '/patients'}
-                className={({ isActive }) =>
-                  `justify-self-center flex flex-col items-center justify-center rounded-[10px] w-[64px] py-1.5 transition-quick text-[10.5px] font-bold whitespace-nowrap ${
-                    isActive
-                      ? 'bg-teal-dark text-white shadow-sm'
-                      : 'text-teal-dark hover:bg-teal-bg'
-                  }`
-                }
+        <div className="relative max-w-md mx-auto bg-white rounded-2xl glow-soft border border-[#e8eeed] grid grid-cols-5 items-center h-[70px] px-1">
+          {isDoctor ? (
+            <>
+              <BarLink to="/patients" label="Пациенты" icon="stethoscope" end />
+              <BarLink to="/analytics" label="Аналитика" icon="chart" />
+              <AssistantSlot />
+              <BarLink to="/profile" label="Профиль" icon="profile" />
+              <button
+                className="justify-self-center flex flex-col items-center justify-center rounded-[10px] w-full max-w-[60px] px-0.5 py-1.5 transition-quick text-[10.5px] font-bold text-teal-dark hover:bg-teal-bg"
+                onClick={() => navigate('/patients')}
+                aria-label="Сигналы пациентов"
               >
-                <Icon name={item.icon} size={18} />
-                <span className="mt-0.5">{item.label}</span>
-              </NavLink>
-            ) : (
-              <div key={`slot-${i}`} aria-hidden />
-            )
+                <span className="relative">
+                  <Icon name="alarm" size={19} />
+                  {signalCount > 0 && (
+                    <span className="absolute -top-1.5 -right-2 bg-coral text-white text-[9px] font-bold rounded-full px-[5px]">
+                      {signalCount}
+                    </span>
+                  )}
+                </span>
+                <span className="mt-0.5 hidden min-[360px]:block">Сигналы</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <BarLink to="/" label="Дашборд" icon="home" end />
+              <BarLink to="/medcard" label="Медкарта" icon="care" />
+              <AssistantSlot />
+              <BarLink to="/profile" label="Профиль" icon="profile" />
+              <button
+                className="justify-self-center flex flex-col items-center justify-center rounded-[10px] w-full max-w-[60px] px-0.5 py-1.5 transition-quick text-[10.5px] font-bold text-teal-dark hover:bg-teal-bg"
+                onClick={() => navigate('/new')}
+                aria-label="Новый замер"
+              >
+                <Icon name="pressure" size={19} />
+                <span className="mt-0.5 hidden min-[360px]:block">Замер</span>
+              </button>
+            </>
           )}
-
-          {/* Ассистент — строго по центру бара, белый фон разливается вокруг */}
-          <NavLink
-            to="/chat"
-            className={({ isActive }) =>
-              `absolute left-1/2 -translate-x-1/2 -top-5 flex items-center ${isActive ? 'assistant-fab-active' : ''}`
-            }
-          >
-            <span className="assistant-fab-circle">
-              <Icon name="sparkle" size={24} />
-            </span>
-          </NavLink>
         </div>
       </nav>
 
