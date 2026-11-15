@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import * as api from '../api'
 import RiskBadge from '../components/RiskBadge'
 import IndicatorCard from '../components/IndicatorCard'
+import AvatarDoctor from '../components/AvatarDoctor'
 import Disclaimer from '../components/Disclaimer'
 import Confetti from '../components/Confetti'
 import { Icon } from '../components/Icon'
@@ -89,8 +90,8 @@ export default function Result() {
           <div className="flex flex-col gap-2">
             {a.notes.map((n) => (
               <div key={n.id} className="flip-card flip-card--gold">
-                <div className="text-xs font-extrabold text-teal-dark/60">
-                  {n.doctor_name} · {n.created_at.slice(0, 16)}
+                <div className="text-xs font-extrabold text-teal-dark/60 flex items-center gap-1.5">
+                  <AvatarDoctor size={20} /> {n.doctor_name} · {n.created_at.slice(0, 16)}
                 </div>
                 <p className="text-sm text-teal-dark/90 mt-1">{n.text}</p>
               </div>

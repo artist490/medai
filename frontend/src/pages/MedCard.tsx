@@ -5,6 +5,7 @@ import * as api from '../api'
 import { useAuth } from '../auth'
 import { brand, clinicCityUrl } from '../brand'
 import { Icon } from '../components/Icon'
+import AvatarDoctor from '../components/AvatarDoctor'
 import { CardCompleteness, CardFormFields, defaultCardForm } from '../components/CardAnamnesis'
 import type { CardFormState } from '../components/CardAnamnesis'
 import RiskSystems from '../components/RiskSystems'
@@ -237,7 +238,12 @@ function VisitCard({ visit, onChanged }: { visit: Visit; onChanged: (visit: Visi
 
       {visit.status === 'completed' && visit.conclusion && (
         <div className="mt-2 border-t border-[#e5e7eb] pt-2 flex flex-col gap-1">
-          <div className="text-xs font-extrabold uppercase tracking-[1px] text-teal-dark/50">Заключение врача{visit.doctor_name ? ` · ${visit.doctor_name}` : ''}</div>
+          <div className="text-xs font-extrabold uppercase tracking-[1px] text-teal-dark/50 flex items-center gap-1.5">
+            {visit.doctor_name ? (
+              <AvatarDoctor size={20} />
+            ) : null}
+            Заключение врача{visit.doctor_name ? ` · ${visit.doctor_name}` : ''}
+          </div>
           <p className="text-sm text-teal-dark/90 whitespace-pre-wrap">{visit.conclusion}</p>
           {visit.recommendations && (
             <p className="text-sm text-teal-dark/75 whitespace-pre-wrap">

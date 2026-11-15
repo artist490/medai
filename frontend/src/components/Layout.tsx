@@ -9,6 +9,7 @@ import { useAuth } from '../auth'
 import { brand } from '../brand'
 import { Icon } from './Icon'
 import type { IconName } from './Icon'
+import AvatarDoctor from './AvatarDoctor'
 
 type NavItem = { to: string; label: string; sub: string; icon: IconName; accent: 'teal' | 'coral' | 'sky' | 'gold' }
 
@@ -82,11 +83,16 @@ export default function Layout() {
             </div>
           </NavLink>
 
-          {/* Профиль-блок как у Сбер Здоровья: аватар, имя, возраст/роль */}
+          {/* Профиль-блок как у Сбер Здоровья: аватар, имя, возраст/роль.
+              Врач — аватар в белом халате, пациент — обычные инициалы */}
           <div className="mt-8 flex items-center gap-3 px-2">
-            <span className="avatar-circle" style={{ width: 44, height: 44, borderRadius: 999, fontSize: 14 }}>
-              {initialsOf(user?.name ?? '', user?.email ?? '')}
-            </span>
+            {isDoctor ? (
+              <AvatarDoctor size={44} />
+            ) : (
+              <span className="avatar-circle" style={{ width: 44, height: 44, borderRadius: 999, fontSize: 14 }}>
+                {initialsOf(user?.name ?? '', user?.email ?? '')}
+              </span>
+            )}
             <div className="min-w-0">
               <div className="text-sm font-bold text-[#1b2622] truncate">{user?.name || user?.email}</div>
               <div className="text-xs text-[#8aa09c]">
@@ -152,14 +158,25 @@ export default function Layout() {
               <button className="topbar-icon" title="Справка" aria-label="Справка">
                 <Icon name="help" size={20} />
               </button>
-              <button
-                className="avatar-circle"
-                title={`${user?.name || user?.email} · выйти`}
-                onClick={handleLogout}
-                aria-label="Профиль, выйти"
-              >
-                {initialsOf(user?.name ?? '', user?.email ?? '')}
-              </button>
+              {isDoctor ? (
+                <button
+                  className="cursor-pointer bg-transparent border-none p-0"
+                  title={`${user?.name || user?.email} · выйти`}
+                  onClick={handleLogout}
+                  aria-label="Профиль, выйти"
+                >
+                  <AvatarDoctor size={40} />
+                </button>
+              ) : (
+                <button
+                  className="avatar-circle"
+                  title={`${user?.name || user?.email} · выйти`}
+                  onClick={handleLogout}
+                  aria-label="Профиль, выйти"
+                >
+                  {initialsOf(user?.name ?? '', user?.email ?? '')}
+                </button>
+              )}
             </div>
           </div>
         </header>

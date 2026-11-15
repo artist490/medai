@@ -10,6 +10,7 @@ import type { RiskLevel, Status } from '../types'
 import { Icon } from '../components/Icon'
 import type { IconName } from '../components/Icon'
 import EmptyArt from '../components/EmptyArt'
+import AvatarDoctor from '../components/AvatarDoctor'
 import { Summary } from '../components/Summary'
 
 const riskColors: Record<RiskLevel, string> = {
@@ -294,8 +295,8 @@ export default function Dashboard() {
               <h2 className="text-lg">Комментарий врача</h2>
               {lastNote ? (
                 <div className="flip-card flip-card--gold mt-3">
-                  <div className="text-xs font-bold text-[#8aa09c]">
-                    {lastNote.doctor_name} · {lastNote.created_at.slice(0, 16)}
+                  <div className="text-xs font-bold text-[#8aa09c] flex items-center gap-1.5">
+                    <AvatarDoctor size={20} /> {lastNote.doctor_name} · {lastNote.created_at.slice(0, 16)}
                   </div>
                   <p className="text-sm text-[#2c3e3b] mt-1">{lastNote.text}</p>
                 </div>
