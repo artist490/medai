@@ -60,6 +60,56 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ---------- Анимированный градиентный фон ----------
+   Три мягких пятна (тил / золото / небо) медленно дрейфуют за контентом.
+   Слой фиксированный, за всем содержимым, клики не перехватывает. */
+.bg-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bg-aurora span {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(90px);
+  will-change: transform;
+}
+.bg-aurora .b1 {
+  width: 620px; height: 620px;
+  top: -200px; left: -140px;
+  background: rgba(0, 184, 169, 0.16);
+  animation: aurora-drift-1 28s ease-in-out infinite alternate;
+}
+.bg-aurora .b2 {
+  width: 480px; height: 480px;
+  top: 12%; right: -160px;
+  background: rgba(250, 204, 21, 0.13);
+  animation: aurora-drift-2 34s ease-in-out infinite alternate;
+}
+.bg-aurora .b3 {
+  width: 700px; height: 700px;
+  bottom: -260px; left: 24%;
+  background: rgba(93, 173, 226, 0.12);
+  animation: aurora-drift-3 40s ease-in-out infinite alternate;
+}
+@keyframes aurora-drift-1 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(180px, 120px) scale(1.18); }
+}
+@keyframes aurora-drift-2 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-150px, 130px) scale(1.12); }
+}
+@keyframes aurora-drift-3 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-120px, -160px) scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bg-aurora span { animation: none; }
+}
+
 h1, h2, h3, h4 {
   font-weight: 700;
   letter-spacing: -0.02em;

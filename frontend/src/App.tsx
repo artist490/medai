@@ -41,7 +41,14 @@ function Home() {
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      {/* Анимированный градиентный фон: медленно дрейфующие мягкие пятна */}
+      <div className="bg-aurora" aria-hidden>
+        <span className="b1" />
+        <span className="b2" />
+        <span className="b3" />
+      </div>
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
@@ -56,6 +63,7 @@ export default function App() {
         <Route path="patients/:id" element={<RequireDoctor><DoctorPatient /></RequireDoctor>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   )
 }
