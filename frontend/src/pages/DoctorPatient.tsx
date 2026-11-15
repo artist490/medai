@@ -8,6 +8,7 @@ import IndicatorCard from '../components/IndicatorCard'
 import { Summary } from '../components/Summary'
 import RiskBadge from '../components/RiskBadge'
 import { Icon } from '../components/Icon'
+import EmptyArt from '../components/EmptyArt'
 import AvatarPatient from '../components/AvatarPatient'
 import { CardFormFields, CardView, defaultCardForm } from '../components/CardAnamnesis'
 import type { CardFormState } from '../components/CardAnamnesis'
@@ -34,10 +35,10 @@ const STATUS_INFO: Record<VisitStatus, { cls: string; label: string }> = {
 
 type Tab = 'measurements' | 'medcard' | 'visits'
 
-const TABS: Array<{ key: Tab; label: string; icon: 'stethoscope' | 'care' | 'clock' }> = [
+const TABS: Array<{ key: Tab; label: string; icon: 'stethoscope' | 'care' | 'calendar' }> = [
   { key: 'measurements', label: 'Замеры', icon: 'stethoscope' },
   { key: 'medcard', label: 'Медкарта', icon: 'care' },
-  { key: 'visits', label: 'Приёмы', icon: 'clock' },
+  { key: 'visits', label: 'Приёмы', icon: 'calendar' },
 ]
 
 function shortDate(iso: string): string {
@@ -199,7 +200,12 @@ function MeasurementsTab({ items, selectedId, setSelectedId, onNoteAdded, onMark
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-teal-dark/55 font-bold">Комментариев пока нет</p>
+              <div className="text-center py-4">
+                <EmptyArt className="mx-auto mb-2" />
+                <p className="text-sm text-teal-dark/70 font-bold">
+                  Комментариев пока нет — ваш комментарий увидит пациент
+                </p>
+              </div>
             )}
 
             <NoteForm analysisId={a.id} onAdded={onNoteAdded} />

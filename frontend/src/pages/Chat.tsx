@@ -119,13 +119,13 @@ export default function Chat() {
         </button>
       </div>
 
-      <p className="text-sm text-teal-dark/60 -mt-3 hidden sm:block shrink-0">
+      <p className="text-sm text-teal-dark/80 -mt-3 hidden sm:block shrink-0">
         Ассистент видит {user?.role === 'doctor'
           ? 'данные пациентов вашего филиала'
           : 'ваши замеры и разборы'} и отвечает с опорой на них.
         Не ставит диагнозы — при тревожных показателях обратитесь к врачу.
       </p>
-      <p className="text-xs text-teal-dark/60 -mt-4 sm:hidden shrink-0">
+      <p className="text-xs text-teal-dark/75 -mt-4 sm:hidden shrink-0">
         Ассистент видит ваши данные и не ставит диагнозы.
       </p>
 

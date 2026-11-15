@@ -75,25 +75,25 @@ body {
 .bg-aurora span {
   position: absolute;
   border-radius: 999px;
-  filter: blur(90px);
+  filter: blur(70px);
   will-change: transform;
 }
 .bg-aurora .b1 {
-  width: 620px; height: 620px;
-  top: -200px; left: -140px;
-  background: rgba(0, 184, 169, 0.16);
+  width: 520px; height: 520px;
+  top: -240px; left: -180px;
+  background: rgba(0, 184, 169, 0.07);
   animation: aurora-drift-1 28s ease-in-out infinite alternate;
 }
 .bg-aurora .b2 {
-  width: 480px; height: 480px;
-  top: 12%; right: -160px;
-  background: rgba(250, 204, 21, 0.13);
+  width: 420px; height: 420px;
+  top: 12%; right: -200px;
+  background: rgba(250, 204, 21, 0.05);
   animation: aurora-drift-2 34s ease-in-out infinite alternate;
 }
 .bg-aurora .b3 {
-  width: 700px; height: 700px;
-  bottom: -260px; left: 24%;
-  background: rgba(93, 173, 226, 0.12);
+  width: 560px; height: 560px;
+  bottom: -300px; left: 42%;
+  background: rgba(93, 173, 226, 0.05);
   animation: aurora-drift-3 40s ease-in-out infinite alternate;
 }
 @keyframes aurora-drift-1 {
@@ -799,36 +799,31 @@ h1, h2, h3, h4 {
   pointer-events: none;
 }
 
-/* FAB замера: только на мобильных (unlayered lg:hidden бьётся с .btn) */
-.fab-mobile { display: inline-flex; }
-@media (min-width: 1024px) {
-  .fab-mobile { display: none; }
-}
-
 /* Центральная кнопка Ассистента в мобильном таб-баре:
-   белый фон бара «разливается» вокруг кнопки белым ореолом */
+   живёт в собственной средней колонке 5-колоночной сетки,
+   белый ореол — «разлив» фона бара вокруг кружка */
 .assistant-fab-circle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 50px;
+  height: 50px;
   border-radius: 999px;
   background: linear-gradient(135deg, #00b8a9, #007b83);
   color: #ffffff;
   box-shadow:
-    0 4px 10px rgba(0, 123, 131, 0.30),
-    0 14px 30px -10px rgba(0, 123, 131, 0.50),
-    0 0 0 7px #ffffff;
+    0 3px 8px rgba(0, 123, 131, 0.28),
+    0 10px 24px -10px rgba(0, 123, 131, 0.45),
+    0 0 0 5px #ffffff;
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
 }
 .assistant-fab-circle:hover { transform: translateY(-2px); filter: brightness(1.06); }
 .assistant-fab-active .assistant-fab-circle {
   box-shadow:
-    0 4px 10px rgba(0, 123, 131, 0.40),
-    0 14px 34px -8px rgba(0, 123, 131, 0.60),
-    0 0 0 7px #ffffff,
-    0 0 0 9px rgba(0, 184, 169, 0.30);
+    0 3px 8px rgba(0, 123, 131, 0.36),
+    0 12px 26px -8px rgba(0, 123, 131, 0.55),
+    0 0 0 5px #ffffff,
+    0 0 0 7px rgba(0, 184, 169, 0.30);
 }
 
 /* Micro-interactions ≤ 500ms */
