@@ -90,9 +90,6 @@ export default function DoctorPatients() {
             {user?.branch ? `Пациенты · ${user.branch.city}` : 'Пациенты клиники'}
           </h1>
         </div>
-        <span className="badge badge-teal normal-case tracking-normal w-fit">
-          Всего пациентов: {items.length}
-        </span>
       </div>
 
       {error && <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>}

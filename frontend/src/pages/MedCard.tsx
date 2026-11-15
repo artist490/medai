@@ -374,7 +374,7 @@ export default function MedCard() {
         <div className="section-title mb-3 flex items-center gap-2">
           <span className="emoji-box"><Icon name="clock" size={20} /></span>
           <span>Приёмы</span>
-          {plannedCount > 0 && <span className="badge badge-teal normal-case tracking-normal">запланировано: {plannedCount}</span>}
+          {plannedCount > 0 && <span className="text-xs font-semibold text-teal-dark/50">· {plannedCount} запланировано</span>}
         </div>
 
         <div className="flex flex-col gap-3">
