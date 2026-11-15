@@ -59,24 +59,25 @@ export default function Layout() {
   return (
     <div className="min-h-screen lg:grid" style={{ gridTemplateColumns: '250px 1fr' }}>
       {/* ---- Сайдбар (desktop) ---- */}
-      <aside className="hidden lg:flex flex-col justify-between sticky top-0 h-screen bg-white border-r border-[#e5e7eb] px-5 py-7">
+      <aside className="hidden lg:flex flex-col justify-between sticky top-0 h-screen sidebar-shell border-r border-[#e9efed] px-5 py-6">
         <div>
           <NavLink to="/" className="block px-2">
-            <div className="flex items-center gap-2">
-              <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden className="shrink-0">
-                <rect width="26" height="26" rx="7" fill="#e9f7f6" stroke="#e5e7eb" />
-                <circle cx="13" cy="13" r="7" fill="#E23A3A" />
-              </svg>
+            <div className="flex items-center gap-2.5">
+              <span className="brand-mark" aria-hidden>
+                <svg width="30" height="30" viewBox="0 0 30 30">
+                  <circle cx="15" cy="15" r="8.5" fill="#E23A3A" />
+                  <circle cx="15" cy="15" r="11.5" fill="none" stroke="#E23A3A" strokeOpacity="0.25" strokeWidth="1.5" />
+                </svg>
+              </span>
               <div>
-                <div className="wordmark" style={{ fontSize: 19 }}>Спектр-Диагностика</div>
+                <div className="wordmark" style={{ fontSize: 18 }}>Спектр-Диагностика</div>
                 <div className="wordmark-sub">{brand.subtitle}</div>
               </div>
             </div>
           </NavLink>
 
-          {/* Профиль-блок как у Сбер Здоровья: аватар, имя, возраст/роль.
-              Врач — аватар в белом халате, пациент — обычный силуэт */}
-          <div className="mt-8 flex items-center gap-3 px-2">
+          {/* Профиль-карточка: аватар, имя, роль */}
+          <div className="profile-card mt-7 flex items-center gap-3 px-3 py-3">
             {isDoctor ? (
               <AvatarDoctor size={44} />
             ) : (
@@ -92,7 +93,9 @@ export default function Layout() {
             </div>
           </div>
 
-          <nav className="mt-6 flex flex-col gap-1.5">
+          <div className="mx-1 my-4 h-px bg-[#e9efed]" />
+
+          <nav className="flex flex-col gap-1">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -116,7 +119,7 @@ export default function Layout() {
           </div>
         ) : (
           <button className="btn btn-gold w-full" onClick={() => navigate('/new')}>
-            + Новый замер
+            <Icon name="pressure" size={16} /> Новый замер
           </button>
         )}
       </aside>
