@@ -80,7 +80,9 @@ export default function Layout() {
             {isDoctor ? (
               <AvatarDoctor size={44} />
             ) : (
-              <AvatarPatient size={44} />
+              <span className="doctor-avatar text-white" style={{ width: 44, height: 44 }}>
+                <AvatarPatient size={36} />
+              </span>
             )}
             <div className="min-w-0">
               <div className="text-sm font-bold text-[#1b2622] truncate">{user?.name || user?.email}</div>
@@ -158,12 +160,13 @@ export default function Layout() {
                 </button>
               ) : (
                 <button
-                  className="cursor-pointer bg-transparent border-none p-0"
+                  className="doctor-avatar text-white cursor-pointer"
+                  style={{ width: 40, height: 40 }}
                   title={`${user?.name || user?.email} · выйти`}
                   onClick={handleLogout}
                   aria-label="Профиль, выйти"
                 >
-                  <AvatarPatient size={40} />
+                  <AvatarPatient size={33} />
                 </button>
               )}
             </div>

@@ -27,11 +27,10 @@ function shortDate(iso: string | null): string {
 }
 
 function PatientAvatar({ p, size = 'md' }: { p: PatientRow; size?: 'sm' | 'md' }) {
-  // Иллюстрация-аватар с кольцом цвета последнего риска
-  const ring = p.last_risk === 'red' ? '#dc2626' : p.last_risk === 'yellow' ? '#eab308' : '#00b8a9'
+  const cls = p.last_risk ? `row-avatar--${p.last_risk}` : 'row-avatar--green'
   return (
-    <span style={{ borderRadius: 999, display: 'inline-flex', boxShadow: `0 0 0 2.5px ${ring}88` }}>
-      <AvatarPatient size={size === 'sm' ? 34 : 40} />
+    <span className={`row-avatar ${cls} ${size === 'sm' ? '!w-8 !h-8' : ''}`}>
+      <AvatarPatient size={size === 'sm' ? 20 : 26} />
     </span>
   )
 }
