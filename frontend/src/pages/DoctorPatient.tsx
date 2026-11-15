@@ -512,18 +512,14 @@ export default function DoctorPatient() {
         <Link to="/patients" className="btn btn-ghost">← К списку</Link>
       </div>
 
-      {/* Профиль: аватар + мета-чипы */}
-      <section className="panel flex flex-wrap items-center gap-x-6 gap-y-3">
-        <span className="row-avatar row-avatar--green !w-12 !h-12">
-          <AvatarPatient size={32} />
-        </span>
-        <div className="flex flex-wrap gap-2 text-sm font-bold">
-          <span className="badge badge-teal normal-case tracking-normal">{patient.email}</span>
-          <span className="badge badge-sky normal-case tracking-normal">возраст: {patient.age ?? '—'}</span>
-          <span className="badge badge-sky normal-case tracking-normal">пол: {sexLabel(patient.sex)}</span>
-          <span className="badge badge-sky normal-case tracking-normal">
-            рост: {patient.height_cm ? `${patient.height_cm} см` : '—'}
-          </span>
+      {/* Профиль: аватар + мета-строка */}
+      <section className="panel flex flex-wrap items-center gap-x-8 gap-y-3">
+        <AvatarPatient size={48} />
+        <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+          <span><span className="text-[#8aa09c] font-semibold">Email:</span> <span className="font-bold text-[#1b2622]">{patient.email}</span></span>
+          <span><span className="text-[#8aa09c] font-semibold">Возраст:</span> <span className="font-bold text-[#1b2622]">{patient.age ?? '—'}</span></span>
+          <span><span className="text-[#8aa09c] font-semibold">Пол:</span> <span className="font-bold text-[#1b2622]">{sexLabel(patient.sex)}</span></span>
+          <span><span className="text-[#8aa09c] font-semibold">Рост:</span> <span className="font-bold text-[#1b2622]">{patient.height_cm ? `${patient.height_cm} см` : '—'}</span></span>
         </div>
       </section>
 
@@ -538,7 +534,7 @@ export default function DoctorPatient() {
             <Icon name={t.icon} size={14} />
             {t.label}
             {t.key === 'visits' && plannedCount > 0 && (
-              <span className={`badge ${tab === t.key ? 'badge-gold' : 'badge-teal'} normal-case tracking-normal !px-1.5`}>{plannedCount}</span>
+              <span className={`font-bold ${tab === t.key ? 'text-white/75' : 'text-teal-dark/50'}`}>{plannedCount}</span>
             )}
           </button>
         ))}

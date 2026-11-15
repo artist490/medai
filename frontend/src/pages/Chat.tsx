@@ -181,7 +181,7 @@ export default function Chat() {
         {chips.map((c) => (
           <button
             key={c}
-            className="badge badge-teal normal-case tracking-normal hover:bg-[#e2f0ef] transition-quick whitespace-nowrap shrink-0 sm:shrink"
+            className="chip-btn whitespace-nowrap shrink-0 sm:shrink"
             onClick={() => send(c)}
             disabled={busy}
           >

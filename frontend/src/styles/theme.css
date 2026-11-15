@@ -559,32 +559,52 @@ h1, h2, h3, h4 {
 
 .flip-hint { font-size: 11px; color: #8aa09c; margin-top: 3px; }
 
-/* ---------- Бейджи: пилюли с точкой статуса ---------- */
+/* ---------- Статусы: тихий вид — цветная точка + цветной текст, без пилюль ---------- */
 
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 11px;
-  border-radius: 999px;
-  font-size: 12px;
+  gap: 7px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.1px;
 }
 .badge::before {
   content: '';
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
   background: currentColor;
-  opacity: 0.85;
+  opacity: 0.9;
   flex-shrink: 0;
 }
-.badge-green { background: rgba(22, 163, 74, 0.11); color: #15803d; }
-.badge-gold  { background: rgba(234, 179, 8, 0.14); color: #a16207; }
-.badge-red   { background: rgba(220, 38, 38, 0.10); color: #c62828; }
-.badge-teal  { background: var(--color-teal-bg); color: var(--color-teal-dark); }
-.badge-sky   { background: rgba(93, 173, 226, 0.15); color: #2f7fb5; }
+.badge-green { color: #15803d; }
+.badge-gold  { color: #9a7a00; }
+.badge-red   { color: #c62828; }
+.badge-teal  { color: var(--color-teal-dark); }
+.badge-sky   { color: #2f7fb5; }
+
+/* Кнопки-подсказки (чипы чата): интерактивные, с рамкой — не статусы */
+.chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #e2e9e8;
+  color: #0d5f60;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.chip-btn:hover { background: #f1f6f5; border-color: #d8e2e0; }
+.chip-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* ---------- Чат с ИИ: аватар-идентичность и глубина пузырей ---------- */
 
