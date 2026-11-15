@@ -1,6 +1,5 @@
 """Оркестратор анализа: правила → риск → LLM-обогащение → готовый результат."""
 import sqlite3
-from typing import Optional
 
 from . import rules
 from . import llm as llm_service

@@ -37,7 +37,7 @@ class MeasurementIn(BaseModel):
     water_ml: Optional[int] = Field(default=None, ge=0, le=10000)
     weight_kg: Optional[float] = Field(default=None, ge=20, le=400)
     period: Optional[Literal["morning", "evening"]] = None  # период дня (дневник давления)
-    recorded_at: Optional[str] = None  # ISO-строка; по умолчанию — сейчас
+    recorded_at: Optional[str] = Field(default=None, max_length=64)  # ISO-строка; по умолчанию — сейчас
 
 
 class GoalIn(BaseModel):

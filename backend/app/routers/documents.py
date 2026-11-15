@@ -5,7 +5,6 @@
 со своими документами.
 """
 import sqlite3
-from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
@@ -32,7 +31,9 @@ def upload_document(
     user: sqlite3.Row = Depends(auth.get_current_user),
     db: sqlite3.Connection = Depends(get_db),
 ):
-    data = file.file.read()
+    # Читаем максимум MAX_SIZE+1 байт: клиент может послать 2 ГБ —
+    # не тащим их в память целиком ради проверки размера.
+    data = file.file.read(MAX_SIZE + 1)
     if not data:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Файл пуст")
     if len(data) > MAX_SIZE:
@@ -43,7 +44,7 @@ def upload_document(
                             "Поддерживаются PDF, PNG, JPG и WebP")
     filename = (file.filename or "document").strip()[:255]
     title = title.strip()[:200] or filename
-    db.execute(
+    cursor = db.execute(
         """INSERT INTO documents (user_id, title, filename, mime, size, data)
            VALUES (?, ?, ?, ?, ?, ?)""",
         (user["id"], title, filename, mime, len(data), data),
@@ -51,7 +52,7 @@ def upload_document(
     db.commit()  # см. комментарий в routers/auth.py register
     row = db.execute(
         "SELECT id, title, filename, mime, size, uploaded_at FROM documents WHERE id = ?",
-        (db.execute("SELECT last_insert_rowid() AS id").fetchone()["id"],),
+        (cursor.lastrowid,),
     ).fetchone()
     return _doc_payload(row)
 

@@ -43,29 +43,27 @@ def _bp_finding(systolic: Optional[float], diastolic: Optional[float]) -> Option
     """Классификация АД по ESC/ESH (2023). Для категории берём худший показатель."""
     if systolic is None and diastolic is None:
         return None
-    sys_ = systolic if systolic is not None else 0
-    dia_ = diastolic if diastolic is not None else 0
     value = f"{systolic:g}/{diastolic:g}" if systolic is not None and diastolic is not None \
         else f"{systolic if systolic is not None else '—'}/{diastolic if diastolic is not None else '—'}"
     norm = "до 120/80"
 
     def sys_cat(v: float) -> int:
-        if v < 90: return -2       # выраженная гипотония
-        if v < 100: return -1      # гипотония
-        if v < 120: return 0       # оптимальное
-        if v < 130: return 1       # нормальное
-        if v < 140: return 2       # повышенное нормальное
-        if v < 160: return 3       # АГ 1 степени
-        if v < 180: return 4       # АГ 2 степени
+        if v < 90: return -2       # noqa: E701 — пороговая лестница, зеркалит клиническую таблицу
+        if v < 100: return -1      # noqa: E701
+        if v < 120: return 0       # noqa: E701
+        if v < 130: return 1       # noqa: E701
+        if v < 140: return 2       # noqa: E701
+        if v < 160: return 3       # noqa: E701
+        if v < 180: return 4       # noqa: E701
         return 5                   # АГ 3 степени / криз
 
     def dia_cat(v: float) -> int:
-        if v < 60: return -1
-        if v < 80: return 0
-        if v < 85: return 1
-        if v < 90: return 2
-        if v < 100: return 3
-        if v < 110: return 4
+        if v < 60: return -1       # noqa: E701
+        if v < 80: return 0        # noqa: E701
+        if v < 85: return 1        # noqa: E701
+        if v < 90: return 2        # noqa: E701
+        if v < 100: return 3       # noqa: E701
+        if v < 110: return 4       # noqa: E701
         return 5
 
     # Тяжесть отклонения от нормы: чем дальше от зоны 0..1, тем хуже

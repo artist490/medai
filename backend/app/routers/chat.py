@@ -1,7 +1,8 @@
 """Роутер чата с ИИ-ассистентом (DeepSeek через PlusVibe, function calling)."""
 import sqlite3
+import time
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from .. import auth, config
@@ -9,6 +10,20 @@ from ..database import get_db
 from ..services import chat_agent
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+# Каждый вызов чата — платный LLM-запрос (до 6 раундов инструментов).
+# Лимит на пользователя: как брутфорс-гвард в routers/auth.py (in-memory,
+# для локального деплоя клиники достаточно).
+CHAT_MAX_SENDS = 20
+CHAT_WINDOW = 3600
+_CHAT_SENDS: dict[int, list[float]] = {}
+
+
+def _chat_blocked(user_id: int) -> bool:
+    now = time.time()
+    fresh = [t for t in _CHAT_SENDS.get(user_id, []) if now - t < CHAT_WINDOW]
+    _CHAT_SENDS[user_id] = fresh
+    return len(fresh) >= CHAT_MAX_SENDS
 
 
 class ChatIn(BaseModel):
@@ -27,6 +42,10 @@ def send(
     db: sqlite3.Connection = Depends(get_db),
 ):
     message = data.message.strip()
+    if _chat_blocked(user["id"]):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,
+                            "Слишком много сообщений ассистенту — подождите час")
+    _CHAT_SENDS.setdefault(user["id"], []).append(time.time())
     db.execute(
         "INSERT INTO chat_messages (user_id, role, content) VALUES (?, 'user', ?)",
         (user["id"], message),
@@ -41,11 +60,18 @@ def send(
                for r in reversed(history_rows)]
 
     result = chat_agent.run(db, user, history)
+    tools_used: list[str]
     if result is None:
-        reply, tools_used = ("ИИ-чат временно недоступен — проверьте подключение "
-                             "к нейросети и баланс. Пока ответить могу только общими "
-                             "советами: замеры делайте в одно и то же время и следите "
-                             "за самочувствием."), []
+        # Разные причины — разные подсказки пациенту/врачу
+        if not config.llm_enabled():
+            reply, tools_used = ("ИИ-чат недоступен: ключ нейросети не настроен "
+                                 "(backend/.env → LLM_API_KEY). Замеры делайте в одно "
+                                 "и то же время и следите за самочувствием."), []
+        else:
+            reply, tools_used = ("ИИ-чат временно недоступен — проверьте подключение "
+                                 "к нейросети и баланс. Пока ответить могу только общими "
+                                 "советами: замеры делайте в одно и то же время и следите "
+                                 "за самочувствием."), []
     else:
         reply, tools_used = result
 

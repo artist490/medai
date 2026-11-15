@@ -27,6 +27,12 @@ def _login_key(email: str, request: Request) -> str:
 
 
 def _login_blocked(key: str) -> bool:
+    # Cap словаря: не даём ему расти бесконечно по подбрасываемым email
+    if len(_LOGIN_FAILS) > 10_000:
+        cutoff = time.time() - LOGIN_WINDOW
+        stale = [k for k, v in _LOGIN_FAILS.items() if not v or v[-1] <= cutoff]
+        for k in stale:
+            del _LOGIN_FAILS[k]
     now = time.time()
     fresh = [t for t in _LOGIN_FAILS.get(key, []) if now - t < LOGIN_WINDOW]
     _LOGIN_FAILS[key] = fresh
@@ -100,7 +106,7 @@ def register(data: RegisterIn, db: sqlite3.Connection = Depends(get_db)):
             (user_id, invite["code"]),
         )
 
-    token = auth.create_session(db, user_id)
+    token = auth.create_session(db, int(cursor.lastrowid or 0))
     # Коммит до отправки ответа: teardown-коммит yield-зависимости выполняется
     # после ответа, и клиент успевает сделать следующий запрос без этих данных
     db.commit()

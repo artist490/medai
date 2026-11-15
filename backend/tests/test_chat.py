@@ -200,3 +200,48 @@ class TestChatAgent:
         assert resp.status_code == 200
         tool_msg = [m for m in mock.calls[1]["messages"] if m["role"] == "tool"][0]
         assert "неизвестный инструмент" in tool_msg["content"]
+
+    def test_tool_loop_forced_to_answer(self, client, monkeypatch):
+        """Модель зациклилась на инструментах (6 раундов) — агент принудительно
+        запрашивает финальный ответ без инструментов (chat_agent.py:302-311)."""
+        from app.services import chat_agent
+
+        p = _register(client, "p7@test.ru")
+        mock = _MockLLM([
+            _tool_call("get_recent_measurements", f"c{i}", {"limit": 1})
+            for i in range(chat_agent.MAX_TOOL_ROUNDS)
+        ])
+        monkeypatch.setattr("app.services.chat_agent.llm_service.chat_completion", mock)
+
+        resp = client.post("/api/chat/send", json={"message": "дай данные"},
+                           headers=_auth(p))
+        body = resp.json()
+        assert resp.status_code == 200
+        assert len(body["tools_used"]) == chat_agent.MAX_TOOL_ROUNDS
+        assert body["reply"]  # финальный вызов без инструментов вернул ответ
+        # Последний запрос модели не содержит tools — форс-подсказка подмешана
+        last_user_msgs = [m for m in mock.calls[-1]["messages"] if m["role"] == "user"]
+        assert any("без вызовов инструментов" in m["content"] for m in last_user_msgs)
+
+    def test_chat_rate_limited(self, client, monkeypatch):
+        """Платный LLM-чат ограничен по частоте (F002): сверх лимита — 429."""
+        from app.routers import chat as chat_router
+
+        p = _register(client, "p8@test.ru")
+        monkeypatch.setattr("app.services.chat_agent.llm_service.chat_completion",
+                            _MockLLM([{"content": "ответ"}]))
+        monkeypatch.setattr(chat_router, "_CHAT_SENDS", {})
+        monkeypatch.setattr(chat_router, "CHAT_MAX_SENDS", 2)
+
+        for _ in range(2):
+            resp = client.post("/api/chat/send", json={"message": "привет"},
+                               headers=_auth(p))
+            assert resp.status_code == 200
+        resp = client.post("/api/chat/send", json={"message": "ещё"},
+                           headers=_auth(p))
+        assert resp.status_code == 429
+        # Лимит пер-пользовательский: другой пациент не заблокирован
+        other = _register(client, "p9@test.ru")
+        resp = client.post("/api/chat/send", json={"message": "моё первое"},
+                           headers=_auth(other))
+        assert resp.status_code == 200

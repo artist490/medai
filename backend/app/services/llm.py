@@ -15,6 +15,22 @@ from .. import config
 
 logger = logging.getLogger("medai.llm")
 
+
+def _strip_fence(content: str) -> str:
+    """Срезает markdown-обёртку ```...```, если модель её добавила.
+
+    Важно: не lstrip("json")/lstrip("markdown") — они режут по МНОЖЕСТВУ
+    символов и съедают начало ответа, совпадающее с этими буквами."""
+    if not content.startswith("```"):
+        return content
+    if "\n" in content:  # ```json\n{...}``` → берём после первой строки
+        content = content.split("\n", 1)[1]
+    else:
+        content = content.strip("`")
+    if content.endswith("```"):
+        content = content[:-3]
+    return content.strip()
+
 SYSTEM_PROMPT = """Ты — дружелюбный медицинский ассистент-советчик приложения MedAI.
 Твоя задача — написать краткие персональные рекомендации по ЗДОРОВОМУ образу жизни
 на основе показателей пользователя и выводов системы правил.
@@ -83,8 +99,7 @@ def patient_summary(payload: str) -> Optional[str]:
     if not message:
         return None
     content = str(message.get("content") or "").strip()
-    if content.startswith("```"):  # модели иногда оборачивают текст в ```...```
-        content = content.strip("`").lstrip("markdown").strip()
+    content = _strip_fence(content)
     return content or None
 
 
@@ -121,8 +136,7 @@ def enrich(profile: dict, indicators: dict, rule_result: dict) -> Optional[dict]
 
     content = str(message.get("content") or "").strip()
     # Модели иногда оборачивают JSON в ```...``` — срезаем
-    if content.startswith("```"):
-        content = content.strip("`").lstrip("json").strip()
+    content = _strip_fence(content)
 
     try:
         data = json.loads(content)
