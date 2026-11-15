@@ -2,7 +2,6 @@
 import json
 import sqlite3
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -10,107 +9,31 @@ from .. import auth
 from ..database import get_db
 from ..schemas import MeasurementIn
 from ..services import analyze as analyze_service
+from ..services.payloads import analysis_payload, measurement_payload, notes_map
 
 router = APIRouter(prefix="/api/measurements", tags=["measurements"])
 
 
-def _parse_llm_text(raw: Optional[str]) -> tuple[Optional[str], Optional[list]]:
-    """В БД llm_text хранится как JSON {"summary": ..., "items": [...]}."""
-    if not raw:
-        return None, None
-    try:
-        data = json.loads(raw)
-        return data.get("summary"), data.get("items")
-    except (json.JSONDecodeError, AttributeError):
-        return None, None
-
-
-def analysis_payload(row: sqlite3.Row, id_key: str = "id", mid_key: str = "measurement_id",
-                     created_key: str = "created_at", notes: Optional[list] = None) -> dict:
-    """Собирает analysis из строки analyses или из joined-строки списка."""
-    llm_summary, llm_items = _parse_llm_text(row["llm_text"])
-    payload = {
-        "id": row[id_key],
-        "measurement_id": row[mid_key],
-        "created_at": row[created_key],
-        "risk_level": row["risk_level"],
-        "source": row["source"],
-        "findings": json.loads(row["findings"]),
-        "recommendations": json.loads(row["recommendations"]),
-        "llm_summary": llm_summary,
-        "llm_items": llm_items,
-        "bmi": row["bmi"],
-        "doctor_seen_at": row["doctor_seen_at"] if "doctor_seen_at" in row.keys() else None,
-    }
-    if notes is not None:
-        payload["notes"] = notes
-    return payload
-
-
-def _notes_map(db: sqlite3.Connection, user_id: int) -> dict[int, list[dict]]:
-    """Комментарии врачей по всем анализам пользователя: {analysis_id: [note]}."""
-    rows = db.execute(
-        """
-        SELECT n.id, n.analysis_id, n.doctor_name, n.text, n.created_at
-        FROM doctor_notes n
-        JOIN analyses a ON a.id = n.analysis_id
-        WHERE a.user_id = ?
-        ORDER BY n.id
-        """,
-        (user_id,),
-    ).fetchall()
-    grouped: dict[int, list[dict]] = {}
-    for r in rows:
-        grouped.setdefault(r["analysis_id"], []).append(
-            {k: r[k] for k in ("id", "doctor_name", "text", "created_at")}
-        )
-    return grouped
-
-
-def measurement_payload(m: sqlite3.Row, analysis: Optional[dict]) -> dict:
-    fields = ("systolic", "diastolic", "pulse", "temperature", "spo2",
-              "sleep_hours", "steps", "water_ml", "weight_kg")
-    data = {
-        "id": m["id"],
-        "recorded_at": m["recorded_at"],
-        "period": m["period"] if "period" in m.keys() else None,
-        **{k: m[k] for k in fields},
-    }
-    if analysis is not None:
-        data["analysis"] = analysis
-    return data
-
-
-@router.post("", status_code=201)
-def create_measurement(
-    data: MeasurementIn,
-    user: sqlite3.Row = Depends(auth.get_current_user),
-    db: sqlite3.Connection = Depends(get_db),
-):
-    values = {k: v for k, v in data.model_dump().items() if k != "recorded_at" and k != "period" and v is not None}
-    if not values:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            "Заполните хотя бы один показатель")
-
-    if data.recorded_at:
-        try:
-            dt = datetime.fromisoformat(data.recorded_at.replace("Z", "+00:00"))
-        except ValueError:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
-                                "Некорректная дата замера — ожидается ISO, например 2026-01-31 14:30")
-        recorded_at = dt.strftime("%Y-%m-%d %H:%M:%S")
-    else:
-        recorded_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    if data.period:
-        values["period"] = data.period
-    columns = ", ".join(values.keys())
-    placeholders = ", ".join("?" for _ in values)
+def _insert_and_analyze(
+    db: sqlite3.Connection,
+    user: sqlite3.Row,
+    values: dict,
+    recorded_at: str,
+    period: str | None = None,
+) -> dict:
+    """Общий блок create/repeat: INSERT замера → анализ (правила + LLM) →
+    INSERT analyses → готовый payload ответа (см. TECH_DEBT_AUDIT.md F018)."""
+    columns = ["user_id", "recorded_at", *values.keys()]
+    params: list[object] = [user["id"], recorded_at, *values.values()]
+    if period:
+        columns.append("period")
+        params.append(period)
+    placeholders = ", ".join("?" for _ in columns)
     cursor = db.execute(
-        f"INSERT INTO measurements (user_id, recorded_at, {columns}) VALUES (?, ?, {placeholders})",
-        (user["id"], recorded_at, *values.values()),
+        f"INSERT INTO measurements ({', '.join(columns)}) VALUES ({placeholders})",
+        params,
     )
     measurement_id = cursor.lastrowid
-
     measurement = db.execute(
         "SELECT * FROM measurements WHERE id = ?", (measurement_id,)
     ).fetchone()
@@ -143,6 +66,29 @@ def create_measurement(
     return measurement_payload(measurement, payload)
 
 
+@router.post("", status_code=201)
+def create_measurement(
+    data: MeasurementIn,
+    user: sqlite3.Row = Depends(auth.get_current_user),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    values = {k: v for k, v in data.model_dump().items() if k != "recorded_at" and k != "period" and v is not None}
+    if not values:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "Заполните хотя бы один показатель")
+
+    if data.recorded_at:
+        try:
+            dt = datetime.fromisoformat(data.recorded_at.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                "Некорректная дата замера — ожидается ISO, например 2026-01-31 14:30")
+        recorded_at = dt.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        recorded_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return _insert_and_analyze(db, user, values, recorded_at, period=data.period)
+
+
 @router.post("/repeat", status_code=201)
 def repeat_last_measurement(
     period: str = Query(default="evening", pattern="^(morning|evening)$"),
@@ -165,33 +111,8 @@ def repeat_last_measurement(
     values = {k: last[k] for k in fields if last[k] is not None}
     if not values:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "В последнем замере нет показателей")
-    columns = ", ".join(["user_id", "recorded_at", "period"] + list(values.keys()))
-    placeholders = ", ".join("?" for _ in range(len(columns.split(", "))))
-    params = [user["id"], datetime.now().strftime("%Y-%m-%d %H:%M:%S"), period] + list(values.values())
-    cursor = db.execute(
-        f"INSERT INTO measurements ({columns}) VALUES ({placeholders})",
-        params,
-    )
-    measurement_id = cursor.lastrowid
-    measurement = db.execute("SELECT * FROM measurements WHERE id = ?", (measurement_id,)).fetchone()
-    result = analyze_service.run_analysis(measurement, user)
-    db.execute(
-        """INSERT INTO analyses (measurement_id, user_id, risk_level, source,
-                                 findings, recommendations, llm_text, bmi)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (measurement_id, user["id"], result["risk_level"], result["source"],
-         json.dumps(result["findings"], ensure_ascii=False),
-         json.dumps(result["recommendations"], ensure_ascii=False),
-         json.dumps({"summary": result["llm_summary"], "items": result["llm_items"]},
-                    ensure_ascii=False) if result["llm_summary"] else None,
-         result["bmi"]),
-    )
-    analysis = db.execute(
-        "SELECT * FROM analyses WHERE measurement_id = ?", (measurement_id,)
-    ).fetchone()
-    db.commit()  # см. комментарий в routers/auth.py register
-    payload = analysis_payload(analysis) if analysis is not None else None
-    return measurement_payload(measurement, payload)
+    return _insert_and_analyze(db, user, values,
+                               datetime.now().strftime("%Y-%m-%d %H:%M:%S"), period=period)
 
 
 @router.get("")
@@ -217,7 +138,7 @@ def list_measurements(
         "SELECT COUNT(*) AS c FROM measurements WHERE user_id = ?", (user["id"],)
     ).fetchone()["c"]
 
-    notes = _notes_map(db, user["id"])
+    notes = notes_map(db, user["id"])
     items = []
     for row in rows:
         analysis = None
@@ -245,7 +166,7 @@ def get_measurement(
     ).fetchone()
     analysis = None
     if analysis_row is not None:
-        notes = _notes_map(db, user["id"])
+        notes = notes_map(db, user["id"])
         analysis = analysis_payload(analysis_row, notes=notes.get(analysis_row["id"], []))
     return measurement_payload(m, analysis)
 

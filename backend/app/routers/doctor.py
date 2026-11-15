@@ -9,45 +9,19 @@ from .. import auth
 from ..database import get_db
 from ..schemas import NoteIn, VisitCloseIn
 from ..services import llm as llm_service
-from .measurements import analysis_payload, measurement_payload
-from .visits import ORDER_SQL, VISIT_SELECT, _visit_payload
+from ..services import signals
+from ..services.payloads import (
+    ORDER_SQL,
+    PATIENT_FIELDS,
+    VISIT_SELECT,
+    analysis_payload,
+    measurement_payload,
+    notes_for,
+    patient_payload,
+    visit_payload,
+)
 
 router = APIRouter(prefix="/api/doctor", tags=["doctor"])
-
-PATIENT_FIELDS = "id, email, name, age, sex, height_cm, role, created_at"
-
-
-def _patient_payload(p: sqlite3.Row) -> dict:
-    return {k: p[k] for k in ("id", "email", "name", "age", "sex", "height_cm", "created_at")}
-
-
-def _notes_for(db: sqlite3.Connection, analysis_id: int) -> list[dict]:
-    rows = db.execute(
-        """
-        SELECT id, doctor_name, text, created_at FROM doctor_notes
-        WHERE analysis_id = ? ORDER BY id
-        """,
-        (analysis_id,),
-    ).fetchall()
-    return [dict(r) for r in rows]
-
-
-# Тревожные ответы опросника МЗ (синхронно с ALARM_KEYS в AnamnesisSurvey.tsx)
-ALARM_SURVEY_KEYS = frozenset({
-    "sym_chest_pain", "sym_sudden_weakness", "sym_sudden_numbness", "sym_vision_loss",
-    "sym_hemoptysis", "sym_black_stool", "sym_blood_in_stool", "sym_weight_loss",
-})
-
-
-def _survey_alarm_count(survey_raw: str | None) -> int:
-    """Сколько тревожных пунктов опросника отметил пациент."""
-    if not survey_raw:
-        return 0
-    try:
-        data = json.loads(survey_raw)
-    except (json.JSONDecodeError, TypeError):
-        return 0
-    return sum(1 for key in ALARM_SURVEY_KEYS if data.get(key) is True)
 
 
 @router.get("/patients")
@@ -55,55 +29,86 @@ def list_patients(
     user: sqlite3.Row = Depends(auth.get_current_doctor),
     db: sqlite3.Connection = Depends(get_db),
 ):
-    """Пациенты филиала врача: последний риск, счётчики за 100 замеров, флаг внимания."""
+    """Пациенты филиала врача: последний риск, счётчики за 100 замеров, флаг внимания.
+
+    Три групповых запроса на филиал вместо трёх на каждого пациента (N+1):
+    замеры с оконной функцией ROW_NUMBER, анкеты, плановые приёмы."""
     patients = db.execute(
         f"SELECT {PATIENT_FIELDS} FROM users WHERE role = 'patient' AND branch_id IS ? ORDER BY id",
         (user["branch_id"],),
     ).fetchall()
 
+    # Последние ≤100 замеров каждого пациента — один запрос с оконной функцией
+    stat_rows = db.execute(
+        """
+        WITH ranked AS (
+            SELECT m.user_id, m.recorded_at, a.risk_level,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY m.user_id
+                       ORDER BY m.recorded_at DESC, m.id DESC
+                   ) AS rn
+            FROM measurements m
+            JOIN users u ON u.id = m.user_id
+            LEFT JOIN analyses a ON a.measurement_id = m.id
+            WHERE u.role = 'patient' AND u.branch_id IS ?
+        )
+        SELECT user_id, recorded_at, risk_level FROM ranked WHERE rn <= 100
+        """,
+        (user["branch_id"],),
+    ).fetchall()
+
+    stats: dict[int, dict] = {}
+    for r in stat_rows:
+        st = stats.setdefault(
+            r["user_id"],
+            {"counts": {"green": 0, "yellow": 0, "red": 0},
+             "last_risk": None, "last_at": None, "total": 0},
+        )
+        st["total"] += 1
+        risk = r["risk_level"]
+        if risk in st["counts"]:
+            st["counts"][risk] += 1
+            if st["last_risk"] is None:
+                st["last_risk"], st["last_at"] = risk, r["recorded_at"]
+
+    # Анкеты (тревожные опросники) и плановые приёмы — по одному запросу
+    surveys = {
+        row["user_id"]: row["survey"]
+        for row in db.execute(
+            """SELECT pc.user_id, pc.survey FROM patient_cards pc
+               JOIN users u ON u.id = pc.user_id
+               WHERE u.role = 'patient' AND u.branch_id IS ?""",
+            (user["branch_id"],),
+        ).fetchall()
+    }
+    planned = {
+        row["patient_id"]: row["c"]
+        for row in db.execute(
+            """SELECT v.patient_id, COUNT(*) AS c FROM visits v
+               JOIN users u ON u.id = v.patient_id
+               WHERE u.role = 'patient' AND u.branch_id IS ? AND v.status = 'planned'
+               GROUP BY v.patient_id""",
+            (user["branch_id"],),
+        ).fetchall()
+    }
+
     items = []
     for p in patients:
-        rows = db.execute(
-            """
-            SELECT m.recorded_at, a.risk_level
-            FROM measurements m
-            LEFT JOIN analyses a ON a.measurement_id = m.id
-            WHERE m.user_id = ?
-            ORDER BY m.recorded_at DESC, m.id DESC
-            LIMIT 100
-            """,
-            (p["id"],),
-        ).fetchall()
-
-        counts = {"green": 0, "yellow": 0, "red": 0}
-        last_risk = None
-        last_at = None
-        for i, row in enumerate(rows):
-            risk = row["risk_level"]
-            if risk in counts:
-                counts[risk] += 1
-                if last_risk is None:
-                    last_risk, last_at = risk, row["recorded_at"]
-
-        # Сигналы вне замеров: тревожные ответы опросника МЗ и плановые приёмы
-        card = db.execute(
-            "SELECT survey FROM patient_cards WHERE user_id = ?", (p["id"],)
-        ).fetchone()
-        survey_alarms = _survey_alarm_count(card["survey"] if card else None)
-        planned_visits = db.execute(
-            "SELECT COUNT(*) FROM visits WHERE patient_id = ? AND status = 'planned'",
-            (p["id"],),
-        ).fetchone()[0]
-
+        st = stats.get(
+            p["id"],
+            {"counts": {"green": 0, "yellow": 0, "red": 0},
+             "last_risk": None, "last_at": None, "total": 0},
+        )
+        survey_alarms = signals.survey_alarm_count(surveys.get(p["id"]))
         items.append({
-            **_patient_payload(p),
-            "last_measurement_at": last_at,
-            "last_risk": last_risk,
+            **patient_payload(p),
+            "last_measurement_at": st["last_at"],
+            "last_risk": st["last_risk"],
             "survey_alarms": survey_alarms,
-            "planned_visits": planned_visits,
-            "requires_attention": last_risk == "red" or survey_alarms > 0,  # urgent всегда даёт red
-            "counts": counts,
-            "total": len(rows),
+            "planned_visits": planned.get(p["id"], 0),
+            "requires_attention": st["last_risk"] == "red" or survey_alarms > 0,  # urgent всегда даёт red
+            "counts": st["counts"],
+            "total": st["total"],
         })
 
     # Непрочитанные сигналы: красные разборы без doctor_seen_at
@@ -159,9 +164,9 @@ def patient_detail(
         analysis = None
         if row["a_id"] is not None:
             analysis = analysis_payload(row, id_key="a_id", mid_key="a_mid", created_key="a_created")
-            analysis["notes"] = _notes_for(db, analysis["id"])
+            analysis["notes"] = notes_for(db, analysis["id"])
         items.append(measurement_payload(row, analysis))
-    return {"patient": _patient_payload(p), "items": items}
+    return {"patient": patient_payload(p), "items": items}
 
 
 @router.post("/analyses/{analysis_id}/seen", status_code=200)
@@ -206,9 +211,8 @@ def unread_signals(
         (user["branch_id"],),
     ).fetchall()
     items = []
-    import json as _json
     for r in rows:
-        findings = _json.loads(r["findings"])
+        findings = json.loads(r["findings"])
         top = next((f for f in findings if f["status"] == "alarm"), findings[0] if findings else None)
         items.append({
             "analysis_id": r["analysis_id"],
@@ -285,7 +289,7 @@ def patient_visits(
         f"{VISIT_SELECT} WHERE v.patient_id = ? {ORDER_SQL}",
         (patient_id,),
     ).fetchall()
-    return {"items": [_visit_payload(r) for r in rows]}
+    return {"items": [visit_payload(r) for r in rows]}
 
 
 @router.put("/visits/{visit_id}")
@@ -298,7 +302,7 @@ def complete_visit(
     """Врач принимает пациента: заключение + рекомендации, приём завершён."""
     visit = db.execute(
         """
-        SELECT v.id FROM visits v
+        SELECT v.id, v.status FROM visits v
         JOIN users u ON u.id = v.patient_id
         WHERE v.id = ? AND u.role = 'patient' AND u.branch_id IS ?
         """,
@@ -306,7 +310,7 @@ def complete_visit(
     ).fetchone()
     if visit is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Приём не найден")
-    if db.execute("SELECT status FROM visits WHERE id = ?", (visit_id,)).fetchone()["status"] != "planned":
+    if visit["status"] != "planned":
         raise HTTPException(status.HTTP_409_CONFLICT, "Приём уже обработан")
 
     db.execute(
@@ -320,7 +324,7 @@ def complete_visit(
     )
     db.commit()
     row = db.execute(f"{VISIT_SELECT} WHERE v.id = ?", (visit_id,)).fetchone()
-    return _visit_payload(row)
+    return visit_payload(row)
 
 
 # ---------- ИИ-сводка пациента ----------

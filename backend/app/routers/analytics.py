@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 
 from .. import auth
 from ..database import get_db
+from ..services import signals
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
@@ -29,24 +30,42 @@ def branch_analytics(
     ).fetchall()
 
     total = len(patients)
-    risky = sum(1 for p in patients if p["last_risk"] == "red")
     warning = sum(1 for p in patients if p["last_risk"] == "yellow")
     stale = sum(1 for p in patients
                 if p["last_at"] is None
                 or date.fromisoformat(p["last_at"][:10]) <= date.today() - timedelta(days=14))
 
-    # Замеры за 14 дней по дням (активность филиала)
-    days = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
-    series = []
-    for d in days:
-        n = db.execute(
-            """SELECT COUNT(*) AS c FROM measurements m
+    # Замеры за 14 дней одним GROUP BY вместо 14 COUNT-запросов (F005)
+    counts = {
+        row["d"]: row["c"]
+        for row in db.execute(
+            """SELECT date(m.recorded_at) AS d, COUNT(*) AS c
+               FROM measurements m
                JOIN users u ON u.id = m.user_id
                WHERE u.role = 'patient' AND u.branch_id IS ?
-                 AND date(m.recorded_at) = ?""",
-            (branch_id, d),
-        ).fetchone()["c"]
-        series.append({"day": d[5:], "count": n})
+                 AND date(m.recorded_at) >= date('now', '-13 days')
+               GROUP BY d""",
+            (branch_id,),
+        ).fetchall()
+    }
+    days = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
+    series = [{"day": d[5:], "count": counts.get(d, 0)} for d in days]
+
+    # Тревожные опросники — тот же сигнал, что и в кабинете врача (F013):
+    # requires_attention = красный замер ИЛИ тревожные ответы опросника МЗ
+    surveys = {
+        row["user_id"]: row["survey"]
+        for row in db.execute(
+            """SELECT pc.user_id, pc.survey FROM patient_cards pc
+               JOIN users u ON u.id = pc.user_id
+               WHERE u.role = 'patient' AND u.branch_id IS ?""",
+            (branch_id,),
+        ).fetchall()
+    }
+    attention_ids = {
+        p["id"] for p in patients
+        if p["last_risk"] == "red" or signals.survey_alarm_count(surveys.get(p["id"])) > 0
+    }
 
     risks = {"green": 0, "yellow": 0, "red": 0}
     for p in patients:
@@ -60,7 +79,7 @@ def branch_analytics(
     return {
         "branch_city": branch_city["city"] if branch_city else None,
         "patients_total": total,
-        "requires_attention": risky,
+        "requires_attention": len(attention_ids),
         "risk_split": risks,
         "warning_split": warning,
         "stale_patients": stale,

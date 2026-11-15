@@ -12,27 +12,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from .. import auth
 from ..database import get_db
 from ..schemas import VisitIn, VisitPatchIn
+from ..services.payloads import ORDER_SQL, VISIT_SELECT, visit_payload
 
 router = APIRouter(prefix="/api/visits", tags=["visits"])
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
-# Сверху плановые (ближайший визит), затем завершённые, отменённые — в конец
-ORDER_SQL = """
-ORDER BY CASE status WHEN 'planned' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END,
-         visit_date DESC, id DESC
-"""
-
-
-def _visit_payload(row: sqlite3.Row) -> dict:
-    return dict(row)
-
-
-# Джойн имени врача — пациенту приятно видеть, кто принимал
-VISIT_SELECT = """
-SELECT v.*, du.name AS doctor_name FROM visits v
-LEFT JOIN users du ON du.id = v.doctor_id
-"""
 
 
 def _check_date(visit_date: str) -> str:
@@ -62,7 +46,7 @@ def create_visit(
     )
     db.commit()  # см. комментарий в routers/auth.py register
     row = db.execute(f"{VISIT_SELECT} WHERE v.id = ?", (cursor.lastrowid,)).fetchone()
-    return _visit_payload(row)
+    return visit_payload(row)
 
 
 @router.get("/mine")
@@ -75,7 +59,7 @@ def my_visits(
         f"{VISIT_SELECT} WHERE v.patient_id = ? {ORDER_SQL}",
         (user["id"],),
     ).fetchall()
-    return {"items": [_visit_payload(r) for r in rows]}
+    return {"items": [visit_payload(r) for r in rows]}
 
 
 def _own_planned_visit(db: sqlite3.Connection, visit_id: int, user_id: int) -> sqlite3.Row:
@@ -99,7 +83,8 @@ def patch_visit(
 ):
     """Пациент правит плановый приём (цель, жалобы, дату)."""
     _own_planned_visit(db, visit_id, user["id"])
-    updates, values = [], []
+    updates: list[str] = []
+    values: list[str | int] = []
     if data.visit_date is not None:
         updates.append("visit_date = ?")
         values.append(_check_date(data.visit_date.strip()))
@@ -115,7 +100,7 @@ def patch_visit(
     db.execute(f"UPDATE visits SET {', '.join(updates)} WHERE id = ?", values)
     db.commit()
     row = db.execute(f"{VISIT_SELECT} WHERE v.id = ?", (visit_id,)).fetchone()
-    return _visit_payload(row)
+    return visit_payload(row)
 
 
 @router.post("/{visit_id}/cancel")
@@ -132,4 +117,4 @@ def cancel_visit(
     )
     db.commit()
     row = db.execute(f"{VISIT_SELECT} WHERE v.id = ?", (visit_id,)).fetchone()
-    return _visit_payload(row)
+    return visit_payload(row)

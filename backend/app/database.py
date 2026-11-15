@@ -124,6 +124,19 @@ CREATE TABLE IF NOT EXISTS visits (
 );
 """
 
+# Индексы под горячие запросы (см. TECH_DEBT_AUDIT.md): пул врача, аналитика,
+# дневник, сигналы — всё фильтрует по user_id/пациенту с сортировкой по времени.
+# Отдельный скрипт: создаётся ПОСЛЕ всех таблиц (documents/goals живут в своих)
+INDEXES_SQL = """
+CREATE INDEX IF NOT EXISTS idx_measurements_user_time ON measurements (user_id, recorded_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_analyses_user          ON analyses (user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires       ON sessions (expires_at);
+CREATE INDEX IF NOT EXISTS idx_documents_user         ON documents (user_id, uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_user              ON chat_messages (user_id, id);
+CREATE INDEX IF NOT EXISTS idx_visits_patient         ON visits (patient_id, status);
+CREATE INDEX IF NOT EXISTS idx_doctor_notes_analysis  ON doctor_notes (analysis_id);
+"""
+
 # Федеральная сеть «Спектр-диагностика»: города и телефоны с spdmed.ru
 BRANCHES_SEED = [
     ("Белая Калитва", "+7 (863) 832-52-55"),
@@ -223,6 +236,7 @@ def init_db() -> None:
         db.executescript(SCHEMA)
         db.executescript(GOALS_TABLE)
         db.executescript(DOCUMENTS_TABLE)
+        db.executescript(INDEXES_SQL)
         _migrate(db)
         db.executemany(
             "INSERT OR IGNORE INTO branches (city, phone) VALUES (?, ?)",
