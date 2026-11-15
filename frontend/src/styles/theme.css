@@ -258,18 +258,18 @@ h1, h2, h3, h4 {
 .stat-card--hero-gradient .stat-value { color: #ffffff; }
 .stat-card--hero-gradient .stat-unit { color: rgba(255, 255, 255, 0.65); }
 
-/* Статус-чип на тёмной hero-панели */
+/* Статус на тёмной hero-панели: тихий вид — цветная точка + светлый текст */
 .hero-pill {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12px;
+  padding: 0;
+  border-radius: 0;
+  font-size: 12.5px;
   font-weight: 600;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.16);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.88);
+  background: transparent;
+  box-shadow: none;
 }
 .hero-pill::before {
   content: '';
