@@ -53,6 +53,7 @@ function hasAnyValue(form: FormShape): boolean {
 
 export default function NewMeasurement() {
   const [form, setForm] = useState<FormShape>(emptyForm)
+  const [period, setPeriod] = useState<'morning' | 'evening'>(new Date().getHours() < 12 ? 'morning' : 'evening')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
@@ -78,7 +79,7 @@ export default function NewMeasurement() {
         water_ml: num(form.water_ml),
         weight_kg: num(form.weight_kg),
       }
-      const created = await api.createMeasurement(input)
+      const created = await api.createMeasurement({ ...input, period })
       navigate(`/result/${created.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось сохранить замер')
@@ -97,6 +98,19 @@ export default function NewMeasurement() {
       </div>
 
       <form onSubmit={submit} className="flex flex-col gap-5">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-[#465a56] mr-1">Период дня:</span>
+          {(['morning', 'evening'] as const).map((pt) => (
+            <button
+              key={pt}
+              type="button"
+              onClick={() => setPeriod(pt)}
+              className={`btn btn-sm ${period === pt ? 'btn-gold' : 'btn-ghost'}`}
+            >
+              {pt === 'morning' ? 'Утро' : 'Вечер'}
+            </button>
+          ))}
+        </div>
         <section className="bg-white rounded-xl p-5 glow-soft">
           <div className="section-title mb-4">
             <span className="emoji-box"><Icon name="pressure" size={20} /></span> Давление и пульс

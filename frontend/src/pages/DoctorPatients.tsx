@@ -160,6 +160,12 @@ export default function DoctorPatients() {
                           {p.last_risk ? (
                             <span className={`${riskBadge[p.last_risk]} badge`}>{riskLabels[p.last_risk]}</span>
                           ) : <span className="text-teal-dark/40">—</span>}
+                          {(p.unread_signals ?? 0) > 0 && (
+                            <span className="mt-1 flex items-center gap-1.5 text-xs font-bold text-coral">
+                              <span className="w-1.5 h-1.5 rounded-full bg-coral" aria-hidden />
+                              {p.unread_signals} новых сигналов
+                            </span>
+                          )}
                           {(p.survey_alarms ?? 0) > 0 && (
                             <span className="badge badge-red normal-case tracking-normal">
                               опросник: {p.survey_alarms}

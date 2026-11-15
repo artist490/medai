@@ -106,6 +106,22 @@ def list_patients(
             "total": len(rows),
         })
 
+    # Непрочитанные сигналы: красные разборы без doctor_seen_at
+    unread_by_patient = {
+        row["pid"]: row["c"]
+        for row in db.execute(
+            """SELECT u.id AS pid, COUNT(*) AS c FROM analyses a
+               JOIN measurements m ON m.id = a.measurement_id
+               JOIN users u ON u.id = m.user_id
+               WHERE a.risk_level = 'red' AND a.doctor_seen_at IS NULL
+                 AND u.role = 'patient' AND u.branch_id IS ?
+               GROUP BY u.id""",
+            (user["branch_id"],),
+        ).fetchall()
+    }
+    for item in items:
+        item["unread_signals"] = unread_by_patient.get(item["id"], 0)
+
     # Свежие замеры — выше; затем стабильной сортировкой поднимаем требующих внимания
     items.sort(key=lambda x: x["last_measurement_at"] or "", reverse=True)
     items.sort(key=lambda x: not x["requires_attention"])
@@ -148,6 +164,62 @@ def patient_detail(
     return {"patient": _patient_payload(p), "items": items}
 
 
+@router.post("/analyses/{analysis_id}/seen", status_code=200)
+def mark_analysis_seen(
+    analysis_id: int,
+    user: sqlite3.Row = Depends(auth.get_current_doctor),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Врач отметил разбор тревожного замера разобранным (сигнал закрыт)."""
+    analysis = db.execute(
+        """SELECT a.id FROM analyses a
+           JOIN measurements m ON m.id = a.measurement_id
+           JOIN users u ON u.id = m.user_id
+           WHERE a.id = ? AND u.role = 'patient' AND u.branch_id IS ?""",
+        (analysis_id, user["branch_id"]),
+    ).fetchone()
+    if analysis is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Анализ не найден")
+    db.execute(
+        "UPDATE analyses SET doctor_seen_at = datetime('now', 'localtime') WHERE id = ? AND doctor_seen_at IS NULL",
+        (analysis_id,),
+    )
+    db.commit()  # см. комментарий в routers/auth.py register
+    return {"ok": True}
+
+
+@router.get("/signals")
+def unread_signals(
+    user: sqlite3.Row = Depends(auth.get_current_doctor),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Непрочитанные красные флаги филиала: разборы без doctor_seen_at."""
+    rows = db.execute(
+        """SELECT a.id AS analysis_id, u.id AS patient_id, u.name AS patient_name,
+                  m.recorded_at, a.findings
+           FROM analyses a
+           JOIN measurements m ON m.id = a.measurement_id
+           JOIN users u ON u.id = m.user_id
+           WHERE a.risk_level = 'red' AND a.doctor_seen_at IS NULL
+             AND u.role = 'patient' AND u.branch_id IS ?
+           ORDER BY m.recorded_at DESC, m.id DESC""",
+        (user["branch_id"],),
+    ).fetchall()
+    items = []
+    import json as _json
+    for r in rows:
+        findings = _json.loads(r["findings"])
+        top = next((f for f in findings if f["status"] == "alarm"), findings[0] if findings else None)
+        items.append({
+            "analysis_id": r["analysis_id"],
+            "patient_id": r["patient_id"],
+            "patient_name": r["patient_name"],
+            "recorded_at": r["recorded_at"],
+            "summary": (top["label"] + ": " + top["value"]) if top else "Тревога",
+        })
+    return {"unread": len(items), "items": items}
+
+
 @router.post("/analyses/{analysis_id}/notes", status_code=201)
 def add_note(
     analysis_id: int,
@@ -174,6 +246,11 @@ def add_note(
         VALUES (?, ?, ?, ?)
         """,
         (analysis_id, user["id"], user["name"].strip() or "Врач", data.text.strip()),
+    )
+    # комментарий врача закрывает сигнал тревоги по этому разбору
+    db.execute(
+        "UPDATE analyses SET doctor_seen_at = datetime('now', 'localtime') WHERE id = ? AND doctor_seen_at IS NULL",
+        (analysis_id,),
     )
     note = db.execute(
         "SELECT id, doctor_name, text, created_at FROM doctor_notes WHERE id = ?",

@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom'
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import * as api from '../api'
 import type { Finding, Measurement, Stats, Visit } from '../types'
-import type { RiskLevel, Status } from '../types'
+import type { Goals, RiskLevel, Status } from '../types'
 import { Icon } from '../components/Icon'
 import type { IconName } from '../components/Icon'
 import EmptyArt from '../components/EmptyArt'
@@ -61,7 +61,13 @@ function StripSegment(props: {
   unit?: string
   status?: Status
   hint?: string
+  goal?: number
+  goalUnit?: string
 }) {
+  const num = Number(props.value.replace(',', '.'))
+  const progress = props.goal && !Number.isNaN(num)
+    ? Math.min(100, Math.round((num / props.goal) * 100))
+    : null
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -75,7 +81,17 @@ function StripSegment(props: {
         <span className="whitespace-nowrap">{props.value}</span>
         {props.unit && <span className="stat-unit text-xs font-bold whitespace-nowrap">{props.unit}</span>}
       </div>
-      {props.hint && <div className="mt-1 text-xs text-[#8aa09c]">{props.hint}</div>}
+      {progress !== null && (
+        <div className="mt-2">
+          <div className="h-1.5 rounded-full bg-[#f1f6f5] overflow-hidden">
+            <div className="h-full rounded-full bg-teal-dark" style={{ width: progress + '%' }} />
+          </div>
+          <div className="mt-1 text-[11px] text-[#8aa09c]">
+            {progress}% до цели {props.goal} {props.goalUnit ?? ''}
+          </div>
+        </div>
+      )}
+      {progress === null && props.hint && <div className="mt-1 text-xs text-[#8aa09c]">{props.hint}</div>}
     </div>
   )
 }
@@ -84,15 +100,32 @@ export default function Dashboard() {
   const [items, setItems] = useState<Measurement[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [nextVisit, setNextVisit] = useState<Visit | null>(null)
+  const [goals, setGoals] = useState<Goals>({ steps: null, sleep: null, water: null, weight: null })
 
   useEffect(() => {
     api.listMeasurements(10).then((d) => setItems(d.items)).catch(() => {})
     api.fetchStats().then(setStats).catch(() => {})
+    api.fetchGoals().then(setGoals).catch(() => {})
     // Ближайший запланированный приём — сверху списка
     api.fetchMyVisits()
       .then((d) => setNextVisit(d.items.find((v) => v.status === 'planned') ?? null))
       .catch(() => {})
   }, [])
+
+  // Напоминание о вечернем замере: после 18:00, если вечернего замера сегодня нет
+  const showEveningReminder = useMemo(() => {
+    const hour = new Date().getHours()
+    if (hour < 18) return false
+    const today = new Date().toISOString().slice(0, 10)
+    return !items.some((m) => m.period === 'evening' && m.recorded_at.slice(0, 10) === today)
+  }, [items])
+
+  async function repeatEvening() {
+    try {
+      const m = await api.repeatLastMeasurement('evening')
+      setItems((prev) => [m, ...prev])
+    } catch { /* нечего повторять */ }
+  }
 
   const latest = items[0] ?? null
   const a = latest?.analysis
@@ -169,6 +202,17 @@ export default function Dashboard() {
 
       {latest && a ? (
         <>
+          {showEveningReminder && (
+            <div className="rounded-xl border border-[#e4ebe9] bg-white px-5 py-3.5 flex flex-wrap items-center gap-3">
+              <span className="text-sm font-semibold text-[#1b2622]">
+                Вечерний замер ещё не сделан — добавьте его в дневник
+              </span>
+              <button className="btn btn-gold btn-sm ml-auto" onClick={repeatEvening}>
+                Повторить вечерний
+              </button>
+            </div>
+          )}
+
           {/* Ряд 1: hero давления + donut */}
           <div className="grid lg:grid-cols-[2fr_1fr] gap-4 items-stretch">
             <div className="stat-card stat-card--hero stat-card--hero-gradient flex flex-col justify-between">
@@ -246,6 +290,8 @@ export default function Dashboard() {
               value={sleepItem ? String(sleepItem.sleep_hours) : '—'}
               unit={sleepItem ? 'ч' : undefined}
               status={sleepFinding?.status}
+              goal={goals.sleep ?? undefined}
+              goalUnit="ч"
               hint={sleepFinding ? 'Норма 7–9' : 'Здесь появится продолжительность сна'}
             />
             <StripSegment

@@ -1,5 +1,5 @@
 // API-клиент: bearer-токен в localStorage, единая обработка ошибок.
-import type { Branch, ChatMessage, DoctorNote, Measurement, MedCard, MedCardInput, PatientRow, Stats, User, Visit } from './types'
+import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DocumentItem, DoctorSignal, Goals, Measurement, MedCard, MedCardInput, PatientRow, Stats, User, Visit } from './types'
 
 const TOKEN_KEY = 'medai_token'
 
@@ -103,6 +103,7 @@ export interface MeasurementInput {
   steps?: number | null
   water_ml?: number | null
   weight_kg?: number | null
+  period?: 'morning' | 'evening'
 }
 
 export async function createMeasurement(input: MeasurementInput): Promise<Measurement> {
@@ -235,4 +236,51 @@ export async function fetchChatHistory(): Promise<{ items: ChatMessage[] }> {
 
 export async function clearChat(): Promise<void> {
   return request<void>('/api/chat', { method: 'DELETE' })
+}
+
+// ---------- цели пациента ----------
+
+export async function fetchGoals(): Promise<Goals> {
+  return request('/api/goals')
+}
+
+export async function saveGoals(patch: Partial<Goals>): Promise<Goals> {
+  return request('/api/goals', { method: 'PUT', body: JSON.stringify(patch) })
+}
+
+// ---------- дневник ----------
+
+export async function repeatLastMeasurement(period: 'morning' | 'evening'): Promise<Measurement> {
+  return request(`/api/measurements/repeat?period=${period}`, { method: 'POST' })
+}
+
+// ---------- документы ----------
+
+export async function uploadDocument(file: File, title: string): Promise<DocumentItem> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('title', title)
+  return request('/api/documents', { method: 'POST', body: fd })
+}
+
+export async function fetchDocuments(): Promise<{ items: DocumentItem[] }> {
+  return request('/api/documents')
+}
+
+export async function deleteDocument(id: number): Promise<void> {
+  return request<void>(`/api/documents/${id}`, { method: 'DELETE' })
+}
+
+// ---------- сигналы и аналитика врача ----------
+
+export async function fetchSignals(): Promise<{ unread: number; items: DoctorSignal[] }> {
+  return request('/api/doctor/signals')
+}
+
+export async function markSignalSeen(analysisId: number): Promise<void> {
+  return request(`/api/doctor/analyses/${analysisId}/seen`, { method: 'POST' })
+}
+
+export async function fetchAnalytics(): Promise<BranchAnalytics> {
+  return request('/api/analytics')
 }

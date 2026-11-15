@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS measurements (
     steps      INTEGER,-- шаги за день
     water_ml   INTEGER,-- вода, мл
     weight_kg  REAL,   -- вес, кг (рост берётся из профиля)
+    period     TEXT,   -- период дня: 'morning' | 'evening' (дневник давления)
     CHECK (systolic IS NOT NULL OR diastolic IS NOT NULL OR pulse IS NOT NULL
         OR temperature IS NOT NULL OR spo2 IS NOT NULL OR sleep_hours IS NOT NULL
         OR steps IS NOT NULL OR water_ml IS NOT NULL OR weight_kg IS NOT NULL)
@@ -142,6 +143,29 @@ BRANCHES_SEED = [
     ("Тамбов", "+7 (920) 230-33-33"),
 ]
 
+GOALS_TABLE = """
+CREATE TABLE IF NOT EXISTS goals (
+    user_id  INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    steps    INTEGER,
+    sleep    REAL,
+    water    INTEGER,
+    weight   REAL
+);
+"""
+
+DOCUMENTS_TABLE = """
+CREATE TABLE IF NOT EXISTS documents (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title       TEXT NOT NULL DEFAULT '',
+    filename    TEXT NOT NULL,
+    mime        TEXT NOT NULL DEFAULT 'application/octet-stream',
+    size        INTEGER NOT NULL DEFAULT 0,
+    data        BLOB NOT NULL,
+    uploaded_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+"""
+
 
 def _migrate(db: sqlite3.Connection) -> None:
     """Лёгкие миграции для БД, созданных до версии для клиники."""
@@ -153,6 +177,12 @@ def _migrate(db: sqlite3.Connection) -> None:
     card_columns = {row["name"] for row in db.execute("PRAGMA table_info(patient_cards)").fetchall()}
     if card_columns and "survey" not in card_columns:
         db.execute("ALTER TABLE patient_cards ADD COLUMN survey TEXT")
+    meas_columns = {row["name"] for row in db.execute("PRAGMA table_info(measurements)").fetchall()}
+    if "period" not in meas_columns:
+        db.execute("ALTER TABLE measurements ADD COLUMN period TEXT CHECK (period IN ('morning', 'evening'))")
+    anal_columns = {row["name"] for row in db.execute("PRAGMA table_info(analyses)").fetchall()}
+    if "doctor_seen_at" not in anal_columns:
+        db.execute("ALTER TABLE analyses ADD COLUMN doctor_seen_at TEXT")
 
 
 def connect() -> sqlite3.Connection:
@@ -191,6 +221,8 @@ def init_db() -> None:
     config.DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with db_session() as db:
         db.executescript(SCHEMA)
+        db.executescript(GOALS_TABLE)
+        db.executescript(DOCUMENTS_TABLE)
         _migrate(db)
         db.executemany(
             "INSERT OR IGNORE INTO branches (city, phone) VALUES (?, ?)",

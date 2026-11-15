@@ -1,5 +1,5 @@
 // Медкарта пациента: анкета-анамнез + приёмы (жалобы пациента, заключения врача).
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as api from '../api'
 import { useAuth } from '../auth'
@@ -11,14 +11,17 @@ import type { CardFormState } from '../components/CardAnamnesis'
 import RiskSystems from '../components/RiskSystems'
 import AnamnesisSurvey from '../components/AnamnesisSurvey'
 import MeasurementsHistory from '../components/MeasurementsHistory'
+import { getToken, repeatLastMeasurement, saveGoals, uploadDocument } from '../api'
+import type { DocumentItem, Goals } from '../types'
 import type { Measurement, MedCard, Visit, VisitStatus } from '../types'
 
-type CardTab = 'overview' | 'anamnesis' | 'meas'
+type CardTab = 'overview' | 'anamnesis' | 'meas' | 'docs'
 
 const TABS: Array<{ id: CardTab; label: string; icon: Parameters<typeof Icon>[0]['name'] }> = [
   { id: 'overview', label: 'Обзор карты', icon: 'home' },
   { id: 'anamnesis', label: 'Анкета', icon: 'check' },
   { id: 'meas', label: 'Замеры', icon: 'chart' },
+  { id: 'docs', label: 'Документы', icon: 'doc' },
 ]
 
 const STATUS_INFO: Record<VisitStatus, { cls: string; label: string }> = {
@@ -283,11 +286,14 @@ export default function MedCard() {
   const [bookMenu, setBookMenu] = useState<string | null>(null) // причина из риск-блока
   const [showSurvey, setShowSurvey] = useState(false)
   const [error, setError] = useState('')
+  const [goals, setGoals] = useState<Goals>({ steps: null, sleep: null, water: null, weight: null })
+  const [diaryBusy, setDiaryBusy] = useState('')
 
   useEffect(() => {
     api.fetchMedCard().then(setCard).catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
     api.fetchMyVisits().then((d) => setVisits(d.items)).catch(() => {})
-    api.listMeasurements(10).then((d) => setItems(d.items)).catch(() => {})
+    api.listMeasurements(30).then((d) => setItems(d.items)).catch(() => {})
+    api.fetchGoals().then(setGoals).catch(() => {})
   }, [])
 
   if (error && !card) {
@@ -355,6 +361,11 @@ export default function MedCard() {
       </div>
 
       <div className="flex gap-2 flex-wrap">
+        <button className="btn btn-ghost btn-sm ml-auto" onClick={() => window.print()}>
+          Печать карты
+        </button>
+      </div>
+      <div className="flex gap-2 flex-wrap -mt-2">
         {TABS.map((tb) => (
           <button
             key={tb.id}
@@ -459,7 +470,258 @@ export default function MedCard() {
         </section>
       )}
 
-      {tab === 'meas' && <MeasurementsHistory />}
+      {tab === 'meas' && (
+        <>
+          {/* Дневник давления: утро/вечер за неделю */}
+          <section className="panel">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <h2 className="text-lg">Дневник давления</h2>
+              <div className="flex gap-2">
+                {(['morning', 'evening'] as const).map((pt) => (
+                  <button key={pt} className="btn btn-ghost btn-sm" disabled={diaryBusy !== ''}
+                          onClick={async () => {
+                            setDiaryBusy(pt)
+                            try {
+                              const m = await repeatLastMeasurement(pt)
+                              setItems((prev) => [m, ...prev])
+                            } finally { setDiaryBusy('') }
+                          }}>
+                    {pt === 'morning' ? 'Повторить как утренний' : 'Повторить как вечерний'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <PressureDiary items={items} />
+          </section>
+
+          {/* Мои цели */}
+          <section className="panel">
+            <GoalsEditor goals={goals} onSaved={setGoals} />
+          </section>
+
+          <MeasurementsHistory />
+        </>
+      )}
+
+      {tab === 'docs' && <DocumentsTab />}
+
+      {tab === 'overview' && (
+        <>
+          <RiskSystems items={items} survey={card.survey} onBook={bookFromRisk} />
+        </>
+      )}
+    </div>
+  )
+}
+
+// ---------- Дневник давления: утро/вечер по дням ----------
+
+function PressureDiary({ items }: { items: Measurement[] }) {
+  const withBP = items.filter((m) => m.systolic != null)
+  const days = new Map<string, Measurement[]>()
+  for (const m of withBP) {
+    const day = m.recorded_at.slice(0, 10)
+    days.set(day, [...(days.get(day) ?? []), m])
+  }
+  const list = [...days.entries()].slice(0, 7)
+
+  if (list.length === 0) {
+    return <p className="text-sm text-[#8aa09c] font-semibold mt-2">Замеров давления пока нет</p>
+  }
+  return (
+    <div className="mt-2 divide-y divide-[#eef4f3]">
+      {list.map(([day, ms]) => (
+        <div key={day} className="py-2.5 grid sm:grid-cols-[110px_1fr] gap-x-4 gap-y-1.5 items-baseline">
+          <div className="text-sm font-bold text-[#1b2622]">
+            {day.slice(8, 10)}.{day.slice(5, 7)}
+          </div>
+          <div className="flex flex-col gap-1">
+            {ms.map((m) => (
+              <div key={m.id} className="flex items-baseline gap-2 text-sm">
+                <span className="text-xs font-bold text-[#8aa09c] w-14">
+                  {m.period === 'evening' ? 'вечер' : m.period === 'morning' ? 'утро' : ''}
+                </span>
+                <span className="font-bold text-[#1b2622] tabular-nums">{m.systolic}/{m.diastolic}</span>
+                <span className="text-[#8aa09c] text-xs">пульс {m.pulse ?? '—'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---------- Мои цели: редактор ----------
+
+function GoalsEditor({ goals, onSaved }: {
+  goals: Goals
+  onSaved: (g: Goals) => void
+}) {
+  const [form, setForm] = useState({
+    steps: goals.steps?.toString() ?? '',
+    sleep: goals.sleep?.toString() ?? '',
+    water: goals.water?.toString() ?? '',
+    weight: goals.weight?.toString() ?? '',
+  })
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  function field(label: string, key: 'steps' | 'sleep' | 'water' | 'weight', unit: string) {
+    return (
+      <div>
+        <label className="flip-label" htmlFor={'goal-' + key}>{label}</label>
+        <input
+          id={'goal-' + key}
+          type="number"
+          className="flip-input"
+          value={form[key]}
+          onChange={(e) => { setForm((f) => ({ ...f, [key]: e.target.value })); setSaved(false) }}
+        />
+        <div className="flip-hint">{unit}</div>
+      </div>
+    )
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      const savedGoals = await saveGoals({
+        steps: form.steps ? Number(form.steps) : null,
+        sleep: form.sleep ? Number(form.sleep) : null,
+        water: form.water ? Number(form.water) : null,
+        weight: form.weight ? Number(form.weight) : null,
+      })
+      onSaved(savedGoals)
+      setSaved(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <div className="grid sm:grid-cols-2 gap-3">
+        {field('Шаги в день', 'steps', 'шагов, например 8000')}
+        {field('Сон', 'sleep', 'часов, например 8')}
+        {field('Вода', 'water', 'мл в день, например 2000')}
+        {field('Целевой вес', 'weight', 'кг')}
+      </div>
+      {saved && (
+        <div className="badge badge-green normal-case tracking-normal w-fit">Сохранено</div>
+      )}
+      <button className="btn btn-teal w-fit" disabled={busy}>
+        {busy ? 'Сохраняем…' : 'Сохранить цели'}
+      </button>
+    </form>
+  )
+}
+
+// ---------- Документы: загрузка, список, скачивание ----------
+
+function DocumentsTab() {
+  const [docs, setDocs] = useState<DocumentItem[] | null>(null)
+  const [title, setTitle] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const fileRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    api.fetchDocuments().then((d) => setDocs(d.items)).catch(() => setDocs([]))
+  }, [])
+
+  async function upload() {
+    const file = fileRef.current?.files?.[0]
+    if (!file) return
+    setBusy(true)
+    setError('')
+    try {
+      const doc = await uploadDocument(file, title)
+      setDocs((prev) => prev ? [doc, ...prev] : [doc])
+      setTitle('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function download(doc: DocumentItem) {
+    const resp = await fetch('/api/documents/' + doc.id + '/download', {
+      headers: { Authorization: 'Bearer ' + getToken() },
+    })
+    if (!resp.ok) return
+    const blob = await resp.blob()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = doc.filename
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  async function remove(doc: DocumentItem) {
+    if (!window.confirm('Удалить «' + doc.title + '»?')) return
+    await api.deleteDocument(doc.id).catch(() => {})
+    setDocs((prev) => prev ? prev.filter((d) => d.id !== doc.id) : prev)
+  }
+
+  function fmtSize(n: number): string {
+    if (n > 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' МБ'
+    return Math.max(1, Math.round(n / 1024)) + ' КБ'
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <form onSubmit={(e) => { e.preventDefault(); upload() }}
+            className="bg-white rounded-xl p-5 border border-[#e4ebe9] flex flex-col gap-3">
+        <div className="text-sm font-bold text-[#1b2622]">Загрузить результат исследования</div>
+        <input
+          type="file"
+          accept=".pdf,.png,.jpg,.jpeg,.webp"
+          className="flip-input !py-2"
+          ref={(el) => { fileRef.current = el }}
+        />
+        <input
+          type="text"
+          className="flip-input"
+          placeholder="Название: МРТ головы, анализы крови…"
+          maxLength={200}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        {error && <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>}
+        <button className="btn btn-teal w-fit" disabled={busy}>
+          {busy ? 'Загружаем…' : 'Загрузить документ'}
+        </button>
+        <div className="flip-hint">PDF или фото до 8 МБ. Документы видны только вам.</div>
+      </form>
+
+      {docs === null ? (
+        <div className="text-center font-bold text-teal-dark animate-pulse">Загрузка…</div>
+      ) : docs.length === 0 ? (
+        <p className="text-sm text-[#8aa09c] font-semibold">Документов пока нет</p>
+      ) : (
+        <div className="divide-y divide-[#eef4f3]">
+          {docs.map((d) => (
+            <div key={d.id} className="py-3 flex items-center gap-3">
+              <span className="emoji-box"><Icon name="doc" size={18} /></span>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-[#1b2622] truncate">{d.title}</div>
+                <div className="text-xs text-[#8aa09c]">
+                  {fmtSize(d.size)} · {d.uploaded_at.slice(0, 16).replace('T', ' ')}
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-sm ml-auto" onClick={() => download(d)} aria-label={'Скачать ' + d.title}>
+                <Icon name="download" size={16} />
+              </button>
+              <button className="btn btn-ghost btn-sm text-coral" onClick={() => remove(d)} aria-label={'Удалить ' + d.title}>
+                <Icon name="trash" size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

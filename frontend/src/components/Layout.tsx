@@ -3,8 +3,9 @@
 // Навигация зависит от роли: пациент — личные вкладки, врач — кабинет пациентов.
 // Сайдбар как у Сбер Здоровья: профиль-блок, пункты с подписями и цветными
 // акцентами иконок (teal/коралл/небо/золото — статусная семантика сохранена).
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import * as api from '../api'
 import { useAuth } from '../auth'
 import { brand } from '../brand'
 import { Icon } from './Icon'
@@ -23,6 +24,7 @@ const patientNav: NavItem[] = [
 
 const doctorNav: NavItem[] = [
   { to: '/patients', label: 'Пациенты', sub: 'Кабинет врача', icon: 'chart', accent: 'teal' },
+  { to: '/analytics', label: 'Аналитика', sub: 'Статистика филиала', icon: 'help', accent: 'gold' },
   { to: '/chat', label: 'Ассистент', sub: 'Помощник врача', icon: 'sparkle', accent: 'sky' },
   { to: '/profile', label: 'Профиль', sub: 'Личные данные', icon: 'profile', accent: 'gold' },
 ]
@@ -38,6 +40,12 @@ function ageWord(age: number): string {
 
 export default function Layout() {
   const { user, logout } = useAuth()
+  const [signalCount, setSignalCount] = useState(0)
+
+  useEffect(() => {
+    if (user?.role !== 'doctor') return
+    api.fetchSignals().then((d) => setSignalCount(d.unread)).catch(() => {})
+  }, [user, signalCount])
   const navigate = useNavigate()
   const location = useLocation()
   const [query, setQuery] = useState('')
@@ -152,6 +160,13 @@ export default function Layout() {
             </form>
 
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
+              {user?.role === 'doctor' && signalCount > 0 && (
+                <button className="topbar-icon" title="Новые сигналы: требуются разборы"
+                        aria-label="Сигналы" onClick={() => navigate('/patients')}>
+                  <Icon name="bell" size={20} />
+                  <span className="absolute -top-0.5 -right-0.5 bg-coral text-white text-[10px] font-bold rounded-full px-1.5">{signalCount}</span>
+                </button>
+              )}
               <button className="topbar-icon" title="Уведомления" aria-label="Уведомления">
                 <Icon name="bell" size={20} /><span className="dot" />
               </button>

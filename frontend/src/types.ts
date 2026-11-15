@@ -57,12 +57,14 @@ export interface Analysis {
   llm_summary: string | null
   llm_items: string[] | null
   bmi: number | null
+  doctor_seen_at?: string | null
   notes?: DoctorNote[]
 }
 
 export interface Measurement {
   id: number
   recorded_at: string
+  period: 'morning' | 'evening' | null
   systolic: number | null
   diastolic: number | null
   pulse: number | null
@@ -73,6 +75,40 @@ export interface Measurement {
   water_ml: number | null
   weight_kg: number | null
   analysis?: Analysis
+}
+
+export interface Goals {
+  steps: number | null
+  sleep: number | null
+  water: number | null
+  weight: number | null
+}
+
+export interface DocumentItem {
+  id: number
+  title: string
+  filename: string
+  mime: string
+  size: number
+  uploaded_at: string
+}
+
+export interface DoctorSignal {
+  analysis_id: number
+  patient_id: number
+  patient_name: string
+  recorded_at: string
+  summary: string
+}
+
+export interface BranchAnalytics {
+  branch_city: string | null
+  patients_total: number
+  requires_attention: number
+  risk_split: { green: number; yellow: number; red: number }
+  stale_patients: number
+  measurements_14d: Array<{ day: string; count: number }>
+  patients: Array<{ id: number; name: string; last_at: string | null; last_risk: RiskLevel | null }>
 }
 
 export interface Stats {
@@ -96,6 +132,7 @@ export interface PatientRow {
   requires_attention: boolean
   counts: { green: number; yellow: number; red: number }
   total: number
+  unread_signals: number
 }
 
 // Медкарта: анкета-анамнез пациента (заполняют пациент и врач)

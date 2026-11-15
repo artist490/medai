@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import * as api from '../api'
+import { markSignalSeen } from '../api'
 import IndicatorCard from '../components/IndicatorCard'
 import { Summary } from '../components/Summary'
 import RiskBadge from '../components/RiskBadge'
@@ -97,11 +98,12 @@ function NoteForm({ analysisId, onAdded }: { analysisId: number; onAdded: (n: Do
 
 // ---------- Вкладка «Замеры» (прежнее содержимое карточки) ----------
 
-function MeasurementsTab({ items, selectedId, setSelectedId, onNoteAdded }: {
+function MeasurementsTab({ items, selectedId, setSelectedId, onNoteAdded, onMarkSeen }: {
   items: Measurement[]
   selectedId: number | null
   setSelectedId: (id: number | null) => void
   onNoteAdded: (note: DoctorNote) => void
+  onMarkSeen: (analysisId: number) => void
 }) {
   const selected = items.find((m) => m.id === selectedId) ?? null
   const a = selected?.analysis ?? null
@@ -164,7 +166,14 @@ function MeasurementsTab({ items, selectedId, setSelectedId, onNoteAdded }: {
             <div className="flex items-center gap-3">
               <h2 className="text-xl">Разбор замера</h2>
               <RiskBadge level={a.risk_level} />
+              {a.risk_level === 'red' && !a.doctor_seen_at && (
+                <button className="btn btn-ghost btn-sm"
+                        onClick={() => onMarkSeen(a.id)}>
+                  Отметить разобранным
+                </button>
+              )}
             </div>
+
             <span className="text-sm text-teal-dark/60 font-bold">анализ от {a.created_at.slice(0, 16)}</span>
           </div>
 
@@ -492,6 +501,17 @@ export default function DoctorPatient() {
   }
   if (!patient) return <div className="text-center font-extrabold text-teal-dark animate-pulse">Загрузка…</div>
 
+  async function markSignal(aid: number) {
+    try {
+      await markSignalSeen(aid)
+      setItems((prev) => prev.map((m) => (
+        m.analysis && m.analysis.id === aid
+          ? { ...m, analysis: { ...m.analysis, doctor_seen_at: new Date().toISOString() } }
+          : m
+      )))
+    } catch { /* не критично */ }
+  }
+
   const plannedCount = visits.filter((v) => v.status === 'planned').length
 
   function onNoteAdded(note: DoctorNote) {
@@ -546,6 +566,7 @@ export default function DoctorPatient() {
           selectedId={selectedId}
           setSelectedId={setSelectedId}
           onNoteAdded={onNoteAdded}
+          onMarkSeen={(aid: number) => markSignal(aid)}
         />
       )}
       {tab === 'medcard' && card && (

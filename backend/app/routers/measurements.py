@@ -40,6 +40,7 @@ def analysis_payload(row: sqlite3.Row, id_key: str = "id", mid_key: str = "measu
         "llm_summary": llm_summary,
         "llm_items": llm_items,
         "bmi": row["bmi"],
+        "doctor_seen_at": row["doctor_seen_at"] if "doctor_seen_at" in row.keys() else None,
     }
     if notes is not None:
         payload["notes"] = notes
@@ -72,6 +73,7 @@ def measurement_payload(m: sqlite3.Row, analysis: Optional[dict]) -> dict:
     data = {
         "id": m["id"],
         "recorded_at": m["recorded_at"],
+        "period": m["period"] if "period" in m.keys() else None,
         **{k: m[k] for k in fields},
     }
     if analysis is not None:
@@ -85,7 +87,7 @@ def create_measurement(
     user: sqlite3.Row = Depends(auth.get_current_user),
     db: sqlite3.Connection = Depends(get_db),
 ):
-    values = {k: v for k, v in data.model_dump().items() if k != "recorded_at" and v is not None}
+    values = {k: v for k, v in data.model_dump().items() if k != "recorded_at" and k != "period" and v is not None}
     if not values:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                             "Заполните хотя бы один показатель")
@@ -99,6 +101,8 @@ def create_measurement(
         recorded_at = dt.strftime("%Y-%m-%d %H:%M:%S")
     else:
         recorded_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if data.period:
+        values["period"] = data.period
     columns = ", ".join(values.keys())
     placeholders = ", ".join("?" for _ in values)
     cursor = db.execute(
@@ -130,6 +134,57 @@ def create_measurement(
                        ensure_ascii=False) if result["llm_summary"] else None,
             result["bmi"],
         ),
+    )
+    analysis = db.execute(
+        "SELECT * FROM analyses WHERE measurement_id = ?", (measurement_id,)
+    ).fetchone()
+    db.commit()  # см. комментарий в routers/auth.py register
+    payload = analysis_payload(analysis) if analysis is not None else None
+    return measurement_payload(measurement, payload)
+
+
+@router.post("/repeat", status_code=201)
+def repeat_last_measurement(
+    period: str = Query(default="evening", pattern="^(morning|evening)$"),
+    user: sqlite3.Row = Depends(auth.get_current_user),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Быстрый дневник: повторить последний замер с новым временем записи.
+
+    Копирует показательные поля последнего замера (значения можно
+    отредактировать обычным созданием замера)."""
+    last = db.execute(
+        "SELECT * FROM measurements WHERE user_id = ? ORDER BY recorded_at DESC, id DESC LIMIT 1",
+        (user["id"],),
+    ).fetchone()
+    if last is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Нечего повторять — сначала сделайте замер")
+
+    fields = ("systolic", "diastolic", "pulse", "temperature", "spo2",
+              "sleep_hours", "steps", "water_ml", "weight_kg")
+    values = {k: last[k] for k in fields if last[k] is not None}
+    if not values:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "В последнем замере нет показателей")
+    columns = ", ".join(["user_id", "recorded_at", "period"] + list(values.keys()))
+    placeholders = ", ".join("?" for _ in range(len(columns.split(", "))))
+    params = [user["id"], datetime.now().strftime("%Y-%m-%d %H:%M:%S"), period] + list(values.values())
+    cursor = db.execute(
+        f"INSERT INTO measurements ({columns}) VALUES ({placeholders})",
+        params,
+    )
+    measurement_id = cursor.lastrowid
+    measurement = db.execute("SELECT * FROM measurements WHERE id = ?", (measurement_id,)).fetchone()
+    result = analyze_service.run_analysis(measurement, user)
+    db.execute(
+        """INSERT INTO analyses (measurement_id, user_id, risk_level, source,
+                                 findings, recommendations, llm_text, bmi)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (measurement_id, user["id"], result["risk_level"], result["source"],
+         json.dumps(result["findings"], ensure_ascii=False),
+         json.dumps(result["recommendations"], ensure_ascii=False),
+         json.dumps({"summary": result["llm_summary"], "items": result["llm_items"]},
+                    ensure_ascii=False) if result["llm_summary"] else None,
+         result["bmi"]),
     )
     analysis = db.execute(
         "SELECT * FROM analyses WHERE measurement_id = ?", (measurement_id,)

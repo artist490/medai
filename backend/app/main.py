@@ -10,7 +10,10 @@ from fastapi.staticfiles import StaticFiles
 from . import config
 from .database import init_db
 from .routers import auth as auth_router
+from .routers import analytics as analytics_router
 from .routers import chat as chat_router
+from .routers import documents as documents_router
+from .routers import goals as goals_router
 from .routers import doctor as doctor_router
 from .routers import measurements as measurements_router
 from .routers import medcard as medcard_router
@@ -37,7 +40,10 @@ app.add_middleware(
 )
 
 app.include_router(auth_router.router)
+app.include_router(analytics_router.router)
 app.include_router(chat_router.router)
+app.include_router(documents_router.router)
+app.include_router(goals_router.router)
 app.include_router(doctor_router.router)
 app.include_router(measurements_router.router)
 app.include_router(medcard_router.router)

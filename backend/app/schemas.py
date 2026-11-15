@@ -36,7 +36,16 @@ class MeasurementIn(BaseModel):
     steps: Optional[int] = Field(default=None, ge=0, le=200000)
     water_ml: Optional[int] = Field(default=None, ge=0, le=10000)
     weight_kg: Optional[float] = Field(default=None, ge=20, le=400)
+    period: Optional[Literal["morning", "evening"]] = None  # период дня (дневник давления)
     recorded_at: Optional[str] = None  # ISO-строка; по умолчанию — сейчас
+
+
+class GoalIn(BaseModel):
+    """Цели пациента: целевые шаги/сон/вода/вес."""
+    steps: Optional[int] = Field(default=None, ge=0, le=200000)
+    sleep: Optional[float] = Field(default=None, ge=0, le=24)
+    water: Optional[int] = Field(default=None, ge=0, le=10000)
+    weight: Optional[float] = Field(default=None, ge=20, le=400)
 
 
 class NoteIn(BaseModel):
