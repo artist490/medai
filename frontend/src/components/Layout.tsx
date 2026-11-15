@@ -44,6 +44,12 @@ export default function Layout() {
   const isDoctor = user?.role === 'doctor'
   const navItems = isDoctor ? doctorNav : patientNav
   const onChat = location.pathname.startsWith('/chat')
+  // Ровная сетка таб-бара: слоты по бокам от центральной кнопки Ассистента.
+  // Пациент: [Дашборд][Медкарта][—][Профиль], врач: [Пациенты][—][Профиль][—]
+  const side = navItems.filter((i) => i.to !== '/chat')
+  const sideSlots: Array<NavItem | null> = isDoctor
+    ? [side[0] ?? null, null, side[1] ?? null, null]
+    : [side[0] ?? null, side[1] ?? null, null, side[2] ?? null]
 
   async function handleLogout() {
     await logout()
@@ -202,18 +208,17 @@ export default function Layout() {
         </button>
       )}
 
-      {/* ---- Мобильная нижняя навигация: Ассистент — приподнятая градиентная кнопка по центру ---- */}
+      {/* ---- Мобильная нижняя навигация: равные колонки, Ассистент строго по центру ---- */}
       <nav className="lg:hidden fixed bottom-4 left-0 right-0 z-40 px-4">
-        <div className="relative max-w-md mx-auto bg-white rounded-2xl px-3 py-1.5 flex items-center glow-soft border border-[#e8eeed]">
-          {/* пункты слева */}
-          <div className="flex-1 flex justify-start gap-1.5 mr-[34px]">
-            {navItems.filter((i) => i.to !== '/chat').slice(0, Math.ceil((navItems.length - 1) / 2)).map((item) => (
+        <div className="relative max-w-md mx-auto bg-white rounded-2xl glow-soft border border-[#e8eeed] grid grid-cols-4 items-center h-[64px] px-1.5">
+          {sideSlots.map((item, i) =>
+            item ? (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to === '/' || item.to === '/patients'}
                 className={({ isActive }) =>
-                  `flex flex-col items-center justify-center rounded-[10px] w-[62px] py-1.5 transition-quick text-[10.5px] font-bold whitespace-nowrap ${
+                  `justify-self-center flex flex-col items-center justify-center rounded-[10px] w-[64px] py-1.5 transition-quick text-[10.5px] font-bold whitespace-nowrap ${
                     isActive
                       ? 'bg-teal-dark text-white shadow-sm'
                       : 'text-teal-dark hover:bg-teal-bg'
@@ -223,43 +228,22 @@ export default function Layout() {
                 <Icon name={item.icon} size={18} />
                 <span className="mt-0.5">{item.label}</span>
               </NavLink>
-            ))}
-          </div>
+            ) : (
+              <div key={`slot-${i}`} aria-hidden />
+            )
+          )}
 
-          {/* Центральная кнопка Ассистента */}
+          {/* Ассистент — строго по центру бара, белый фон разливается вокруг */}
           <NavLink
             to="/chat"
             className={({ isActive }) =>
-              `absolute left-1/2 -translate-x-1/2 -top-5 flex items-center w-[76px] ${
-                isActive ? 'assistant-fab-active' : ''
-              }`
+              `absolute left-1/2 -translate-x-1/2 -top-5 flex items-center ${isActive ? 'assistant-fab-active' : ''}`
             }
           >
             <span className="assistant-fab-circle">
               <Icon name="sparkle" size={24} />
             </span>
           </NavLink>
-
-          {/* пункты справа */}
-          <div className="flex-1 flex justify-end gap-1.5 ml-[34px]">
-            {navItems.filter((i) => i.to !== '/chat').slice(Math.ceil((navItems.length - 1) / 2)).map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/' || item.to === '/patients'}
-                className={({ isActive }) =>
-                  `flex flex-col items-center justify-center rounded-[10px] w-[62px] py-1.5 transition-quick text-[10.5px] font-bold whitespace-nowrap ${
-                    isActive
-                      ? 'bg-teal-dark text-white shadow-sm'
-                      : 'text-teal-dark hover:bg-teal-bg'
-                  }`
-                }
-              >
-                <Icon name={item.icon} size={18} />
-                <span className="mt-0.5">{item.label}</span>
-              </NavLink>
-            ))}
-          </div>
         </div>
       </nav>
 
