@@ -206,18 +206,15 @@ h1, h2, h3, h4 {
   flex-shrink: 0;
 }
 
-/* Аватар врача: белоснежный халат со стетоскопом на тил-градиенте */
-.doctor-avatar {
+/* Иллюстрированные аватары (врач и пациент): круглая обрезка + мягкая тень */
+.avatar-ill {
   display: inline-flex;
-  align-items: flex-end;
-  justify-content: center;
   border-radius: 999px;
   overflow: hidden;
-  background: linear-gradient(135deg, #00b8a9, #007b83);
-  box-shadow: 0 2px 6px rgba(0, 123, 131, 0.35), inset 0 0 0 1.5px rgba(255, 255, 255, 0.30);
   flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 123, 131, 0.35), inset 0 0 0 1.5px rgba(255, 255, 255, 0.30);
 }
-.doctor-avatar svg { display: block; }
+.avatar-ill svg { display: block; }
 
 /* ---------- Тени: слоистая мягкая глубина ---------- */
 
