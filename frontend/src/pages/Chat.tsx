@@ -106,7 +106,7 @@ export default function Chat() {
   const chips = user?.role === 'doctor' ? DOCTOR_CHIPS : PATIENT_CHIPS
 
   return (
-    <div className="flex flex-col gap-4 w-full max-w-3xl mx-auto h-[calc(100dvh-195px)] sm:h-auto sm:min-h-[480px]">
+    <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-3xl mx-auto h-[calc(100dvh-170px)] sm:h-auto sm:min-h-[480px]">
       <div className="flex flex-wrap items-end justify-between gap-4 shrink-0">
         <div>
           <div className="eyebrow">ИИ-ассистент клиники</div>
@@ -132,7 +132,7 @@ export default function Chat() {
       {/* Лента сообщений */}
       <div
         ref={boxRef}
-        className="flex-1 min-h-0 flex flex-col gap-3 rounded-2xl border border-[#eef3f2] bg-white p-3 sm:p-4 sm:max-h-[58vh] overflow-y-auto shadow-soft"
+        className="flex-1 min-h-0 flex flex-col gap-3 rounded-2xl border border-[#eef3f2] bg-white p-3 sm:p-4 sm:max-h-[58vh] overflow-y-auto shadow-soft [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {items.length === 0 && (
           <div className="grid place-items-center py-8 text-center">
@@ -190,8 +190,8 @@ export default function Chat() {
         ))}
       </div>
 
-      {/* Ввод */}
-      <div className="shrink-0 sticky bottom-[76px] z-20 -mx-4 px-4 pt-2 pb-1 sm:static sm:mx-0 sm:px-0 sm:pb-0">
+      {/* Ввод: на телефоне прилипает над таб-баром с плавной белой подложкой */}
+      <div className="chat-dock shrink-0 sticky bottom-[82px] z-20 -mx-4 px-4 sm:static sm:mx-0 sm:px-0">
       <form
         className="composer-card flex items-end gap-1.5"
         onSubmit={(e) => { e.preventDefault(); send(input) }}

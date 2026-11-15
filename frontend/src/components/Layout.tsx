@@ -190,8 +190,9 @@ export default function Layout() {
         </footer>
       </div>
 
-      {/* ---- FAB замера (мобильный, пациент) ---- */}
-      {!isDoctor && (
+      {/* ---- FAB замера (мобильный, пациент); на странице чата скрыт —
+           освобождает место композеру ввода ---- */}
+      {!isDoctor && !onChat && (
         <button
           className="fab-mobile fixed bottom-[86px] left-1/2 -translate-x-1/2 z-40 btn btn-gold rounded-full !min-h-[52px] !px-5 shadow-[0_6px_18px_rgba(23,46,42,0.25)]"
           onClick={() => navigate('/new')}

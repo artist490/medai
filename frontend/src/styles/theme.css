@@ -746,6 +746,20 @@ h1, h2, h3, h4 {
 }
 .composer-card .flip-input:focus { box-shadow: none; }
 
+/* Мобильный док композера: прилипает над таб-баром,
+   снизу — плавный белый градиент, чтобы лента не просвечивала */
+.chat-dock { position: sticky; }
+.chat-dock::before {
+  content: '';
+  position: absolute;
+  inset: -20px -16px -96px;
+  background: linear-gradient(to top, var(--color-surface) 62%, transparent);
+  z-index: -1;
+}
+@media (min-width: 640px) {
+  .chat-dock::before { display: none; }
+}
+
 /* ---------- Аутентификация: атмосфера + парящая карточка ---------- */
 
 .auth-bg {
