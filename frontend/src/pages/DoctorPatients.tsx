@@ -7,6 +7,7 @@ import type { PatientRow } from '../types'
 import type { RiskLevel } from '../types'
 import { brand } from '../brand'
 import { useAuth } from '../auth'
+import AvatarPatient from '../components/AvatarPatient'
 
 const riskBadge: Record<RiskLevel, string> = {
   green: 'badge-green',
@@ -25,16 +26,11 @@ function shortDate(iso: string | null): string {
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-function initialsOf(name: string, email: string): string {
-  const base = (name || email || '?').trim()
-  return base.slice(0, 2).toUpperCase()
-}
-
 function PatientAvatar({ p, size = 'md' }: { p: PatientRow; size?: 'sm' | 'md' }) {
   const cls = p.last_risk ? `row-avatar--${p.last_risk}` : 'row-avatar--green'
   return (
-    <span className={`row-avatar ${cls} ${size === 'sm' ? '!w-8 !h-8 !text-xs' : ''}`}>
-      {initialsOf(p.name, p.email)}
+    <span className={`row-avatar ${cls} ${size === 'sm' ? '!w-8 !h-8' : ''}`}>
+      <AvatarPatient size={size === 'sm' ? 20 : 26} />
     </span>
   )
 }

@@ -7,6 +7,7 @@ import IndicatorCard from '../components/IndicatorCard'
 import { Summary } from '../components/Summary'
 import RiskBadge from '../components/RiskBadge'
 import { Icon } from '../components/Icon'
+import AvatarPatient from '../components/AvatarPatient'
 import { CardFormFields, CardView, defaultCardForm } from '../components/CardAnamnesis'
 import type { CardFormState } from '../components/CardAnamnesis'
 import RiskSystems from '../components/RiskSystems'
@@ -513,8 +514,8 @@ export default function DoctorPatient() {
 
       {/* Профиль: аватар + мета-чипы */}
       <section className="panel flex flex-wrap items-center gap-x-6 gap-y-3">
-        <span className="row-avatar row-avatar--green !w-12 !h-12 text-base">
-          {(patient.name || patient.email || '?').slice(0, 2).toUpperCase()}
+        <span className="row-avatar row-avatar--green !w-12 !h-12">
+          <AvatarPatient size={32} />
         </span>
         <div className="flex flex-wrap gap-2 text-sm font-bold">
           <span className="badge badge-teal normal-case tracking-normal">{patient.email}</span>

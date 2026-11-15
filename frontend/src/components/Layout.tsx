@@ -10,6 +10,7 @@ import { brand } from '../brand'
 import { Icon } from './Icon'
 import type { IconName } from './Icon'
 import AvatarDoctor from './AvatarDoctor'
+import AvatarPatient from './AvatarPatient'
 
 type NavItem = { to: string; label: string; sub: string; icon: IconName; accent: 'teal' | 'coral' | 'sky' | 'gold' }
 
@@ -25,16 +26,6 @@ const doctorNav: NavItem[] = [
   { to: '/chat', label: 'Чат ИИ', sub: 'Ассистент врача', icon: 'robot', accent: 'sky' },
   { to: '/profile', label: 'Профиль', sub: 'Личные данные', icon: 'profile', accent: 'gold' },
 ]
-
-function initialsOf(name: string, email: string): string {
-  const base = (name || email || '?').trim()
-  if (base.includes('@')) {
-    const parts = base.split(/\s+/).filter(Boolean)
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-    return base.slice(0, 2).toUpperCase()
-  }
-  return base.slice(0, 2).toUpperCase()
-}
 
 // Русские склонения возраста: 31 год, 34 года, 40 лет
 function ageWord(age: number): string {
@@ -84,13 +75,13 @@ export default function Layout() {
           </NavLink>
 
           {/* Профиль-блок как у Сбер Здоровья: аватар, имя, возраст/роль.
-              Врач — аватар в белом халате, пациент — обычные инициалы */}
+              Врач — аватар в белом халате, пациент — обычный силуэт */}
           <div className="mt-8 flex items-center gap-3 px-2">
             {isDoctor ? (
               <AvatarDoctor size={44} />
             ) : (
-              <span className="avatar-circle" style={{ width: 44, height: 44, borderRadius: 999, fontSize: 14 }}>
-                {initialsOf(user?.name ?? '', user?.email ?? '')}
+              <span className="doctor-avatar text-white" style={{ width: 44, height: 44 }}>
+                <AvatarPatient size={36} />
               </span>
             )}
             <div className="min-w-0">
@@ -169,12 +160,13 @@ export default function Layout() {
                 </button>
               ) : (
                 <button
-                  className="avatar-circle"
+                  className="doctor-avatar text-white cursor-pointer"
+                  style={{ width: 40, height: 40 }}
                   title={`${user?.name || user?.email} · выйти`}
                   onClick={handleLogout}
                   aria-label="Профиль, выйти"
                 >
-                  {initialsOf(user?.name ?? '', user?.email ?? '')}
+                  <AvatarPatient size={33} />
                 </button>
               )}
             </div>
