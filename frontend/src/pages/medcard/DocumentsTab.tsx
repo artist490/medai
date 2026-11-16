@@ -6,6 +6,7 @@ import * as api from '../../api'
 import { getToken, uploadDocument } from '../../api'
 import { Icon } from '../../components/Icon'
 import EmptyArt from '../../components/EmptyArt'
+import { Skeleton } from '../../components/Skeleton'
 import type { DocumentItem } from '../../types'
 
 export default function DocumentsTab() {
@@ -86,7 +87,18 @@ export default function DocumentsTab() {
       </form>
 
       {docs === null ? (
-        <div className="text-center font-bold text-teal-dark animate-pulse">Загрузка…</div>
+        <div className="flex flex-col gap-3" aria-busy>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="py-1 flex items-center gap-3">
+              <Skeleton w={34} h={34} r={10} />
+              <div className="flex flex-col gap-1.5 flex-1">
+                <Skeleton w={`${55 - i * 10}%`} h={13} />
+                <Skeleton w={`${30 - i * 5}%`} h={10} />
+              </div>
+              <Skeleton w={80} h={26} r={10} />
+            </div>
+          ))}
+        </div>
       ) : docs.length === 0 ? (
         <div className="grid place-items-center py-8 text-center">
           <EmptyArt className="mx-auto mb-2" />

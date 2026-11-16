@@ -124,7 +124,7 @@ export default function MeasurementsHistory() {
           <div className="eyebrow">Замеры и динамика</div>
           {query && <p className="text-xs text-[#8aa09c] mt-0.5">Поиск: «{query}»</p>}
         </div>
-        <Link to="/new" className="btn btn-gold btn-sm">+ Новый замер</Link>
+        <Link to="/new" className="btn btn-gold btn-sm">Новый замер</Link>
       </div>
 
       <Chart title="Давление, мм рт. ст." subtitle="Систолическое и диастолическое" icon="pressure"

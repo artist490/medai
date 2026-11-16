@@ -64,7 +64,9 @@ body {
 
 /* ---------- Анимированный градиентный фон ----------
    Три мягких пятна (тил / золото / небо) медленно дрейфуют за контентом.
-   Слой фиксированный, за всем содержимым, клики не перехватывает. */
+   Слой фиксированный, за всем содержимым, клики не перехватывает.
+   Мягкость сделана radial-градиентом, а не filter: blur — блюр больших
+   слоёв перерастровается каждый кадр и рвёт все анимации на странице. */
 .bg-aurora {
   position: fixed;
   inset: 0;
@@ -75,25 +77,24 @@ body {
 .bg-aurora span {
   position: absolute;
   border-radius: 999px;
-  filter: blur(70px);
   will-change: transform;
 }
 .bg-aurora .b1 {
-  width: 520px; height: 520px;
-  top: -240px; left: -180px;
-  background: rgba(0, 184, 169, 0.07);
+  width: 820px; height: 820px;
+  top: -430px; left: -330px;
+  background: radial-gradient(closest-side, rgba(0, 184, 169, 0.10), rgba(0, 184, 169, 0.04) 52%, transparent 74%);
   animation: aurora-drift-1 28s ease-in-out infinite alternate;
 }
 .bg-aurora .b2 {
-  width: 420px; height: 420px;
-  top: 12%; right: -200px;
-  background: rgba(250, 204, 21, 0.05);
+  width: 680px; height: 680px;
+  top: 8%; right: -330px;
+  background: radial-gradient(closest-side, rgba(250, 204, 21, 0.09), rgba(250, 204, 21, 0.035) 52%, transparent 74%);
   animation: aurora-drift-2 34s ease-in-out infinite alternate;
 }
 .bg-aurora .b3 {
-  width: 560px; height: 560px;
-  bottom: -300px; left: 42%;
-  background: rgba(93, 173, 226, 0.05);
+  width: 900px; height: 900px;
+  bottom: -480px; left: 38%;
+  background: radial-gradient(closest-side, rgba(93, 173, 226, 0.08), rgba(93, 173, 226, 0.03) 52%, transparent 74%);
   animation: aurora-drift-3 40s ease-in-out infinite alternate;
 }
 @keyframes aurora-drift-1 {
@@ -177,14 +178,18 @@ h1, h2, h3, h4 {
   font-weight: 600;
   color: #3f4f4c;
   border: 1px solid transparent;
+  position: relative;
+  z-index: 1;
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 .sidebar-link:hover { background: rgba(255, 255, 255, 0.85); }
+/* Активная белая карточка рисуется общим .flow-indicator--card,
+   который перетекает между пунктами; у самой ссылки остаётся только цвет */
 .sidebar-link.active {
-  background: #ffffff;
-  border-color: #e9efed;
+  background: transparent;
+  border-color: transparent;
   color: #0d5f60;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04), 0 10px 26px -12px rgba(23, 46, 42, 0.14);
+  box-shadow: none;
 }
 .sidebar-icon {
   display: inline-flex;
@@ -565,6 +570,53 @@ h1, h2, h3, h4 {
 /* Кнопка-пилюля (фильтры-табы, как у Сбер Здоровья) */
 .btn-pill { border-radius: 999px !important; }
 
+/* ---------- Перетекающий индикатор активной кнопки ----------
+   Активная заливка — общий элемент позади кнопок; при переключении
+   она не мигает, а плавно съезжает к новой кнопке (см. useFlowRect). */
+
+.flow-box { position: relative; }
+
+.flow-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 0;
+  /* Только transform: изменение размера доезжает через scale
+     (useFlowIndicatorStyle), layout в кадре не участвует */
+  transition: transform 0.4s var(--ease-out), opacity 0.2s ease;
+  will-change: transform;
+}
+
+/* Пилюля для вкладок (медкарта, период замера) */
+.flow-indicator--pill {
+  border-radius: 999px;
+  background: linear-gradient(180deg, #009aa1 0%, #00727a 100%);
+  box-shadow: 0 2px 6px rgba(0, 114, 122, 0.28), 0 10px 22px -8px rgba(0, 114, 122, 0.55);
+}
+
+/* Белая карточка для сайдбара */
+.flow-indicator--card {
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e9efed;
+  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04), 0 10px 26px -12px rgba(23, 46, 42, 0.14);
+}
+
+/* Плашка для мобильного таб-бара */
+.flow-indicator--bar {
+  border-radius: 10px;
+  background: var(--color-teal-dark);
+}
+
+/* Кнопки вкладок: прозрачные, текст поверх индикатора */
+.flow-tab { position: relative; z-index: 1; background: transparent; border: none; box-shadow: none; color: #3f4f4c; }
+.flow-tab:hover { background: rgba(0, 123, 131, 0.06); }
+.flow-tab.active { color: #ffffff; }
+.flow-tab.active:hover { background: transparent; }
+
+.bar-link { position: relative; z-index: 1; }
+
 /* Плавающая кнопка ИИ-помощника (desktop) */
 .ai-fab {
   position: fixed;
@@ -826,8 +878,124 @@ h1, h2, h3, h4 {
     0 0 0 7px rgba(0, 184, 169, 0.30);
 }
 
-/* Micro-interactions ≤ 500ms */
-.transition-quick { transition: all 0.2s ease; }
+/* Micro-interactions ≤ 500ms; конкретные свойства — не «all»,
+   чтобы браузер не готовился анимировать layout */
+.transition-quick {
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* ============================================================
+   Система движения
+   Единая кривая ease-out; анимируются только transform и opacity;
+   всё гасится при prefers-reduced-motion.
+   ============================================================ */
+
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html { scroll-behavior: smooth; }
+
+/* Вход маршрута: обёртка контента пересоздаётся при смене пути (Layout) */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: page-in 0.32s var(--ease-out) both; }
+
+/* Каскад: прямые дети контейнера входят по очереди */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.stagger > * { animation: rise-in 0.45s var(--ease-out) both; }
+.stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.stagger > *:nth-child(2) { animation-delay: 0.10s; }
+.stagger > *:nth-child(3) { animation-delay: 0.16s; }
+.stagger > *:nth-child(4) { animation-delay: 0.22s; }
+.stagger > *:nth-child(5) { animation-delay: 0.28s; }
+.stagger > *:nth-child(6) { animation-delay: 0.34s; }
+.stagger > *:nth-child(7) { animation-delay: 0.40s; }
+.stagger > *:nth-child(n+8) { animation-delay: 0.46s; }
+.anim-rise { animation: rise-in 0.5s var(--ease-out) both; }
+
+/* Смена вкладки внутри страницы (медкарта) */
+.tab-enter { animation: page-in 0.28s var(--ease-out) both; }
+
+/* Скелетон загрузки: форма будущего контента вместо текстовой «Загрузка…» */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #e7eeec;
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-sweep { to { transform: translateX(100%); } }
+
+/* Пузыри чата входят мягко */
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.chat-bubble-ai,
+.chat-bubble-user { animation: bubble-in 0.28s var(--ease-out) both; }
+
+/* Приподъём интерактивных карточек при наведении */
+.lift {
+  transition: transform 0.22s var(--ease-out), box-shadow 0.22s var(--ease-out);
+}
+.lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(23, 46, 42, 0.05), 0 16px 40px -14px rgba(23, 46, 42, 0.16);
+}
+.lift:active { transform: translateY(0) scale(0.995); }
+
+/* Доступность: полное отключение движения */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- Карта филиалов (MapLibre): контролы под дизайн-систему ---------- */
+
+.maplibregl-ctrl-group {
+  border-radius: 12px !important;
+  overflow: hidden;
+  border: 1px solid #e4ebe9 !important;
+  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.08), 0 8px 22px -10px rgba(23, 46, 42, 0.18) !important;
+}
+.maplibregl-ctrl-group button { border: none !important; }
+.maplibregl-ctrl-group button + button { border-top: 1px solid #eef3f1 !important; }
+.maplibregl-ctrl-group button:hover { background: #f1f6f5 !important; }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: saturate(0.85); }
+
+.maplibregl-ctrl-scale {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: #d9e2df !important;
+  border-radius: 4px;
+  color: #5b6b68 !important;
+  font-size: 10px !important;
+}
+
+.maplibregl-ctrl-attrib {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-radius: 10px 0 0 0 !important;
+  font-size: 10px !important;
+}
+.maplibregl-ctrl-attrib a { color: #5b6b68 !important; }
 
 /* ---------- Печать карточки пациента ---------- */
 @media print {

@@ -4,6 +4,7 @@ import * as api from '../api'
 import { useAuth } from '../auth'
 import { Icon } from '../components/Icon'
 import EmptyArt from '../components/EmptyArt'
+import PageHeader from '../components/PageHeader'
 import type { ChatMessage } from '../types'
 
 const TOOL_LABELS: Record<string, string> = {
@@ -106,17 +107,17 @@ export default function Chat() {
   const chips = user?.role === 'doctor' ? DOCTOR_CHIPS : PATIENT_CHIPS
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-3xl mx-auto h-[calc(100dvh-170px)] sm:h-auto sm:min-h-[480px]">
-      <div className="flex flex-wrap items-end justify-between gap-4 shrink-0">
-        <div>
-          <div className="eyebrow">ИИ-ассистент клиники</div>
-          <h1 className="mt-1.5" style={{ fontSize: 'clamp(24px, 6vw, 32px)', letterSpacing: '-0.02em' }}>
-            Ассистент <Icon name="sparkle" size={20} className="inline-block align-[-2px] text-teal" />
-          </h1>
-        </div>
-        <button className="btn btn-ghost btn-sm shrink-0" onClick={clear}>
-          <Icon name="trash" size={14} /> Очистить
-        </button>
+    <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-3xl mx-auto h-[calc(100dvh-170px)] sm:h-auto sm:min-h-[480px] stagger">
+      <div className="shrink-0">
+        <PageHeader
+          eyebrow="ИИ-ассистент клиники"
+          title={<>Ассистент <Icon name="sparkle" size={20} className="inline-block align-[-2px] text-teal" /></>}
+          actions={
+            <button className="btn btn-ghost btn-sm" onClick={clear}>
+              <Icon name="trash" size={14} /> Очистить
+            </button>
+          }
+        />
       </div>
 
       <p className="text-sm text-teal-dark/80 -mt-3 hidden sm:block shrink-0">

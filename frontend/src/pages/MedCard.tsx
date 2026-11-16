@@ -10,6 +10,9 @@ import AnamnesisSurvey from '../components/AnamnesisSurvey'
 import MeasurementsHistory from '../components/MeasurementsHistory'
 import { repeatLastMeasurement } from '../api'
 import type { Goals, Measurement, MedCard, Visit } from '../types'
+import PageHeader from '../components/PageHeader'
+import FlowTabs from '../components/FlowTabs'
+import { Skeleton, SkeletonCard } from '../components/Skeleton'
 import AnamnesisForm from './medcard/AnamnesisForm'
 import BookingMenu from './medcard/BookingMenu'
 import DocumentsTab from './medcard/DocumentsTab'
@@ -54,7 +57,18 @@ export default function MedCard() {
       </div>
     )
   }
-  if (!card) return <div className="text-center font-extrabold text-teal-dark animate-pulse">Загрузка…</div>
+  if (!card) {
+    return (
+      <div className="flex flex-col gap-6" aria-busy>
+        <Skeleton w="42%" h={30} r={10} />
+        <div className="flex gap-2">
+          {TABS.map((tb) => <Skeleton key={tb.id} w={112} h={32} r={999} />)}
+        </div>
+        <SkeletonCard lines={4} />
+        <SkeletonCard lines={3} />
+      </div>
+    )
+  }
 
   function onVisitDone(visit: Visit, isEdit: boolean) {
     setVisits((prev) => isEdit ? prev.map((v) => (v.id === visit.id ? visit : v)) : [visit, ...prev])
@@ -104,161 +118,153 @@ export default function MedCard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="mb-1">
-        <div className="eyebrow">Личная медицинская информация</div>
-        <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>
-          Медкарта <Icon name="care" size={26} className="inline-block align-[-4px]" />
-        </h1>
-      </div>
+      <PageHeader
+        eyebrow="Личная медицинская информация"
+        title={<>Медкарта <Icon name="care" size={26} className="inline-block align-[-4px]" /></>}
+        actions={<button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Печать карты</button>}
+      />
+      {/* Вкладки с перетекающей активной пилюлей */}
+      <FlowTabs
+        ariaLabel="Разделы медкарты"
+        items={TABS.map((tb) => ({ id: tb.id, label: tb.label, icon: <Icon name={tb.icon} size={14} /> }))}
+        value={tab}
+        onChange={setTab}
+      />
 
-      <div className="flex gap-2 flex-wrap">
-        <button className="btn btn-ghost btn-sm ml-auto" onClick={() => window.print()}>
-          Печать карты
-        </button>
-      </div>
-      <div className="flex gap-2 flex-wrap -mt-2">
-        {TABS.map((tb) => (
-          <button
-            key={tb.id}
-            onClick={() => setTab(tb.id)}
-            className={`btn btn-sm btn-pill ${tab === tb.id ? 'btn-gold' : 'btn-ghost'}`}
-          >
-            <Icon name={tb.icon} size={14} /> {tb.label}
-          </button>
-        ))}
-      </div>
+      {/* Содержимое вкладки: пересоздаётся при смене — секции входят каскадом */}
+      <div key={tab} className="tab-enter stagger flex flex-col gap-6">
+        {tab === 'overview' && (
+          <>
+            <RiskSystems items={items} survey={card.survey} onBook={bookFromRisk} />
 
-      {tab === 'overview' && (
-        <>
-      <RiskSystems items={items} survey={card.survey} onBook={bookFromRisk} />
+            <section id="visits-section">
+              <div className="section-title mb-3 flex items-center gap-2">
+                <span className="emoji-box"><Icon name="calendar" size={20} /></span>
+                <span>Приёмы</span>
+                {plannedCount > 0 && <span className="text-xs font-semibold text-teal-dark/50">· {plannedCount} запланировано</span>}
+              </div>
 
-      <section id="visits-section">
-        <div className="section-title mb-3 flex items-center gap-2">
-          <span className="emoji-box"><Icon name="calendar" size={20} /></span>
-          <span>Приёмы</span>
-          {plannedCount > 0 && <span className="text-xs font-semibold text-teal-dark/50">· {plannedCount} запланировано</span>}
-        </div>
+              <div className="flex flex-col gap-3">
+                {bookMenu !== null && (
+                  <BookingMenu
+                    reason={bookMenu}
+                    onAppBooking={bookInApp}
+                    onClose={() => setBookMenu(null)}
+                  />
+                )}
 
-        <div className="flex flex-col gap-3">
-          {bookMenu !== null && (
-            <BookingMenu
-              reason={bookMenu}
-              onAppBooking={bookInApp}
-              onClose={() => setBookMenu(null)}
-            />
-          )}
+                {showVisitForm ? (
+                  <VisitForm
+                    key={prefillReason || (editing ? `edit-${editing.id}` : 'new')}
+                    editing={editing}
+                    defaultReason={prefillReason}
+                    onDone={onVisitDone}
+                    onCancel={() => { setShowVisitForm(false); setEditing(null); setPrefillReason('') }}
+                  />
+                ) : (
+                  <div className="flex gap-2">
+                    <button className="btn btn-gold w-fit" onClick={() => { setEditing(null); setShowVisitForm(true) }}>
+                      Записаться на приём
+                    </button>
+                  </div>
+                )}
 
-          {showVisitForm ? (
-            <VisitForm
-              key={prefillReason || (editing ? `edit-${editing.id}` : 'new')}
-              editing={editing}
-              defaultReason={prefillReason}
-              onDone={onVisitDone}
-              onCancel={() => { setShowVisitForm(false); setEditing(null); setPrefillReason('') }}
-            />
-          ) : (
-            <div className="flex gap-2">
-              <button className="btn btn-gold w-fit" onClick={() => { setEditing(null); setShowVisitForm(true) }}>
-                + Записаться на приём
-              </button>
-            </div>
-          )}
+                {visits.length === 0 && !showVisitForm && (
+                  <div className="bg-white rounded-xl p-6 text-center glow-soft">
+                    <EmptyArt className="mx-auto mb-2" />
+                    <p className="text-base font-bold text-[#1b2622]">Приёмов пока нет</p>
+                    <p className="text-sm text-teal-dark/70 mt-1">
+                      Запишитесь и опишите жалобы — врач подготовится заранее.
+                    </p>
+                  </div>
+                )}
 
-          {visits.length === 0 && !showVisitForm && (
-            <div className="bg-white rounded-xl p-6 text-center glow-soft">
-              <EmptyArt className="mx-auto mb-2" />
-              <p className="text-base font-bold text-[#1b2622]">Приёмов пока нет</p>
-              <p className="text-sm text-teal-dark/70 mt-1">
-                Запишитесь и опишите жалобы — врач подготовится заранее.
-              </p>
-            </div>
-          )}
-
-          {visits.map((visit) => (
-            <div key={visit.id}>
-              <VisitCard visit={visit} onChanged={(v) => setVisits((prev) => prev.map((x) => (x.id === v.id ? v : x)))} />
-              {visit.status === 'planned' && !showVisitForm && (
-                <button
-                  className="text-xs font-extrabold text-teal hover:text-teal-light mt-1 ml-1"
-                  onClick={() => startEdit(visit)}
-                >
-                  Изменить жалобу или дату
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-        </>
-      )}
-
-      {tab === 'anamnesis' && (
-        <section>
-          <div className="section-title mb-3">
-            <span className="emoji-box"><Icon name="check" size={20} /></span>
-            Анкета-анамнез
-          </div>
-          {showSurvey ? (
-            <AnamnesisSurvey
-              initial={card.survey}
-              onSaved={onSurveySaved}
-              onCancel={() => setShowSurvey(false)}
-            />
-          ) : (
-            <div className="flex flex-col gap-3">
-              <button className="flip-card flip-card--sky flex items-center gap-3 text-left hover:opacity-90 transition-quick"
-                      onClick={() => setShowSurvey(true)}>
-                <span className="emoji-box"><Icon name="check" size={20} /></span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-extrabold text-teal-dark">
-                    {card.survey ? 'Пройти опросник Минздрава заново' : 'Пройти опросник Минздрава (5 минут)'}
-                  </span>
-                  <span className="block text-xs font-bold text-teal-dark/55">
-                    28 вопросов как на диспансеризации: диагнозы, симптомы, привычки — заполняет форму автоматически
-                  </span>
-                </span>
-                <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />
-              </button>
-              <AnamnesisForm card={card} />
-            </div>
-          )}
-        </section>
-      )}
-
-      {tab === 'meas' && (
-        <>
-          {/* Дневник давления: утро/вечер за неделю */}
-          <section className="panel">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <h2 className="text-lg">Дневник давления</h2>
-              <div className="flex gap-2">
-                {(['morning', 'evening'] as const).map((pt) => (
-                  <button key={pt} className="btn btn-ghost btn-sm" disabled={diaryBusy !== ''}
-                          onClick={async () => {
-                            setDiaryBusy(pt)
-                            try {
-                              const m = await repeatLastMeasurement(pt)
-                              setItems((prev) => [m, ...prev])
-                            } finally { setDiaryBusy('') }
-                          }}>
-                    {pt === 'morning' ? 'Повторить как утренний' : 'Повторить как вечерний'}
-                  </button>
+                {visits.map((visit) => (
+                  <div key={visit.id}>
+                    <VisitCard visit={visit} onChanged={(v) => setVisits((prev) => prev.map((x) => (x.id === v.id ? v : x)))} />
+                    {visit.status === 'planned' && !showVisitForm && (
+                      <button
+                        className="text-xs font-extrabold text-teal hover:text-teal-light mt-1 ml-1"
+                        onClick={() => startEdit(visit)}
+                      >
+                        Изменить жалобу или дату
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
+            </section>
+          </>
+        )}
+
+        {tab === 'anamnesis' && (
+          <section>
+            <div className="section-title mb-3">
+              <span className="emoji-box"><Icon name="check" size={20} /></span>
+              Анкета-анамнез
             </div>
-            <PressureDiary items={items} />
+            {showSurvey ? (
+              <AnamnesisSurvey
+                initial={card.survey}
+                onSaved={onSurveySaved}
+                onCancel={() => setShowSurvey(false)}
+              />
+            ) : (
+              <div className="flex flex-col gap-3">
+                <button className="flip-card flip-card--sky flex items-center gap-3 text-left hover:opacity-90 transition-quick"
+                        onClick={() => setShowSurvey(true)}>
+                  <span className="emoji-box"><Icon name="check" size={20} /></span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-extrabold text-teal-dark">
+                      {card.survey ? 'Пройти опросник Минздрава заново' : 'Пройти опросник Минздрава (5 минут)'}
+                    </span>
+                    <span className="block text-xs font-bold text-teal-dark/55">
+                      28 вопросов как на диспансеризации: диагнозы, симптомы, привычки — заполняет форму автоматически
+                    </span>
+                  </span>
+                  <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />
+                </button>
+                <AnamnesisForm card={card} />
+              </div>
+            )}
           </section>
+        )}
 
-          {/* Мои цели */}
-          <section className="panel">
-            <GoalsEditor goals={goals} onSaved={setGoals} />
-          </section>
+        {tab === 'meas' && (
+          <>
+            {/* Дневник давления: утро/вечер за неделю */}
+            <section className="panel">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <h2 className="text-lg">Дневник давления</h2>
+                <div className="flex gap-2">
+                  {(['morning', 'evening'] as const).map((pt) => (
+                    <button key={pt} className="btn btn-ghost btn-sm" disabled={diaryBusy !== ''}
+                            onClick={async () => {
+                              setDiaryBusy(pt)
+                              try {
+                                const m = await repeatLastMeasurement(pt)
+                                setItems((prev) => [m, ...prev])
+                              } finally { setDiaryBusy('') }
+                            }}>
+                      {pt === 'morning' ? 'Повторить как утренний' : 'Повторить как вечерний'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <PressureDiary items={items} />
+            </section>
 
-          <MeasurementsHistory />
-        </>
-      )}
+            {/* Мои цели */}
+            <section className="panel">
+              <GoalsEditor goals={goals} onSaved={setGoals} />
+            </section>
 
-      {tab === 'docs' && <DocumentsTab />}
+            <MeasurementsHistory />
+          </>
+        )}
+
+        {tab === 'docs' && <DocumentsTab />}
+      </div>
     </div>
   )
 }

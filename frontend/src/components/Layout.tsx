@@ -3,8 +3,9 @@
 // Навигация зависит от роли: пациент — личные вкладки, врач — кабинет пациентов.
 // Сайдбар как у Сбер Здоровья: профиль-блок, пункты с подписями и цветными
 // акцентами иконок (teal/коралл/небо/золото — статусная семантика сохранена).
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useFlowIndicatorStyle, useFlowRect } from './useFlowRect'
 import * as api from '../api'
 import { useAuth } from '../auth'
 import { brand } from '../brand'
@@ -38,7 +39,8 @@ function ageWord(age: number): string {
   return 'лет'
 }
 
-// Кнопка нижней панели: иконка + подпись, активная — тёмная плашка
+// Кнопка нижней панели: иконка + подпись; активная тёмная плашка —
+// общий перетекающий индикатор, у самой кнопки только цвет текста
 function BarLink({ to, label, icon, end }: {
   to: string; label: string; icon: IconName; end?: boolean
 }) {
@@ -47,8 +49,8 @@ function BarLink({ to, label, icon, end }: {
       to={to}
       end={end}
       className={({ isActive }) =>
-        `justify-self-center flex flex-col items-center justify-center rounded-[10px] w-full max-w-[60px] px-0.5 py-1.5 transition-quick text-[10.5px] font-bold whitespace-nowrap ${
-          isActive ? 'bg-teal-dark text-white shadow-sm' : 'text-teal-dark hover:bg-teal-bg'
+        `bar-link justify-self-center flex flex-col items-center justify-center rounded-[10px] w-full max-w-[60px] px-0.5 py-1.5 transition-quick text-[10.5px] font-bold whitespace-nowrap ${
+          isActive ? 'active text-white' : 'text-teal-dark hover:bg-teal-bg'
         }`
       }
     >
@@ -89,6 +91,13 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [query, setQuery] = useState('')
+  // Перетекающий индикатор: белая карточка в сайдбаре и плашка в мобильном баре
+  const navRef = useRef<HTMLElement>(null)
+  const navRect = useFlowRect(navRef, '.sidebar-link.active', location.pathname)
+  const navIndicator = useFlowIndicatorStyle(navRect)
+  const barRef = useRef<HTMLDivElement>(null)
+  const barRect = useFlowRect(barRef, '.bar-link.active', location.pathname)
+  const barIndicator = useFlowIndicatorStyle(barRect)
   const isDoctor = user?.role === 'doctor'
   const navItems = isDoctor ? doctorNav : patientNav
   const onChat = location.pathname.startsWith('/chat')
@@ -109,7 +118,7 @@ export default function Layout() {
       {/* ---- Сайдбар (desktop) ---- */}
       <aside className="hidden lg:flex flex-col justify-between sticky top-0 h-screen sidebar-shell border-r border-[#e9efed] px-5 py-6">
         <div>
-          <NavLink to="/" className="block px-2">
+          <NavLink to="/" className="block px-2 anim-rise">
             <div className="flex items-center gap-2.5">
               <span className="brand-mark" aria-hidden>
                 <svg width="30" height="30" viewBox="0 0 30 30">
@@ -125,7 +134,7 @@ export default function Layout() {
           </NavLink>
 
           {/* Профиль-карточка: аватар, имя, роль */}
-          <div className="profile-card mt-7 flex items-center gap-3 px-3 py-3">
+          <div className="profile-card mt-7 flex items-center gap-3 px-3 py-3 anim-rise" style={{ animationDelay: '60ms' }}>
             {isDoctor ? (
               <AvatarDoctor size={44} />
             ) : (
@@ -143,13 +152,15 @@ export default function Layout() {
 
           <div className="mx-1 my-4 h-px bg-[#e9efed]" />
 
-          <nav className="flex flex-col gap-1">
-            {navItems.map((item) => (
+          <nav ref={navRef} className="flex flex-col gap-1 flow-box">
+            <span className="flow-indicator flow-indicator--card" style={navIndicator} aria-hidden />
+            {navItems.map((item, i) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to === '/' || item.to === '/patients'}
-                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                className={({ isActive }) => `sidebar-link anim-rise ${isActive ? 'active' : ''}`}
+                style={{ animationDelay: `${110 + i * 45}ms` }}
               >
                 <span className={`sidebar-icon sidebar-icon--${item.accent}`}><Icon name={item.icon} size={20} /></span>
                 <span className="flex flex-col leading-tight min-w-0">
@@ -166,7 +177,7 @@ export default function Layout() {
             Кабинет врача{user?.name ? ` · ${user.name}` : ''}
           </div>
         ) : (
-          <button className="btn btn-gold w-full" onClick={() => navigate('/new')}>
+          <button className="btn btn-gold w-full anim-rise" style={{ animationDelay: '290ms' }} onClick={() => navigate('/new')}>
             <Icon name="pressure" size={16} /> Новый замер
           </button>
         )}
@@ -174,7 +185,7 @@ export default function Layout() {
 
       {/* ---- Правая колонка ---- */}
       <div className="min-w-0 flex flex-col">
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-[#e5e7eb]">
+        <header className="sticky top-0 z-40 bg-white/95 border-b border-[#e5e7eb]">
           <div className="px-5 sm:px-8 h-16 flex items-center gap-3 sm:gap-5">
             {/* Мобильный логотип */}
             <NavLink to="/" className="lg:hidden">
@@ -234,7 +245,10 @@ export default function Layout() {
         </header>
 
         <main className="flex-1 px-5 sm:px-8 pt-7 pb-28 lg:pb-7 max-w-[1200px] w-full mx-auto">
-          <Outlet />
+          {/* Вход маршрута: контент страницы мягко проявляется при смене пути */}
+          <div key={location.pathname} className="page-enter">
+            <Outlet />
+          </div>
         </main>
 
         <footer className="hidden lg:flex px-5 sm:px-8 py-7 flex-wrap items-center justify-between gap-2">
@@ -250,7 +264,8 @@ export default function Layout() {
       {/* ---- Мобильная нижняя навигация: 5 равных колонок, Ассистент —
            в собственной средней ячейке, никого не перекрывает ---- */}
       <nav className="lg:hidden fixed bottom-4 left-0 right-0 z-40 px-4">
-        <div className="relative max-w-md mx-auto bg-white rounded-2xl glow-soft border border-[#e8eeed] grid grid-cols-5 items-center h-[70px] px-1">
+        <div ref={barRef} className="relative max-w-md mx-auto bg-white rounded-2xl glow-soft border border-[#e8eeed] grid grid-cols-5 items-center h-[70px] px-1 anim-rise" style={{ animationDelay: '120ms' }}>
+          <span className="flow-indicator flow-indicator--bar" style={barIndicator} aria-hidden />
           {isDoctor ? (
             <>
               <BarLink to="/patients" label="Пациенты" icon="stethoscope" end />

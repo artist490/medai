@@ -12,6 +12,7 @@ import type { IconName } from '../components/Icon'
 import EmptyArt from '../components/EmptyArt'
 import AvatarDoctor from '../components/AvatarDoctor'
 import { Summary } from '../components/Summary'
+import PageHeader from '../components/PageHeader'
 
 const riskColors: Record<RiskLevel, string> = {
   green: '#00b8a9',
@@ -169,22 +170,21 @@ export default function Dashboard() {
   }, [items])
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Шапка страницы */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="eyebrow">Здоровье под контролем</div>
-          <h1 className="mt-1" style={{ fontSize: 30, letterSpacing: '-0.02em' }}>Обзор здоровья</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          {latest && (
-            <Link to={`/result/${latest.id}`} className="btn btn-ghost">
-              <Icon name="pulse" size={16} /> Последний замер
-            </Link>
-          )}
-          <Link to="/new" className="btn btn-gold"><Icon name="pressure" size={16} /> Новый замер</Link>
-        </div>
-      </div>
+    <div className="flex flex-col gap-6 stagger">
+      <PageHeader
+        eyebrow="Здоровье под контролем"
+        title="Обзор здоровья"
+        actions={
+          <>
+            {latest && (
+              <Link to={`/result/${latest.id}`} className="btn btn-ghost">
+                <Icon name="pulse" size={16} /> Последний замер
+              </Link>
+            )}
+            <Link to="/new" className="btn btn-gold"><Icon name="pressure" size={16} /> Новый замер</Link>
+          </>
+        }
+      />
 
       {/* Ближайший приём */}
       {nextVisit && (

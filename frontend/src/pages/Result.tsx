@@ -8,6 +8,8 @@ import Disclaimer from '../components/Disclaimer'
 import Confetti from '../components/Confetti'
 import { Icon } from '../components/Icon'
 import type { IconName } from '../components/Icon'
+import PageHeader from '../components/PageHeader'
+import { SkeletonCard } from '../components/Skeleton'
 import { brand } from '../brand'
 import { useAuth } from '../auth'
 import type { Measurement } from '../types'
@@ -33,27 +35,27 @@ export default function Result() {
       </div>
     )
   }
-  if (!m) return <div className="text-center font-extrabold text-teal-dark animate-pulse">Загрузка…</div>
+  if (!m) return <div aria-busy><SkeletonCard lines={4} /></div>
 
   const a = m.analysis!
   const green = a.risk_level === 'green'
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 stagger">
       <Confetti fire={green} />
 
       {/* Hero */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="eyebrow">Результат анализа</div>
-          <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>Разбор замера</h1>
-          <p className="text-sm text-teal-dark/60 mt-1.5">Анализ от {a.created_at.slice(0, 16)}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <RiskBadge level={a.risk_level} big />
-          <Link to="/new" className="btn btn-gold"><Icon name="pressure" size={16} /> Новый замер</Link>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Результат анализа"
+        title="Разбор замера"
+        sub={`Анализ от ${a.created_at.slice(0, 16)}`}
+        actions={
+          <>
+            <RiskBadge level={a.risk_level} big />
+            <Link to="/new" className="btn btn-gold"><Icon name="pressure" size={16} /> Новый замер</Link>
+          </>
+        }
+      />
 
       {/* Срочный флаг */}
       {a.findings.some((f) => f.status === 'alarm') && (

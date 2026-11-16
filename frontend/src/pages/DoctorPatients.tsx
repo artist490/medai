@@ -8,6 +8,8 @@ import type { RiskLevel } from '../types'
 import { brand } from '../brand'
 import { useAuth } from '../auth'
 import AvatarPatient from '../components/AvatarPatient'
+import PageHeader from '../components/PageHeader'
+import { SkeletonRows } from '../components/Skeleton'
 
 const riskBadge: Record<RiskLevel, string> = {
   green: 'badge-green',
@@ -82,20 +84,16 @@ export default function DoctorPatients() {
   }, [items, query])
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="eyebrow">Кабинет врача</div>
-          <h1 className="mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>
-            {user?.branch ? `Пациенты · ${user.branch.city}` : 'Пациенты клиники'}
-          </h1>
-        </div>
-      </div>
+    <div className="flex flex-col gap-6 stagger">
+      <PageHeader
+        eyebrow="Кабинет врача"
+        title={user?.branch ? `Пациенты · ${user.branch.city}` : 'Пациенты клиники'}
+      />
 
       {error && <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>}
 
       {loading ? (
-        <div className="text-center font-extrabold text-teal-dark animate-pulse py-10">Загрузка…</div>
+        <SkeletonRows rows={6} />
       ) : (
         <>
           {attention.length > 0 && (

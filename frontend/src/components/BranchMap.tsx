@@ -54,7 +54,11 @@ function buildStyle(slug: string, threeD: boolean): StyleSpecification {
     version: 8,
     glyphs: '/glyphs/{fontstack}/{range}.pbf',
     sources: {
-      protomaps: { type: 'vector', url: `pmtiles:///maps/${slug}.pmtiles` },
+      protomaps: {
+        type: 'vector',
+        url: `pmtiles:///maps/${slug}.pmtiles`,
+        attribution: '© OpenStreetMap contributors · Protomaps',
+      },
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': '#F7FAF8' } },
@@ -222,6 +226,7 @@ export default function BranchMap({ slug, lat, lon, city }: {
   const markerRef = useRef<Marker | null>(null)
   const clinicRef = useRef<[number, number]>([lat, lon])
   const [threeD, setThreeD] = useState(false)
+  const threeDRef = useRef(false)
   const dimBtnRef = useRef<HTMLButtonElement | null>(null)
 
   // Карта создаётся один раз на время жизни компонента
@@ -251,7 +256,8 @@ export default function BranchMap({ slug, lat, lon, city }: {
       'stroke-linecap="round"><circle cx="12" cy="12" r="3.2"></circle><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"></path></svg></button>'
     clinicBtn.querySelector('button')!.addEventListener('click', () => {
       const [la, lo] = clinicRef.current
-      map.jumpTo({ center: [lo, la], zoom: 14 })
+      // мягкий перелёт вместо jumpTo
+      map.easeTo({ center: [lo, la], zoom: 14, duration: 800, easing: (t) => 1 - Math.pow(1 - t, 3) })
     })
     map.addControl({ onAdd: () => clinicBtn, onRemove: () => { clinicBtn.remove() } }, 'top-left')
 
@@ -277,7 +283,14 @@ export default function BranchMap({ slug, lat, lon, city }: {
         'fog-color': '#F7FAF8',
       })
     } catch { /* Sky API недоступна */ }
-    map.on('load', () => addMapImages(map))
+    map.on('load', () => {
+      addMapImages(map)
+      // если 3D включили до загрузки стиля — применяем слои зданий здесь
+      if (threeDRef.current && map.getLayer('buildings-3d')) {
+        map.setLayoutProperty('buildings-flat', 'visibility', 'none')
+        map.setLayoutProperty('buildings-3d', 'visibility', 'visible')
+      }
+    })
 
     return () => {
       map.remove()
@@ -287,11 +300,18 @@ export default function BranchMap({ slug, lat, lon, city }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Режим 2D/3D: наклон камеры и высота контейнера
+  // Режим 2D/3D: наклон камеры + прямое переключение слоёв зданий.
+  // Раньше менялась только камера — над плоскими крышами «3D» выглядел
+  // сломанным; объём появлялся лишь после смены филиала (пересборка стиля).
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    map.resize()
+    threeDRef.current = threeD
+    const setVis = (id: string, visible: boolean) => {
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
+    }
+    setVis('buildings-flat', !threeD)
+    setVis('buildings-3d', threeD)
     map.easeTo({ pitch: threeD ? 52 : 0, bearing: threeD ? -22 : 0, duration: 700 })
     if (dimBtnRef.current) dimBtnRef.current.textContent = threeD ? '2D' : '3D'
   }, [threeD])
@@ -308,11 +328,13 @@ export default function BranchMap({ slug, lat, lon, city }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, lat, lon])
 
+  // Эргономичный формат ~16:10 (вместо растянутой полосы), одинаковый
+  // в 2D и 3D — при переключении камера наклоняется внутри той же рамки
   return (
     <div
       ref={boxRef}
-      className="h-full w-full transition-[height] duration-300"
-      style={{ background: '#F7FAF8', height: threeD ? 300 : 170 }}
+      className="w-full h-[260px] lg:h-[340px]"
+      style={{ background: '#F7FAF8' }}
     />
   )
 }

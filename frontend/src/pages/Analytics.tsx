@@ -5,6 +5,8 @@ import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import * as api from '../api'
 import type { BranchAnalytics } from '../types'
 import { Icon } from '../components/Icon'
+import PageHeader from '../components/PageHeader'
+import { Skeleton, SkeletonCard } from '../components/Skeleton'
 
 const riskLabels: Record<string, string> = {
   green: 'Норма',
@@ -46,19 +48,25 @@ export default function Analytics() {
       </div>
     )
   }
-  if (!data) return <div className="text-center font-bold text-teal-dark animate-pulse">Загрузка…</div>
+  if (!data) {
+    return (
+      <div className="flex flex-col gap-6" aria-busy>
+        <Skeleton w="42%" h={30} r={10} />
+        <div className="flex flex-wrap gap-4">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} w={190} h={110} r={16} />)}
+        </div>
+        <SkeletonCard lines={4} />
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="eyebrow">Статистика филиала</div>
-          <h1 className="mt-1" style={{ fontSize: 30, letterSpacing: '-0.02em' }}>
-            Аналитика {data.branch_city ? `· ${data.branch_city}` : ''}
-          </h1>
-        </div>
-        <Link to="/patients" className="btn btn-ghost">← К пациентам</Link>
-      </div>
+    <div className="flex flex-col gap-6 stagger">
+      <PageHeader
+        eyebrow="Статистика филиала"
+        title={<>Аналитика {data.branch_city ? `· ${data.branch_city}` : ''}</>}
+        actions={<Link to="/patients" className="btn btn-ghost"><Icon name="chevron-left" size={14} /> К пациентам</Link>}
+      />
 
       {/* Метрики */}
       <div className="flex flex-wrap gap-4">

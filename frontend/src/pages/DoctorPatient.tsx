@@ -13,6 +13,8 @@ import AvatarPatient from '../components/AvatarPatient'
 import { CardFormFields, CardView, defaultCardForm } from '../components/CardAnamnesis'
 import type { CardFormState } from '../components/CardAnamnesis'
 import RiskSystems from '../components/RiskSystems'
+import PageHeader from '../components/PageHeader'
+import { Skeleton, SkeletonCard, SkeletonRows } from '../components/Skeleton'
 import type { Measurement, MedCard, User, DoctorNote, Visit, VisitStatus } from '../types'
 
 const riskBadgeClass = {
@@ -505,7 +507,15 @@ export default function DoctorPatient() {
       </div>
     )
   }
-  if (!patient) return <div className="text-center font-extrabold text-teal-dark animate-pulse">Загрузка…</div>
+  if (!patient) {
+    return (
+      <div className="flex flex-col gap-6" aria-busy>
+        <Skeleton w="45%" h={30} r={10} />
+        <SkeletonCard lines={2} />
+        <SkeletonRows rows={4} />
+      </div>
+    )
+  }
 
   async function markSignal(aid: number) {
     try {
@@ -529,13 +539,13 @@ export default function DoctorPatient() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4 no-print">
-        <div>
-          <div className="eyebrow"><Link to="/patients" className="hover:underline">Пациенты</Link> · карточка</div>
-          <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>{patient.name || '(без имени)'}</h1>
-        </div>
-        <Link to="/patients" className="btn btn-ghost"><Icon name="chevron-left" size={14} /> К списку</Link>
+    <div className="flex flex-col gap-6 stagger">
+      <div className="no-print">
+        <PageHeader
+          eyebrow={<><Link to="/patients" className="hover:underline">Пациенты</Link> · карточка</>}
+          title={patient.name || '(без имени)'}
+          actions={<Link to="/patients" className="btn btn-ghost"><Icon name="chevron-left" size={14} /> К списку</Link>}
+        />
       </div>
 
       {/* Профиль: аватар + мета-строка */}

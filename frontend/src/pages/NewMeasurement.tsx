@@ -4,6 +4,8 @@ import * as api from '../api'
 import type { MeasurementInput } from '../api'
 import { Icon } from '../components/Icon'
 import type { IconName } from '../components/Icon'
+import PageHeader from '../components/PageHeader'
+import FlowTabs from '../components/FlowTabs'
 
 // Поле ввода одного показателя с нормой-подсказкой (cream-инпут Flip7)
 function Field(props: {
@@ -88,28 +90,22 @@ export default function NewMeasurement() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="mb-1">
-        <div className="eyebrow">Новые данные</div>
-        <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>Новый замер <Icon name="stethoscope" size={26} className="inline-block align-[-4px]" /></h1>
-        <p className="text-sm text-teal-dark/60 mt-1.5">
-          Заполните только то, что измерили — остальное можно пропустить.
-        </p>
-      </div>
+    <div className="flex flex-col gap-5 stagger">
+      <PageHeader
+        eyebrow="Новые данные"
+        title={<>Новый замер <Icon name="stethoscope" size={26} className="inline-block align-[-4px]" /></>}
+        sub="Заполните только то, что измерили — остальное можно пропустить."
+      />
 
       <form onSubmit={submit} className="flex flex-col gap-5">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-[#465a56] mr-1">Период дня:</span>
-          {(['morning', 'evening'] as const).map((pt) => (
-            <button
-              key={pt}
-              type="button"
-              onClick={() => setPeriod(pt)}
-              className={`btn btn-sm ${period === pt ? 'btn-gold' : 'btn-ghost'}`}
-            >
-              {pt === 'morning' ? 'Утро' : 'Вечер'}
-            </button>
-          ))}
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-semibold text-[#465a56]">Период дня:</span>
+          <FlowTabs
+            ariaLabel="Период дня"
+            items={[{ id: 'morning' as const, label: 'Утро' }, { id: 'evening' as const, label: 'Вечер' }]}
+            value={period}
+            onChange={setPeriod}
+          />
         </div>
         <section className="bg-white rounded-xl p-5 glow-soft">
           <div className="section-title mb-4">

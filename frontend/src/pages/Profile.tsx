@@ -6,6 +6,7 @@ import { useAuth } from '../auth'
 import * as api from '../api'
 import { Icon } from '../components/Icon'
 import BranchMap from '../components/BranchMap'
+import PageHeader from '../components/PageHeader'
 import type { Branch } from '../types'
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max)
@@ -134,11 +135,11 @@ export default function Profile() {
   }
 
   return (
-    <div className="flex flex-col gap-6 pb-2">
-      <div className="mb-1">
-        <div className="eyebrow">Настройки аккаунта</div>
-        <h1 className="text-4xl mt-1.5" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>Профиль <Icon name="profile" size={26} className="inline-block align-[-4px]" /></h1>
-      </div>
+    <div className="flex flex-col gap-6 pb-2 stagger">
+      <PageHeader
+        eyebrow="Настройки аккаунта"
+        title={<>Профиль <Icon name="profile" size={26} className="inline-block align-[-4px]" /></>}
+      />
 
       {/* Hero: кольцо заполненности + идентичность */}
       <section className="rounded-2xl bg-teal-dark text-white px-7 py-6 flex flex-wrap items-center gap-7">
@@ -343,44 +344,49 @@ export default function Profile() {
         )}
       </section>
 
-      {/* Филиал */}
+      {/* Филиал: карта и список городов в две колонки — формат 16:10 вместо
+          растянутой на всю ширину полосы */}
       <section className="bg-white rounded-2xl glow-soft p-6">
         <div className="flex items-baseline justify-between gap-3 mb-4">
           <h3 className="text-lg font-extrabold">Филиал</h3>
           <p className="text-xs font-bold text-[#8aa09c]">Для записи и результатов</p>
         </div>
 
-        {/* Локальная карта: тайлы с нашего сервера (offline), пин выбранного филиала */}
-        {branchCity && CITY_COORDS[branchCity] && CITY_SLUG[branchCity] ? (
-          <div className="relative rounded-xl overflow-hidden border border-[#e4ebe9] z-0 mb-4">
-            <BranchMap
-              slug={CITY_SLUG[branchCity]}
-              lat={CITY_COORDS[branchCity][0]}
-              lon={CITY_COORDS[branchCity][1]}
-              city={branchCity}
-            />
-            <span className="absolute right-3 top-3 z-[900] bg-teal-dark text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md">
-              {branchCity}
-            </span>
-            <a
-              href={`https://yandex.ru/maps/?pt=${CITY_COORDS[branchCity][1]},${CITY_COORDS[branchCity][0]}&z=15`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="absolute right-3 top-[52px] z-[900] bg-white/95 backdrop-blur text-teal-dark text-xs font-bold px-3 py-1.5 rounded-full shadow-md border border-[#e4ebe9] hover:bg-teal-bg transition-quick"
-            >
-              Яндекс.Карты
-            </a>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] items-stretch">
+          {/* Локальная карта: тайлы с нашего сервера (offline), пин выбранного филиала */}
+          <div className="relative rounded-xl overflow-hidden border border-[#e4ebe9] z-0">
+            {branchCity && CITY_COORDS[branchCity] && CITY_SLUG[branchCity] ? (
+              <>
+                <BranchMap
+                  slug={CITY_SLUG[branchCity]}
+                  lat={CITY_COORDS[branchCity][0]}
+                  lon={CITY_COORDS[branchCity][1]}
+                  city={branchCity}
+                />
+                <span className="absolute right-3 top-3 z-[900] bg-teal-dark text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md">
+                  {branchCity}
+                </span>
+                <a
+                  href={`https://yandex.ru/maps/?pt=${CITY_COORDS[branchCity][1]},${CITY_COORDS[branchCity][0]}&z=15`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute right-3 top-[52px] z-[900] bg-white/95 text-teal-dark text-xs font-bold px-3 py-1.5 rounded-full shadow-md border border-[#e4ebe9] hover:bg-teal-bg transition-quick"
+                >
+                  Яндекс.Карты
+                </a>
+              </>
+            ) : (
+              <div className="h-[260px] lg:h-[340px] grid place-items-center bg-[#f4f8f7]">
+                <p className="text-sm text-[#8aa09c] font-bold px-6 text-center">
+                  Выберите филиал — покажу его на карте
+                </p>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="h-[120px] rounded-xl bg-[#f4f8f7] grid place-items-center mb-4">
-            <p className="text-sm text-[#8aa09c] font-bold">
-              Выберите филиал — покажу его на карте
-            </p>
-          </div>
-        )}
 
-        <div role="radiogroup" aria-label="Выберите филиал"
-             className="grid gap-2 max-h-[190px] overflow-y-auto pr-1">
+          {/* Города: скролл-список рядом с картой, а не под ней */}
+          <div role="radiogroup" aria-label="Выберите филиал"
+               className="grid gap-2 content-start max-h-[240px] lg:max-h-[340px] overflow-y-auto pr-1 [scrollbar-width:thin]">
           {branches.map((b) => {
             const on = String(b.id) === branchId
             return (
@@ -408,6 +414,7 @@ export default function Profile() {
               </button>
             )
           })}
+          </div>
         </div>
       </section>
 
