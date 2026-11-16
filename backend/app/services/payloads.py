@@ -8,7 +8,6 @@ import json
 import sqlite3
 from typing import Optional
 
-
 # ---------- Общие SQL-заготовки ----------
 
 # Поля пациента, отдаваемые наружу (без password_hash и служебных колонок)

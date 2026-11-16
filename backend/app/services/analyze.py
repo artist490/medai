@@ -1,8 +1,8 @@
 """Оркестратор анализа: правила → риск → LLM-обогащение → готовый результат."""
 import sqlite3
 
-from . import rules
 from . import llm as llm_service
+from . import rules
 
 INDICATOR_FIELDS = (
     "systolic", "diastolic", "pulse", "temperature", "spo2",

@@ -7,7 +7,6 @@
 """
 import json
 
-
 # Тревожные ответы опросника МЗ (синхронно с ALARM_KEYS в AnamnesisSurvey.tsx)
 ALARM_SURVEY_KEYS = frozenset({
     "sym_chest_pain", "sym_sudden_weakness", "sym_sudden_numbness", "sym_vision_loss",

@@ -1,10 +1,10 @@
 """Авторизация: pbkdf2-хэши паролей и bearer-токены сессий."""
 import hashlib
 import secrets
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import sqlite3
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 

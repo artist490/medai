@@ -9,12 +9,12 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config
 from .database import init_db
-from .routers import auth as auth_router
 from .routers import analytics as analytics_router
+from .routers import auth as auth_router
 from .routers import chat as chat_router
+from .routers import doctor as doctor_router
 from .routers import documents as documents_router
 from .routers import goals as goals_router
-from .routers import doctor as doctor_router
 from .routers import measurements as measurements_router
 from .routers import medcard as medcard_router
 from .routers import stats as stats_router

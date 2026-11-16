@@ -1,11 +1,10 @@
 """Роутер авторизации и профиля."""
 import sqlite3
 import time
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-
-from datetime import datetime, timezone
 
 from .. import auth
 from ..database import db_session, get_db
