@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from app import config, database
 from app.main import app
+from app.services import chat_agent
 
 
 @pytest.fixture()
@@ -245,3 +246,25 @@ class TestChatAgent:
         resp = client.post("/api/chat/send", json={"message": "моё первое"},
                            headers=_auth(other))
         assert resp.status_code == 200
+
+    def test_offtopic_rule_in_system_prompt(self, client, monkeypatch):
+        """Посторонние темы: ассистенту жёстко предписано отвечать только
+        по здоровью/медицине — правило должно быть в системном промпте,
+        а отказ модели доходит пациенту без изменений."""
+        refusal = ("Я ассистент здоровья и обсуждаю только вопросы здоровья. "
+                   "Расскажите, какие показатели вас беспокоят?")
+        mock = _MockLLM([{"content": refusal}])
+        monkeypatch.setattr("app.services.chat_agent.llm_service.chat_completion", mock)
+
+        p = _register(client, "p10@test.ru")
+        resp = client.post("/api/chat/send", json={"message": "Напиши код на Python"},
+                           headers=_auth(p))
+        assert resp.status_code == 200
+        assert resp.json()["reply"] == refusal
+
+        # Правило об ограничении тем — в системном промпте (и у пациента, и у врача)
+        system = mock.calls[0]["messages"][0]["content"]
+        assert "ТОЛЬКО темы здоровья и медицины" in system
+        assert "вежливо откажись" in system
+        for prompt in (chat_agent.SYSTEM_PROMPT_PATIENT, chat_agent.SYSTEM_PROMPT_DOCTOR):
+            assert "ТОЛЬКО темы здоровья и медицины" in prompt
