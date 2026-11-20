@@ -268,3 +268,151 @@ class TestChatAgent:
         assert "вежливо откажись" in system
         for prompt in (chat_agent.SYSTEM_PROMPT_PATIENT, chat_agent.SYSTEM_PROMPT_DOCTOR):
             assert "ТОЛЬКО темы здоровья и медицины" in prompt
+
+
+class TestPatientToolsExtended:
+    """Уровень 1: ассистент пациента видит свою медкарту, приёмы, заметки
+    врача, цели и документы — данные уже в БД, но инструментов не было."""
+
+    def test_my_medcard(self, client, monkeypatch):
+        p = _register(client, "mc1@test.ru")
+        client.put("/api/medcard", json={"blood_type": "II Rh+", "allergies": "пенициллин"},
+                   headers=_auth(p))
+        from app.database import connect
+        db = connect()
+        user_row = db.execute("SELECT * FROM users WHERE email = ?", ("mc1@test.ru",)).fetchone()
+        result = json.loads(chat_agent._my_medcard(db, user_row, {}))
+        db.close()
+        assert result["blood_type"] == "II Rh+"
+        assert "пенициллин" in result["allergies"]
+
+    def test_my_medcard_empty_is_honest(self, client):
+        p = _register(client, "mc2@test.ru")
+        from app.database import connect
+        db = connect()
+        user_row = db.execute("SELECT * FROM users WHERE email = ?", ("mc2@test.ru",)).fetchone()
+        result = json.loads(chat_agent._my_medcard(db, user_row, {}))
+        db.close()
+        assert "error" in result
+        assert "медкарта не заполнена" in result["error"].lower()
+
+    def test_my_visits(self, client):
+        p = _register(client, "v1@test.ru")
+        client.post("/api/visits", json={"visit_date": "2026-12-01", "reason": "Давление",
+                                        "complaints": "Болит голова"}, headers=_auth(p))
+        from app.database import connect
+        db = connect()
+        user_row = db.execute("SELECT * FROM users WHERE email = ?", ("v1@test.ru",)).fetchone()
+        rows = json.loads(chat_agent._my_visits(db, user_row, {}))
+        db.close()
+        assert len(rows) == 1
+        assert rows[0]["reason"] == "Давление"
+
+    def test_doctor_notes_for_my_analyses(self, client):
+        p = _register(client, "n1@test.ru")
+        client.post("/api/measurements", json={"systolic": 185, "diastolic": 115}, headers=_auth(p))
+        from app.database import connect
+        db = connect()
+        user_row = db.execute("SELECT * FROM users WHERE email = ?", ("n1@test.ru",)).fetchone()
+        analysis = db.execute("SELECT id FROM analyses WHERE user_id = ?",
+                              (user_row["id"],)).fetchone()
+        db.execute("""INSERT INTO doctor_notes (analysis_id, doctor_id, doctor_name, text)
+                      VALUES (?, ?, ?, ?)""",
+                   (analysis["id"], user_row["id"], "Доктор Тест", "Следите за давлением"))
+        db.commit()
+        rows = json.loads(chat_agent._doctor_notes(db, user_row, {}))
+        db.close()
+        assert len(rows) == 1
+        assert "Следите за давлением" in rows[0]["text"]
+
+    def test_my_goals(self, client):
+        p = _register(client, "g1@test.ru")
+        client.put("/api/goals", json={"steps": 8000, "sleep": 8}, headers=_auth(p))
+        from app.database import connect
+        db = connect()
+        user_row = db.execute("SELECT * FROM users WHERE email = ?", ("g1@test.ru",)).fetchone()
+        result = json.loads(chat_agent._my_goals(db, user_row, {}))
+        db.close()
+        assert result["steps"] == 8000
+        assert result["sleep"] == 8
+
+    def test_my_documents_metadata_only(self, client):
+        """Документы: только метаданные, содержимое файла модели не отдаём."""
+        p = _register(client, "d1@test.ru")
+        from app.database import connect
+        db = connect()
+        user_row = db.execute("SELECT * FROM users WHERE email = ?", ("d1@test.ru",)).fetchone()
+        db.execute("""INSERT INTO documents (user_id, title, filename, mime, size, data)
+                      VALUES (?, ?, ?, ?, ?, ?)""",
+                   (user_row["id"], "МРТ головы", "mrt.pdf", "application/pdf", 1024, b"x" * 1024))
+        db.commit()
+        rows = json.loads(chat_agent._my_documents(db, user_row, {}))
+        db.close()
+        assert len(rows) == 1
+        assert rows[0]["title"] == "МРТ головы"
+        assert "data" not in rows[0]
+
+    def test_search_measurements_by_period(self, client):
+        p = _register(client, "s1@test.ru")
+        client.post("/api/measurements", json={"pulse": 70}, headers=_auth(p))
+        from app.database import connect
+        db = connect()
+        user_row = db.execute("SELECT * FROM users WHERE email = ?", ("s1@test.ru",)).fetchone()
+        found = json.loads(chat_agent._search_measurements(
+            db, user_row, {"date_from": "2020-01-01", "date_to": "2099-12-31"}))
+        missed = json.loads(chat_agent._search_measurements(
+            db, user_row, {"date_from": "1990-01-01", "date_to": "1990-12-31"}))
+        db.close()
+        assert len(found) == 1
+        assert missed == []
+
+
+class TestDoctorToolsExtended:
+    def test_patient_visits_for_doctor(self, client):
+        branches = client.get("/api/auth/branches").json()["items"]
+        vrn = next(b for b in branches if b["city"] == "Воронеж")["id"]
+        doc = _doctor(client, "dv@test.ru", branch_id=vrn)
+        pat = _register(client, "pv1@test.ru", branch_id=vrn)
+        client.post("/api/visits", json={"visit_date": "2026-12-01", "reason": "Осмотр",
+                                        "complaints": "Кашель"}, headers=_auth(pat))
+        from app.database import connect
+        db = connect()
+        doc_row = db.execute("SELECT * FROM users WHERE email = ?", ("dv@test.ru",)).fetchone()
+        rows = json.loads(chat_agent._exec_patient_visits(
+            db, doc_row, {"patient_id": pat["user"]["id"]}))
+        db.close()
+        assert len(rows) == 1
+        assert rows[0]["reason"] == "Осмотр"
+
+    def test_other_branch_patient_blocked(self, client):
+        branches = client.get("/api/auth/branches").json()["items"]
+        vrn = next(b for b in branches if b["city"] == "Воронеж")["id"]
+        bld = next(b for b in branches if b["city"] == "Белгород")["id"]
+        doc = _doctor(client, "dv2@test.ru", branch_id=vrn)
+        foreign = _register(client, "pbg1@test.ru", branch_id=bld)
+        from app.database import connect
+        db = connect()
+        doc_row = db.execute("SELECT * FROM users WHERE email = ?", ("dv2@test.ru",)).fetchone()
+        result = json.loads(chat_agent._exec_patient_visits(
+            db, doc_row, {"patient_id": foreign["user"]["id"]}))
+        db.close()
+        assert "error" in result
+
+    def test_patients_needing_attention(self, client):
+        branches = client.get("/api/auth/branches").json()["items"]
+        vrn = next(b for b in branches if b["city"] == "Воронеж")["id"]
+        doc = _doctor(client, "dv3@test.ru", branch_id=vrn)
+        bad = _register(client, "bad1@test.ru", branch_id=vrn)
+        good = _register(client, "good1@test.ru", branch_id=vrn)
+        client.post("/api/measurements", json={"systolic": 190, "diastolic": 120},
+                    headers=_auth(bad))
+        client.post("/api/measurements", json={"pulse": 70}, headers=_auth(good))
+        from app.database import connect
+        db = connect()
+        doc_row = db.execute("SELECT * FROM users WHERE email = ?", ("dv3@test.ru",)).fetchone()
+        rows = json.loads(chat_agent._exec_patients_needing_attention(db, doc_row, {"days": 30}))
+        db.close()
+        ids = [r["patient_id"] for r in rows]
+        assert bad["user"]["id"] in ids
+        assert good["user"]["id"] not in ids
+

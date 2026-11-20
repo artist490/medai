@@ -75,6 +75,43 @@ PATIENT_TOOLS = [
             "limit": {"type": "integer", "description": "Сколько записей, 1–50", "default": 20},
         }, "required": []},
     }},
+    {"type": "function", "function": {
+        "name": "get_my_medcard",
+        "description": "Своя медкарта: группа крови, аллергии, хронические заболевания, "
+                       "постоянные лекарства, операции, курение, алкоголь, активность",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "get_my_visits",
+        "description": "Свои приёмы: дата, цель визита, жалобы, статус, заключение и "
+                       "рекомендации врача по завершённым приёмам",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "get_doctor_notes",
+        "description": "Заметки врача к вашим разборам: кто, когда, текст и уровень риска",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "get_my_goals",
+        "description": "Ваши личные цели: шаги в день, часы сна, вода в мл, целевой вес",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "list_my_documents",
+        "description": "Загруженные документы: название, тип файла, размер, дата загрузки "
+                       "(без содержимого)",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "search_measurements",
+        "description": "Замеры за произвольный период по датам (в отличие от "
+                       "get_recent_measurements, который берёт последние N)",
+        "parameters": {"type": "object", "properties": {
+            "date_from": {"type": "string", "description": "Начало периода, YYYY-MM-DD"},
+            "date_to": {"type": "string", "description": "Конец периода, YYYY-MM-DD"},
+        }, "required": ["date_from"]},
+    }},
 ]
 
 DOCTOR_TOOLS = [
@@ -104,6 +141,28 @@ DOCTOR_TOOLS = [
         "parameters": {"type": "object", "properties": {
             "patient_id": {"type": "integer", "description": "ID пациента из get_patients_overview"},
         }, "required": ["patient_id"]},
+    }},
+    {"type": "function", "function": {
+        "name": "get_patient_visits",
+        "description": "Приёмы пациента: жалобы, заключения и рекомендации врача",
+        "parameters": {"type": "object", "properties": {
+            "patient_id": {"type": "integer", "description": "ID пациента из get_patients_overview"},
+        }, "required": ["patient_id"]},
+    }},
+    {"type": "function", "function": {
+        "name": "get_patient_documents",
+        "description": "Документы пациента: название, тип, размер, дата загрузки (без содержимого)",
+        "parameters": {"type": "object", "properties": {
+            "patient_id": {"type": "integer", "description": "ID пациента из get_patients_overview"},
+        }, "required": ["patient_id"]},
+    }},
+    {"type": "function", "function": {
+        "name": "get_patients_needing_attention",
+        "description": "Пациенты филиала с тревожным (red) или пограничным (yellow) разбором "
+                       "за период; помечает непрочитанные красные флаги",
+        "parameters": {"type": "object", "properties": {
+            "days": {"type": "integer", "description": "Период в днях, 1–365", "default": 30},
+        }, "required": []},
     }},
 ]
 
@@ -163,7 +222,7 @@ def _stats_summary(db: sqlite3.Connection, user_id: int, args: dict) -> str:
                   ROUND(AVG(water_ml)) AS avg_water_ml,
                   ROUND(AVG(weight_kg), 1) AS avg_weight_kg
            FROM measurements
-           WHERE user_id = ? AND date(recorded_at) >= date('now', ?)""",
+           WHERE user_id = ? AND date(recorded_at) >= date('now', 'localtime', ?)""",
         (user_id, f"-{days} days"),
     ).fetchone()
     return json.dumps({"period_days": days, **dict(row)}, ensure_ascii=False)
@@ -189,12 +248,78 @@ def _doctor_guard(db: sqlite3.Connection, doctor: sqlite3.Row, patient_id: int) 
     ).fetchone()
 
 
+def _my_medcard(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
+    row = db.execute("SELECT * FROM patient_cards WHERE user_id = ?", (user["id"],)).fetchone()
+    if row is None:
+        return json.dumps({"error": "медкарта не заполнена"}, ensure_ascii=False)
+    return json.dumps(dict(row), ensure_ascii=False)
+
+
+def _my_visits(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
+    rows = db.execute(
+        """SELECT visit_date, reason, complaints, status, conclusion, recommendations
+           FROM visits WHERE patient_id = ?
+           ORDER BY CASE status WHEN 'planned' THEN 0 ELSE 1 END, id DESC LIMIT 20""",
+        (user["id"],),
+    ).fetchall()
+    return _rows_to_json(rows)
+
+
+def _doctor_notes(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
+    rows = db.execute(
+        """SELECT n.doctor_name, n.text, n.created_at, a.risk_level
+           FROM doctor_notes n
+           JOIN analyses a ON a.id = n.analysis_id
+           WHERE a.user_id = ? ORDER BY n.id DESC LIMIT 20""",
+        (user["id"],),
+    ).fetchall()
+    return _rows_to_json(rows)
+
+
+def _my_goals(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
+    row = db.execute("SELECT steps, sleep, water, weight FROM goals WHERE user_id = ?",
+                     (user["id"],)).fetchone()
+    if row is None:
+        return json.dumps({"error": "цели не заданы"}, ensure_ascii=False)
+    return json.dumps(dict(row), ensure_ascii=False)
+
+
+def _my_documents(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
+    # Только метаданные: содержимое файла модели не передаём
+    rows = db.execute(
+        """SELECT id, title, filename, mime, size, uploaded_at
+           FROM documents WHERE user_id = ? ORDER BY id DESC LIMIT 50""",
+        (user["id"],),
+    ).fetchall()
+    return _rows_to_json(rows)
+
+
+def _search_measurements(db: sqlite3.Connection, user: sqlite3.Row, args: dict) -> str:
+    date_from = str(args.get("date_from") or "1970-01-01")
+    date_to = str(args.get("date_to") or "2999-12-31")
+    rows = db.execute(
+        """SELECT recorded_at, systolic, diastolic, pulse, temperature, spo2,
+                  sleep_hours, steps, water_ml, weight_kg
+           FROM measurements
+           WHERE user_id = ? AND date(recorded_at) BETWEEN date(?) AND date(?)
+           ORDER BY recorded_at DESC, id DESC LIMIT 50""",
+        (user["id"], date_from, date_to),
+    ).fetchall()
+    return _rows_to_json(rows)
+
+
 PATIENT_EXECUTORS: dict[str, Callable] = {
     "get_profile": lambda db, user, args: _get_profile(db, user, args),
     "get_recent_measurements": lambda db, user, args: _recent_measurements(db, user["id"], args),
     "get_last_analysis": lambda db, user, args: _last_analysis(db, user["id"], args),
     "get_stats_summary": lambda db, user, args: _stats_summary(db, user["id"], args),
     "get_risk_history": lambda db, user, args: _risk_history(db, user["id"], args),
+    "get_my_medcard": _my_medcard,
+    "get_my_visits": _my_visits,
+    "get_doctor_notes": _doctor_notes,
+    "get_my_goals": _my_goals,
+    "list_my_documents": _my_documents,
+    "search_measurements": _search_measurements,
 }
 
 
@@ -241,11 +366,74 @@ def _exec_patient_medcard(db: sqlite3.Connection, doctor: sqlite3.Row, args: dic
     return json.dumps(dict(row), ensure_ascii=False)
 
 
+def _exec_patient_visits(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
+    patient = _doctor_guard(db, doctor, int(args.get("patient_id") or 0))
+    if patient is None:
+        return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
+    rows = db.execute(
+        """SELECT visit_date, reason, complaints, status, conclusion,
+                  recommendations, created_at
+           FROM visits WHERE patient_id = ?
+           ORDER BY CASE status WHEN 'planned' THEN 0 ELSE 1 END, id DESC LIMIT 20""",
+        (patient["id"],),
+    ).fetchall()
+    return _rows_to_json(rows)
+
+
+def _exec_patient_documents(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
+    patient = _doctor_guard(db, doctor, int(args.get("patient_id") or 0))
+    if patient is None:
+        return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
+    rows = db.execute(
+        """SELECT id, title, filename, mime, size, uploaded_at
+           FROM documents WHERE user_id = ? ORDER BY id DESC LIMIT 50""",
+        (patient["id"],),
+    ).fetchall()
+    return _rows_to_json(rows)
+
+
+def _exec_patients_needing_attention(db: sqlite3.Connection, doctor: sqlite3.Row,
+                                     args: dict) -> str:
+    """Пациенты филиала с тревожным разбором за период (или непрочитанным
+    красным флагом). Врач видит только свой филиал — как в /api/doctor/signals."""
+    days = max(1, min(365, int(args.get("days") or 30)))
+    rows = db.execute(
+        """SELECT u.id AS patient_id, u.name AS patient_name,
+                  m.recorded_at, a.risk_level, a.findings,
+                  a.doctor_seen_at IS NULL AS unseen
+           FROM analyses a
+           JOIN measurements m ON m.id = a.measurement_id
+           JOIN users u ON u.id = m.user_id
+           WHERE u.role = 'patient' AND u.branch_id IS ?
+             AND a.risk_level IN ('red', 'yellow')
+             AND date(m.recorded_at) >= date('now', 'localtime', ?)
+           ORDER BY CASE a.risk_level WHEN 'red' THEN 0 ELSE 1 END,
+                    m.recorded_at DESC, m.id DESC LIMIT 50""",
+        (doctor["branch_id"], f"-{days} days"),
+    ).fetchall()
+    items = []
+    for r in rows:
+        findings = json.loads(r["findings"] or "[]")
+        top = next((f for f in findings if f.get("status") == "alarm"), None)
+        items.append({
+            "patient_id": r["patient_id"],
+            "patient_name": r["patient_name"],
+            "recorded_at": r["recorded_at"],
+            "risk_level": r["risk_level"],
+            "unseen": bool(r["unseen"]),
+            "summary": f"{top['label']}: {top['value']}" if top else "",
+        })
+    return json.dumps(items, ensure_ascii=False)
+
+
 DOCTOR_EXECUTORS: dict[str, Callable] = {
     "get_patients_overview": _exec_patients_overview,
     "get_patient_measurements": _exec_patient_measurements,
     "get_patient_last_analysis": _exec_patient_last_analysis,
     "get_patient_medcard": _exec_patient_medcard,
+    "get_patient_visits": _exec_patient_visits,
+    "get_patient_documents": _exec_patient_documents,
+    "get_patients_needing_attention": _exec_patients_needing_attention,
 }
 
 # ---------- Агентный цикл ----------
