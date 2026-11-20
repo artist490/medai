@@ -51,6 +51,7 @@ export default function GoalsEditor({ goals, onSaved }: {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
+      <h2 className="text-lg">Мои цели</h2>
       <div className="grid sm:grid-cols-2 gap-3">
         {field('Шаги в день', 'steps', 'шагов, например 8000')}
         {field('Сон', 'sleep', 'часов, например 8')}

@@ -26,7 +26,7 @@ export default function VisitCard({ visit, onChanged }: { visit: Visit; onChange
           {visit.visit_date ? `на ${fmtDate(visit.visit_date)} · ` : ''}запись от {fmtDate(visit.created_at)}
         </span>
       </div>
-      {visit.reason && <div className="text-sm font-extrabold text-teal-dark mt-1.5">{visit.reason}</div>}
+      {visit.reason && <div className="text-sm font-extrabold text-[#1b2622] mt-1.5">{visit.reason}</div>}
       <p className="text-sm text-teal-dark/90 mt-1 whitespace-pre-wrap">{visit.complaints}</p>
 
       {visit.status === 'completed' && visit.conclusion && (

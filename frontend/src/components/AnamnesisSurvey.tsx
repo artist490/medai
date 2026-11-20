@@ -368,7 +368,7 @@ export default function AnamnesisSurvey({ initial, onSaved, onCancel }: {
       </div>
 
       <div className="flip-hint">
-        Ответы не являются диагнозом — их увидит врач вашего филиала перед приёмом.
+        Ответы не являются диагнозом. Их увидит врач вашего филиала перед приёмом.
       </div>
     </div>
   )

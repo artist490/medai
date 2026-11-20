@@ -41,10 +41,13 @@ function Home() {
 }
 
 export default function App() {
+  // На входе и регистрации аурора ярче: кроме одной карточки размывать нечего
+  const { pathname } = useLocation()
+  const onAuth = pathname === '/login' || pathname === '/register'
   return (
     <>
       {/* Анимированный градиентный фон: медленно дрейфующие мягкие пятна */}
-      <div className="bg-aurora" aria-hidden>
+      <div className={`bg-aurora${onAuth ? ' bg-aurora--auth' : ''}`} aria-hidden>
         <span className="b1" />
         <span className="b2" />
         <span className="b3" />

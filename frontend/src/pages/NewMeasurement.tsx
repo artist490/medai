@@ -92,9 +92,8 @@ export default function NewMeasurement() {
   return (
     <div className="flex flex-col gap-5 stagger">
       <PageHeader
-        eyebrow="Новые данные"
         title={<>Новый замер <Icon name="stethoscope" size={26} className="inline-block align-[-4px]" /></>}
-        sub="Заполните только то, что измерили — остальное можно пропустить."
+        sub="Заполните только то, что измерили. Остальное можно пропустить."
       />
 
       <form onSubmit={submit} className="flex flex-col gap-5">

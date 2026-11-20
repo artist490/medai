@@ -46,7 +46,6 @@ export default function Result() {
 
       {/* Hero */}
       <PageHeader
-        eyebrow="Результат анализа"
         title="Разбор замера"
         sub={`Анализ от ${a.created_at.slice(0, 16)}`}
         actions={
@@ -150,7 +149,7 @@ export default function Result() {
       <Disclaimer urgent={a.risk_level === 'red'} phone={user?.branch?.phone} />
 
       <p className="text-center text-xs text-teal-dark/50 font-bold">
-        Источник анализа: {a.source === 'rules+llm' ? 'база правил + языковая модель' : 'база правил'} · история — во вкладке «История»
+        Источник анализа: {a.source === 'rules+llm' ? 'база правил + языковая модель' : 'база правил'} · история во вкладке «История»
       </p>
     </div>
   )

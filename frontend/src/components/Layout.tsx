@@ -280,7 +280,7 @@ export default function Layout() {
                 <span className="relative">
                   <Icon name="alarm" size={19} />
                   {signalCount > 0 && (
-                    <span className="absolute -top-1.5 -right-2 bg-coral text-white text-[9px] font-bold rounded-full px-[5px]">
+                    <span className="absolute -top-1.5 -right-2 bg-coral text-white text-[9px] font-bold rounded-full px-[6px]">
                       {signalCount}
                     </span>
                   )}

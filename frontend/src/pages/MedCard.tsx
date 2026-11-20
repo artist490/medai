@@ -119,7 +119,6 @@ export default function MedCard() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow="Личная медицинская информация"
         title={<>Медкарта <Icon name="care" size={26} className="inline-block align-[-4px]" /></>}
         actions={<button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Печать карты</button>}
       />
@@ -184,7 +183,7 @@ export default function MedCard() {
                     <VisitCard visit={visit} onChanged={(v) => setVisits((prev) => prev.map((x) => (x.id === v.id ? v : x)))} />
                     {visit.status === 'planned' && !showVisitForm && (
                       <button
-                        className="text-xs font-extrabold text-teal hover:text-teal-light mt-1 ml-1"
+                        className="text-xs font-extrabold text-teal-dark hover:text-teal-dark/80 mt-1 ml-1 min-h-[32px] inline-flex items-center"
                         onClick={() => startEdit(visit)}
                       >
                         Изменить жалобу или дату

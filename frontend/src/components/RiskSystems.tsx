@@ -118,8 +118,7 @@ export default function RiskSystems({ items, survey, onBook }: {
         {risks.map((r) => {
           const meta = r.status ? STATUS_META[r.status] : null
           return (
-            <div key={r.def.key} className={`border rounded-xl p-3.5 ${meta ? '' : 'opacity-55'}`}
-                 style={{ borderColor: meta ? meta.color + '55' : 'var(--color-line)' }}>
+            <div key={r.def.key} className={`border border-[#e9efed] rounded-xl p-3.5 ${meta ? '' : 'opacity-55'}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-extrabold text-teal-dark">{r.def.label}</span>
                 {meta ? (
@@ -132,24 +131,16 @@ export default function RiskSystems({ items, survey, onBook }: {
                 )}
               </div>
               {(r.findings.length > 0 || r.surveyFlags.length > 0) && (
-                <div className="flex flex-wrap gap-1.5 mt-2.5">
-                  {r.findings.map((f) => {
-                    const fm = STATUS_META[f.status]
-                    return (
-                      <span key={f.key}
-                            className="text-[11px] font-bold px-2 py-0.5 rounded-md"
-                            style={{ background: fm.color + '14', color: fm.color }}
-                            title={f.message}>
-                        {f.label}: {f.value} {f.unit}
-                      </span>
-                    )
-                  })}
+                <div className="mt-2.5 flex flex-col gap-1">
+                  {r.findings.map((f) => (
+                    <div key={f.key} className="text-xs text-[#465a56]" title={f.message}>
+                      {f.label}: <span className="font-semibold text-[#1b2622]">{f.value} {f.unit}</span>
+                    </div>
+                  ))}
                   {r.surveyFlags.map((flag) => (
-                    <span key={flag}
-                          className="text-[11px] font-bold px-2 py-0.5 rounded-md border border-[#e5e7eb] text-teal-dark/70"
-                          title="Из опросника Минздрава">
+                    <div key={flag} className="text-xs text-teal-dark/60" title="Из опросника Минздрава">
                       из анкеты: {flag}
-                    </span>
+                    </div>
                   ))}
                 </div>
               )}

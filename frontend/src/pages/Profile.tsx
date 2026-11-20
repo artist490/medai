@@ -137,7 +137,6 @@ export default function Profile() {
   return (
     <div className="flex flex-col gap-6 pb-2 stagger">
       <PageHeader
-        eyebrow="Настройки аккаунта"
         title={<>Профиль <Icon name="profile" size={26} className="inline-block align-[-4px]" /></>}
       />
 
@@ -175,7 +174,7 @@ export default function Profile() {
 
         <div className="flex items-center gap-3.5">
           <span className="w-14 h-14 rounded-full grid place-items-center font-extrabold text-lg shrink-0"
-                style={{ background: 'linear-gradient(140deg,#1B8A7D,#0E6A61)', color: '#EAF6F3' }} aria-hidden>
+                style={{ background: '#0E6A61', color: '#EAF6F3' }} aria-hidden>
             {initials(name || user?.email || '')}
           </span>
           <div className="text-sm">
@@ -196,7 +195,7 @@ export default function Profile() {
           <div className="flex flex-col gap-5">
             <div>
               <label className="flip-label" htmlFor="p-name">Имя</label>
-              <input id="p-name" className="flip-input" placeholder="Ваше имя"
+              <input id="p-name" className="flip-input"
                      value={name} onChange={(e) => setName(e.target.value)} />
             </div>
 
@@ -271,20 +270,20 @@ export default function Profile() {
           </div>
 
           {/* Ростомер */}
-          <div className="mt-5 h-[64px] relative flex items-end gap-[3px] px-1" aria-hidden>
+          <div className="mt-5 h-[64px] relative flex items-end gap-[4px] px-1" aria-hidden>
             {Array.from({ length: 40 }).map((_, i) => {
               const share = height > 0 ? (height - 50) / 200 : 0
               return (
                 <span
                   key={i}
-                  className={`flex-1 rounded-sm transition-all duration-200 ${i % 5 === 0 ? 'h-[60%]' : 'h-[30%]'} ${
+                  className={`flex-1 rounded-sm transition-colors duration-200 ${i % 5 === 0 ? 'h-[60%]' : 'h-[30%]'} ${
                     height > 0 && i < Math.round(share * 40) ? 'bg-teal' : 'bg-[#dbe6e3]'
                   }`}
                 />
               )
             })}
             <span
-              className="absolute -top-1 w-[2px] h-[74px] bg-[#1b2622] transition-all duration-300"
+              className="absolute -top-1 w-[2px] h-[74px] bg-[#1b2622] transition-[left] duration-300"
               style={{ left: `${height > 0 ? ((height - 50) / 200) * 100 : 0}%` }}
             />
           </div>
@@ -330,7 +329,7 @@ export default function Profile() {
             <div className="mt-6 relative" aria-hidden>
               <div className="h-2.5 rounded-full"
                    style={{ background: 'linear-gradient(90deg,#8DB7D9 0%,#6FD3C2 30%,#6FD3C2 52%,#E8B964 72%,#D9803F 100%)' }} />
-              <span className="absolute -top-[7px] w-[22px] h-[22px] rounded-full bg-white border-4 border-[#1b2622] transition-all duration-500"
+              <span className="absolute -top-[7px] w-[22px] h-[22px] rounded-full bg-white border-4 border-[#1b2622] transition-[left] duration-500"
                     style={{ left: `${clamp((bmi - 16) / 19, 0, 1) * 100}%`, transform: 'translateX(-50%)' }} />
             </div>
             <div className="flex justify-between text-xs text-[#8aa09c] mt-2" aria-hidden>

@@ -86,7 +86,6 @@ export default function DoctorPatients() {
   return (
     <div className="flex flex-col gap-6 stagger">
       <PageHeader
-        eyebrow="Кабинет врача"
         title={user?.branch ? `Пациенты · ${user.branch.city}` : 'Пациенты клиники'}
       />
 

@@ -38,7 +38,7 @@ function humanTime(iso: string): string {
 
 function Chart({ title, subtitle, icon, data, series }: {
   title: string
-  subtitle: string
+  subtitle?: string
   icon: IconName
   data: Array<Record<string, unknown>>
   series: Array<{ key: string; name: string; color: string }>
@@ -51,7 +51,7 @@ function Chart({ title, subtitle, icon, data, series }: {
           <h2 className="text-xl flex items-center gap-2.5">
             <span className="emoji-box"><Icon name={icon} size={20} /></span> {title}
           </h2>
-          <p className="text-sm text-teal-dark/60 mt-0.5">{subtitle}</p>
+          {subtitle && <p className="text-sm text-teal-dark/60 mt-0.5">{subtitle}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           {series.map((s) => (
@@ -121,29 +121,28 @@ export default function MeasurementsHistory() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="eyebrow">Замеры и динамика</div>
           {query && <p className="text-xs text-[#8aa09c] mt-0.5">Поиск: «{query}»</p>}
         </div>
         <Link to="/new" className="btn btn-gold btn-sm">Новый замер</Link>
       </div>
 
-      <Chart title="Давление, мм рт. ст." subtitle="Систолическое и диастолическое" icon="pressure"
+      <Chart title="Давление, мм рт. ст." icon="pressure"
              data={chartData}
              series={[{ key: 'systolic', name: 'Систолическое', color: '#EF6C4A' },
                       { key: 'diastolic', name: 'Диастолическое', color: '#2BA8A2' }]} />
-      <Chart title="Пульс, уд/мин" subtitle="Частота сердечных сокращений" icon="pulse"
+      <Chart title="Пульс, уд/мин" icon="pulse"
              data={chartData}
              series={[{ key: 'pulse', name: 'Пульс', color: '#E74C3C' }]} />
-      <Chart title="Вес" subtitle="Изменение массы тела" icon="scale"
+      <Chart title="Вес" icon="scale"
              data={chartData}
              series={[{ key: 'weight_kg', name: 'Вес, кг', color: '#5DADE2' }]} />
       <Chart title="ИМТ" subtitle="Индекс массы тела, норма 18.5–24.9" icon="scale"
              data={bmiData}
              series={[{ key: 'bmi', name: 'ИМТ', color: '#FFD23F' }]} />
-      <Chart title="Сон, часы" subtitle="Продолжительность сна" icon="sleep"
+      <Chart title="Сон, часы" icon="sleep"
              data={chartData}
              series={[{ key: 'sleep_hours', name: 'Сон', color: '#2BA8A2' }]} />
-      <Chart title="Активность и вода" subtitle="Шаги за день и выпитая вода" icon="steps"
+      <Chart title="Активность и вода" icon="steps"
              data={chartData}
              series={[{ key: 'steps', name: 'Шаги', color: '#27AE60' },
                       { key: 'water_ml', name: 'Вода, мл', color: '#5DADE2' }]} />
@@ -166,7 +165,7 @@ export default function MeasurementsHistory() {
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={3} className="text-center text-sm text-teal-dark/60 py-8">
-                    {query ? `Ничего не найдено по «${query}»` : (<span className="inline-flex items-center gap-1">Замеров пока нет — сделайте первый во вкладке «Замер» <Icon name="stethoscope" size={14} /></span>)}
+                    {query ? `Ничего не найдено по «${query}»` : (<span className="inline-flex items-center gap-1">Замеров пока нет. Сделайте первый во вкладке «Замер» <Icon name="stethoscope" size={14} /></span>)}
                   </td>
                 </tr>
               )}

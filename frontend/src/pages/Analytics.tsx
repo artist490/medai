@@ -63,7 +63,6 @@ export default function Analytics() {
   return (
     <div className="flex flex-col gap-6 stagger">
       <PageHeader
-        eyebrow="Статистика филиала"
         title={<>Аналитика {data.branch_city ? `· ${data.branch_city}` : ''}</>}
         actions={<Link to="/patients" className="btn btn-ghost"><Icon name="chevron-left" size={14} /> К пациентам</Link>}
       />

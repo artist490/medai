@@ -20,7 +20,7 @@ export default function BookingMenu({ reason, onAppBooking, onClose }: {
         <div>
           <div className="text-sm font-extrabold text-teal-dark">Записаться: {reason}</div>
           <div className="text-xs font-bold text-teal-dark/55 mt-0.5">
-            Выберите удобный способ — запись ведёт к врачу «Спектр-Диагностики»
+            Выберите удобный способ. Запись ведёт к врачу «Спектр-Диагностики»
           </div>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Закрыть"><Icon name="close" size={15} /></button>
@@ -32,7 +32,7 @@ export default function BookingMenu({ reason, onAppBooking, onClose }: {
         <span className="min-w-0">
           <span className="block text-sm font-extrabold text-teal-dark">Онлайн-запись на сайте клиники</span>
           <span className="block text-xs font-bold text-teal-dark/55">
-            {branch ? `${branch.city} · ` : ''}откроется spdmed.ru — выберите врача и время
+            {branch ? `${branch.city} · ` : ''}откроется spdmed.ru: выберите врача и время
           </span>
         </span>
         <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />

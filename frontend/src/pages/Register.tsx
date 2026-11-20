@@ -132,11 +132,11 @@ export default function Register() {
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value)}
           />
-          <div className="flip-hint">Есть у врачей клиники — превращает аккаунт в кабинет врача.</div>
+          <div className="flip-hint">Есть у врачей клиники. Превращает аккаунт в кабинет врача.</div>
         </div>
 
         <button className="btn btn-gold w-full" disabled={busy}>
-          {busy ? 'Создаём…' : (<span className="inline-flex items-center gap-2">Создать аккаунт <Icon name="party" size={16} /></span>)}
+          {busy ? 'Создаём…' : (<span className="inline-flex items-center gap-2">Создать аккаунт <Icon name="user-plus" size={16} /></span>)}
         </button>
 
         <p className="text-center text-sm text-teal-dark/70">

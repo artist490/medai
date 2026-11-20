@@ -172,7 +172,6 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col gap-6 stagger">
       <PageHeader
-        eyebrow="Здоровье под контролем"
         title="Обзор здоровья"
         actions={
           <>
@@ -238,8 +237,7 @@ export default function Dashboard() {
             </div>
 
             <section className="panel flex flex-col">
-              <h2 className="text-lg">Структура замеров</h2>
-              <p className="text-xs text-[#8aa09c] mt-0.5 mb-3">Распределение по уровню риска</p>
+              <h2 className="text-lg mb-3">Структура замеров</h2>
               <div className="chart-box relative flex-1" style={{ minHeight: 190 }}>
                 {totalMeasured > 0 ? (
                   <>
@@ -306,11 +304,8 @@ export default function Dashboard() {
           {/* Ряд 3: график + комментарий врача */}
           <div className="grid lg:grid-cols-[2fr_1fr] gap-4 items-stretch">
             <section className="panel">
-              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                <div>
-                  <h2 className="text-lg">Давление в динамике</h2>
-                  <p className="text-xs text-[#8aa09c] mt-0.5">Систолическое и диастолическое по замерам</p>
-                </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 className="text-lg">Давление в динамике</h2>
                 <div className="flex gap-2">
                   <span className="legend-pill"><span className="legend-dot" style={{ background: '#dc2626' }} />Систолическое</span>
                   <span className="legend-pill"><span className="legend-dot" style={{ background: '#00b8a9' }} />Диастолическое</span>
@@ -351,9 +346,6 @@ export default function Dashboard() {
                   Заметок пока нет — врач оставит их после разбора замеров.
                 </p>
               )}
-              <p className="mt-auto pt-3 text-xs text-[#8aa09c]">
-                Заметки появляются в разборе замера и в чате с ИИ не дублируются.
-              </p>
             </section>
           </div>
 

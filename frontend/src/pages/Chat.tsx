@@ -110,7 +110,6 @@ export default function Chat() {
     <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-3xl mx-auto h-[calc(100dvh-170px)] sm:h-auto sm:min-h-[480px] stagger">
       <div className="shrink-0">
         <PageHeader
-          eyebrow="ИИ-ассистент клиники"
           title={<>Ассистент <Icon name="sparkle" size={20} className="inline-block align-[-2px] text-teal" /></>}
           actions={
             <button className="btn btn-ghost btn-sm" onClick={clear}>
@@ -124,7 +123,7 @@ export default function Chat() {
         Ассистент видит {user?.role === 'doctor'
           ? 'данные пациентов вашего филиала'
           : 'ваши замеры и разборы'} и отвечает с опорой на них.
-        Не ставит диагнозы — при тревожных показателях обратитесь к врачу.
+        Не ставит диагнозы. При тревожных показателях обратитесь к врачу.
       </p>
       <p className="text-xs text-teal-dark/75 -mt-4 sm:hidden shrink-0">
         Ассистент видит ваши данные и не ставит диагнозы.
@@ -140,7 +139,7 @@ export default function Chat() {
             <EmptyArt className="mx-auto mb-2" />
             <p className="text-base font-bold text-[#1b2622]">Пока нет сообщений</p>
             <p className="text-sm text-teal-dark/60 max-w-sm mt-1">
-              Задайте вопрос о показателях — ассистент сам посмотрит нужные замеры
+              Задайте вопрос о показателях. Ассистент сам посмотрит нужные замеры
               и разборы через инструменты.
             </p>
           </div>
@@ -212,7 +211,7 @@ export default function Chat() {
           }}
         />
         <button className="btn btn-gold shrink-0 !min-h-[36px] !px-3.5" disabled={busy || !input.trim()}>
-          <Icon name="rocket" size={16} />
+          <Icon name="send" size={16} />
           <span className="hidden sm:inline">Отправить</span>
         </button>
       </form>
