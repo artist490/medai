@@ -405,11 +405,13 @@ def _survey_lines(survey_raw: str | None) -> list[str]:
 
 
 def _build_summary_payload(db: sqlite3.Connection, patient: sqlite3.Row) -> str:
-    """Собирает данные пациента в текст для ИИ-сводки."""
-    sex = {"male": "мужской", "female": "женский"}.get(patient["sex"], "не указан")
+    """Собирает данные пациента в текст для ИИ-сводки.
+
+    F034: реальные имя/пол/возраст подменяются на «Пациент N, X лет» —
+    во внешний LLM уходят только клинические данные."""
     lines = [
         "Пациент:",
-        f"- имя: {patient['name'] or 'не указано'}; возраст: {patient['age'] or 'не указан'}; пол: {sex}",
+        f"- {llm_service.patient_alias(patient['id'], patient['age'])}",
     ]
     if patient["height_cm"]:
         lines.append(f"- рост: {patient['height_cm']} см")

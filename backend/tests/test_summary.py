@@ -22,6 +22,8 @@ def client(tmp_path, monkeypatch):
 
 
 def _register(c: TestClient, email: str, **extra) -> dict:
+    # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
+    extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
         "email": email, "password": "secret1", "name": "Тест", **extra,
     })
@@ -88,6 +90,38 @@ class TestSummary:
         assert "Давление подскочило" in seen["payload"]
         assert "185" in seen["payload"]
         assert "ТРЕВОГА" in seen["payload"]
+        # F034: реальное имя пациента в LLM не уходит
+        assert "Анна Петровна" not in seen["payload"]
+        assert f"Пациент {p['user']['id']}" in seen["payload"]
+
+    def test_summary_payload_deidentified(self, client, monkeypatch):
+        """F034: имя/пол/возраст подменяются на «Пациент N, X лет», клиника остаётся."""
+        d = _doctor(client, "invite-s-5", "d5@test.ru", branch_id=1)
+        p = _register(client, "p5@test.ru", branch_id=1, name="Анна Демо")
+        # возраст/пол заполняются профилем (PUT /api/auth/me), регистрируется только имя
+        client.put("/api/auth/me", json={"age": 46, "sex": "female"}, headers=_auth(p))
+        client.post("/api/measurements", json={"systolic": 185, "diastolic": 115}, headers=_auth(p))
+        client.post("/api/visits", json={"complaints": "Давление подскочило"}, headers=_auth(p))
+
+        import app.services.llm as llm_mod
+        seen = {}
+
+        def handler(url, **kw):
+            seen["payload"] = kw["json"]["messages"][1]["content"]
+            return _Resp(_completion("Справка."))
+
+        monkeypatch.setattr(llm_mod.httpx, "post", handler)
+        resp = client.post(f"/api/doctor/patients/{p['user']['id']}/summary", headers=_auth(d))
+        assert resp.status_code == 200
+        payload = seen["payload"]
+        assert "Анна" not in payload
+        assert "Демо" not in payload
+        assert "женский" not in payload  # пол — тоже ПДн
+        assert f"Пациент {p['user']['id']}, 46 лет" in payload
+        # клинические поля не пострадали
+        assert "Давление подскочило" in payload
+        assert "Анамнез" in payload
+        assert "185" in payload
 
     def test_summary_503_when_llm_down(self, client, monkeypatch):
         d, p = self._setup(client)

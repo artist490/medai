@@ -22,6 +22,8 @@ def client(tmp_path, monkeypatch):
 
 
 def _register(c: TestClient, email: str, **extra) -> dict:
+    # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
+    extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
         "email": email, "password": "secret1", "name": "Тест", **extra,
     })
@@ -48,6 +50,7 @@ class TestInviteFlow:
     def test_unknown_code_rejected(self, client):
         resp = client.post("/api/auth/register", json={
             "email": "d0@test.ru", "password": "secret1", "invite_code": "no-such-code",
+            "branch_id": 1,
         })
         assert resp.status_code == 422
 
@@ -61,6 +64,7 @@ class TestInviteFlow:
         _register(client, "d2@test.ru", invite_code="invite-doc-2")
         resp = client.post("/api/auth/register", json={
             "email": "d3@test.ru", "password": "secret1", "invite_code": "invite-doc-2",
+            "branch_id": 1,
         })
         assert resp.status_code == 422
 

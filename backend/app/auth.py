@@ -64,11 +64,13 @@ def get_current_user(
             """
             SELECT u.* FROM sessions s
             JOIN users u ON u.id = s.user_id
-            WHERE s.token = ? AND s.expires_at > ?
+            WHERE s.token = ? AND s.expires_at > ? AND u.disabled = 0
             """,
             (token, datetime.now(timezone.utc).isoformat()),
         ).fetchone()
     if row is None:
+        # Сюда попадает и отключённый пользователь (u.disabled = 1) даже с
+        # формально живой сессией: отзыв доступа не зависит от отзыва токенов
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Сессия недействительна")
     return row
 

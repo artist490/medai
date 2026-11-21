@@ -2,12 +2,13 @@
 
 Раньше ключи дублировались в doctor.py и использовались в аналитике —
 рассинхрон означал тихую потерю сигналов (см. TECH_DEBT_AUDIT.md F007/F013).
-Фронтенд (AnamnesisSurvey.tsx) пока держит свой ALARM_KEYS — при правке
-опросника менять ОБА места, пока ключи не отдаются API-эндпоинтом.
+Теперь ключи отдаются API (GET /api/medcard → alarm_keys, routers/medcard.py);
+ALARM_KEYS в AnamnesisSurvey.tsx — только fallback на случай, когда API
+недоступен, правится этот список, а не фронтовый.
 """
 import json
 
-# Тревожные ответы опросника МЗ (синхронно с ALARM_KEYS в AnamnesisSurvey.tsx)
+# Тревожные ответы опросника МЗ (фронтовый fallback — ALARM_KEYS в AnamnesisSurvey.tsx)
 ALARM_SURVEY_KEYS = frozenset({
     "sym_chest_pain", "sym_sudden_weakness", "sym_sudden_numbness", "sym_vision_loss",
     "sym_hemoptysis", "sym_black_stool", "sym_blood_in_stool", "sym_weight_loss",

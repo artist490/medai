@@ -21,6 +21,8 @@ def client(tmp_path, monkeypatch):
 
 
 def _register(c: TestClient, email: str, **extra) -> dict:
+    # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
+    extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
         "email": email, "password": "secret1", "name": "Тест", **extra,
     })
@@ -152,9 +154,15 @@ class TestDoctorCardAccess:
         assert resp.status_code == 404
 
     def test_doctor_without_branch_sees_only_null_branch_patients(self, client):
+        """Легаси-врач без филиала (NULL) видит только пациентов без филиала
+        (С.3: через API такие больше не создаются — NULL проставляем в БД)."""
         d = self._doctor(client, "invite-mc-7", "d7@test.ru")
         p_branch = _register(client, "p9@test.ru", branch_id=1)
         p_free = _register(client, "p10@test.ru")
+        db = sqlite3.connect(config.DATABASE_PATH)
+        db.execute("UPDATE users SET branch_id = NULL WHERE email IN ('d7@test.ru', 'p10@test.ru')")
+        db.commit()
+        db.close()
         assert client.get(f"/api/medcard/patient/{p_branch['user']['id']}",
                           headers=_auth(d)).status_code == 404
         assert client.get(f"/api/medcard/patient/{p_free['user']['id']}",
@@ -183,3 +191,25 @@ class TestSurvey:
         p = _register(client, "p12@test.ru")
         resp = client.put("/api/medcard", json={"survey": "x" * 12001}, headers=_auth(p))
         assert resp.status_code == 422
+
+
+class TestAlarmKeys:
+    """F007: тревожные ключи опросника МЗ отдаёт API — источник signals.ALARM_SURVEY_KEYS."""
+
+    def test_medcard_alarm_keys_equal_signals(self, client):
+        from app.services.signals import ALARM_SURVEY_KEYS
+
+        p = _register(client, "p13@test.ru")
+        card = client.get("/api/medcard", headers=_auth(p)).json()
+        assert set(card["alarm_keys"]) == set(ALARM_SURVEY_KEYS)
+        assert len(card["alarm_keys"]) == len(ALARM_SURVEY_KEYS)
+
+    def test_doctor_view_carries_same_alarm_keys(self, client):
+        """Врач читает CardView по /api/medcard/patient/{id} — ключи те же."""
+        from app.services.signals import ALARM_SURVEY_KEYS
+
+        _make_invite(client, "invite-mc-9")
+        d = _register(client, "d9@test.ru", invite_code="invite-mc-9")
+        p = _register(client, "p14@test.ru")
+        card = client.get(f"/api/medcard/patient/{p['user']['id']}", headers=_auth(d)).json()
+        assert set(card["alarm_keys"]) == set(ALARM_SURVEY_KEYS)

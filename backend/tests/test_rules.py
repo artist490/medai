@@ -4,7 +4,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.services import rules
 from app.services.rules import analyze, calc_bmi
 
 
@@ -138,7 +137,7 @@ class TestCombinations:
         assert "Жар" in joined or "жар" in joined
 
     def test_bp_plus_pulse(self):
-        r = bp(145, 92)
+        bp(145, 92)
         r2 = analyze({"systolic": 145, "diastolic": 92, "pulse": 105})
         joined = " ".join(r2.recommendations)
         assert "вместе" in joined

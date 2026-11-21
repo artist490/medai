@@ -22,6 +22,8 @@ def client(tmp_path, monkeypatch):
 
 
 def _register(c: TestClient, email: str, **extra) -> dict:
+    # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
+    extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
         "email": email, "password": "secret1", "name": "Тест", **extra,
     })
@@ -74,9 +76,16 @@ class TestBranches:
         }).json()
         assert login["user"]["branch"]["city"] == "Воронеж"
 
-    def test_register_without_branch_ok(self, client):
-        p = _register(client, "p3@test.ru")
-        assert p["user"]["branch"] is None
+    def test_register_without_branch_422(self, client):
+        """С.3: филиал обязателен на сервере для любой роли — «невидимых» не создавать."""
+        resp = client.post("/api/auth/register", json={
+            "email": "p3@test.ru", "password": "secret1", "name": "Тест",
+        })
+        assert resp.status_code == 422
+        db = sqlite3.connect(config.DATABASE_PATH)
+        n = db.execute("SELECT COUNT(*) FROM users WHERE email = 'p3@test.ru'").fetchone()[0]
+        db.close()
+        assert n == 0  # пользователь не создан
 
     def test_change_branch_via_profile(self, client):
         branches = client.get("/api/auth/branches").json()["items"]
@@ -115,9 +124,15 @@ class TestBranches:
         assert r.status_code == 404
 
     def test_doctor_and_patient_same_null_branch(self, client):
-        """Врач и пациент без филиала видят друг друга (NULL IS NULL)."""
+        """Легаси-пользователи без филиала (branch_id NULL, созданы до С.3):
+        NULL IS NULL — врач видит пациента без филиала. Зарегистрировать таких
+        через API больше нельзя, поэтому NULL проставляем напрямую в БД."""
         _make_invite(client, "inv-c")
         doc = _register(client, "dn@test.ru", invite_code="inv-c")
         p = _register(client, "pn@test.ru")
+        db = sqlite3.connect(config.DATABASE_PATH)
+        db.execute("UPDATE users SET branch_id = NULL WHERE email IN ('dn@test.ru', 'pn@test.ru')")
+        db.commit()
+        db.close()
         items = client.get("/api/doctor/patients", headers=_auth(doc)).json()["items"]
         assert any(i["id"] == p["user"]["id"] for i in items)

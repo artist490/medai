@@ -9,7 +9,9 @@ class RegisterIn(BaseModel):
     password: str = Field(min_length=6, max_length=128)
     name: str = Field(default="", max_length=64)
     invite_code: Optional[str] = Field(default=None, max_length=64)  # код приглашения для врачей
-    branch_id: Optional[int] = None  # филиал клиники
+    # Филиал обязателен на сервере для любой роли (С.3): без него 422 — иначе
+    # возникают «невидимые» пациенты (branch_id IS NULL не попадает ни в один пул врача)
+    branch_id: int
 
 
 class LoginIn(BaseModel):

@@ -1,5 +1,6 @@
 """Тесты фич расширения: цели, документы, дневник/периоды, сигналы, аналитика."""
 import io
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -21,6 +22,8 @@ def client(tmp_path, monkeypatch):
 
 
 def _register(c: TestClient, email: str, **extra) -> dict:
+    # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
+    extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
         "email": email, "password": "secret1", "name": "Тест", **extra,
     })
@@ -159,8 +162,14 @@ class TestDoctorSignals:
         assert sig["unread"] == 0
 
     def test_branch_isolation(self, client):
+        """NULL IS NULL для легаси-строк без филиала (С.3: через API не создать,
+        NULL проставляем в БД напрямую)."""
         doc = _doctor(client, "sig-doc3@test.ru")
         p = _register(client, "sig-p3@test.ru")
+        db = sqlite3.connect(config.DATABASE_PATH)
+        db.execute("UPDATE users SET branch_id = NULL WHERE email IN ('sig-doc3@test.ru', 'sig-p3@test.ru')")
+        db.commit()
+        db.close()
         client.post("/api/measurements", json={"systolic": 190, "diastolic": 120},
                     headers=_auth(p))
         sig = client.get("/api/doctor/signals", headers=_auth(doc)).json()

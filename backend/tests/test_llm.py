@@ -1,4 +1,5 @@
 """Тесты LLM-обогащения (PlusVibe-совместимый клиент) на моках httpx."""
+import contextlib
 import json
 import sys
 from pathlib import Path
@@ -22,9 +23,11 @@ def client(tmp_path, monkeypatch):
         yield c
 
 
-def _register(c: TestClient, email: str) -> dict:
+def _register(c: TestClient, email: str, **extra) -> dict:
+    # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
+    extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
-        "email": email, "password": "secret1", "name": "Тест",
+        "email": email, "password": "secret1", "name": "Тест", **extra,
     })
     assert resp.status_code == 201
     return resp.json()
@@ -34,7 +37,6 @@ def _auth(session: dict) -> dict:
     return {"Authorization": f"Bearer {session['token']}"}
 
 
-import contextlib
 
 
 class _Resp:
@@ -88,6 +90,30 @@ class TestEnrich:
             self._create_measurement(client, s)
         assert captured[0].startswith(f"{config.LLM_BASE_URL}/chat/completions")
         assert "deepseek" in json.dumps(None) or True  # модель в body — проверяем ниже
+
+    def test_enrich_payload_deidentified(self, client):
+        """F034: в payload, уходящем во внешний LLM, нет ПДн пациента.
+
+        Реальное имя из seed-данных («Анна Демо») и пол подменены
+        на «Пациент N, X лет»; клинические поля остаются."""
+        s = _register(client, "p7@test.ru", name="Анна Демо")
+        # возраст/пол/рост заполняются профилем (PUT /api/auth/me), регистрируется только имя
+        client.put("/api/auth/me", json={"age": 46, "sex": "female", "height_cm": 165}, headers=_auth(s))
+        captured: list[str] = []
+
+        def handler(url, **kw):
+            captured.append(kw["json"]["messages"][1]["content"])
+            return _Resp(200, _completion(json.dumps({"summary": "s", "items": ["i"]})))
+
+        with _mock_transport(handler):
+            self._create_measurement(client, s)
+        payload = captured[0]
+        assert "Анна" not in payload
+        assert "Демо" not in payload
+        assert "женский" not in payload  # пол — тоже ПДн
+        assert f"Пациент {s['user']['id']}, 46 лет" in payload
+        # клинические поля не пострадали
+        assert "рост_см: 165" in payload
 
     def test_enrich_json_in_markdown_fence(self, client):
         s = _register(client, "p3@test.ru")

@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from .. import auth
 from ..database import get_db
 from ..schemas import MedCardIn
+from ..services.signals import ALARM_SURVEY_KEYS
 
 router = APIRouter(prefix="/api/medcard", tags=["medcard"])
 
@@ -22,12 +23,19 @@ CARD_FIELDS = (
 
 
 def _card_payload(row: sqlite3.Row | None) -> dict:
+    # alarm_keys — единый источник тревожных ключей опросника МЗ (F007):
+    # импортируется из services/signals.py, фронт дубликата не держит
+    alarm_keys = sorted(ALARM_SURVEY_KEYS)
     if row is None:  # анкета ещё не заводилась
-        return {field: "" for field in CARD_FIELDS} | {"survey": None, "updated_by": None, "updated_at": None}
+        return {field: "" for field in CARD_FIELDS} | {
+            "survey": None, "updated_by": None, "updated_at": None,
+            "alarm_keys": alarm_keys,
+        }
     return {field: row[field] for field in CARD_FIELDS} | {
         "survey": row["survey"],
         "updated_by": row["updated_by"],
         "updated_at": row["updated_at"],
+        "alarm_keys": alarm_keys,
     }
 
 

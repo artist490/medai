@@ -87,10 +87,16 @@ def register(data: RegisterIn, db: sqlite3.Connection = Depends(get_db)):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Код приглашения не найден")
         if invite["used_by"] is not None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Код приглашения уже использован")
+        # С.3: срок действия кода (tools/make_invite.py --days). Коды, созданные до
+        # миграции (expires_at IS NULL), остаются бессрочными — срок им не назначаем задним числом.
+        if invite["expires_at"] and invite["expires_at"] <= datetime.now(timezone.utc).isoformat():
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Срок действия кода приглашения истёк")
         role = "doctor"
 
+    # branch_id обязателен для любой роли (schema.RegisterIn): без него 422,
+    # иначе register молча создавал «невидимых» пользователей branch_id IS NULL
     branch = _branch_of(db, data.branch_id)
-    if data.branch_id is not None and branch is None:
+    if branch is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Филиал не найден")
 
     cursor = db.execute(
@@ -123,6 +129,10 @@ def login(data: LoginIn, request: Request, db: sqlite3.Connection = Depends(get_
     if user is None or not auth.verify_password(data.password, user["password_hash"]):
         _LOGIN_FAILS.setdefault(key, []).append(time.time())
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный email или пароль")
+    # С.3: отключённому пользователю (tools/disable_user.py) новых сессий не выдаём —
+    # проверка после пароля, чтобы статус аккаунта не раскрывался до аутентификации
+    if user["disabled"]:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Аккаунт отключён — обратитесь к администратору клиники")
     _LOGIN_FAILS.pop(key, None)
     # попутно убираем истёкшие сессии пользователя
     db.execute("DELETE FROM sessions WHERE user_id = ? AND expires_at <= ?",

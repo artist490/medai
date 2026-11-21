@@ -24,12 +24,14 @@ CREATE TABLE IF NOT EXISTS users (
     height_cm     REAL,
     role          TEXT NOT NULL DEFAULT 'patient' CHECK (role IN ('patient', 'doctor')),
     branch_id     INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+    disabled      INTEGER NOT NULL DEFAULT 0,  -- 1 = доступ отозван (tools/disable_user.py)
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS invite_codes (
     code       TEXT PRIMARY KEY,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    expires_at TEXT,   -- срок действия (UTC ISO, tools/make_invite.py); NULL = бессрочный (код до миграции)
     used_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
     used_at    TEXT
 );
@@ -187,6 +189,8 @@ def _migrate(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'patient'")
     if "branch_id" not in columns:
         db.execute("ALTER TABLE users ADD COLUMN branch_id INTEGER REFERENCES branches(id)")
+    if "disabled" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0")
     card_columns = {row["name"] for row in db.execute("PRAGMA table_info(patient_cards)").fetchall()}
     if card_columns and "survey" not in card_columns:
         db.execute("ALTER TABLE patient_cards ADD COLUMN survey TEXT")
@@ -196,6 +200,9 @@ def _migrate(db: sqlite3.Connection) -> None:
     anal_columns = {row["name"] for row in db.execute("PRAGMA table_info(analyses)").fetchall()}
     if "doctor_seen_at" not in anal_columns:
         db.execute("ALTER TABLE analyses ADD COLUMN doctor_seen_at TEXT")
+    invite_columns = {row["name"] for row in db.execute("PRAGMA table_info(invite_codes)").fetchall()}
+    if invite_columns and "expires_at" not in invite_columns:
+        db.execute("ALTER TABLE invite_codes ADD COLUMN expires_at TEXT")
 
 
 def connect() -> sqlite3.Connection:

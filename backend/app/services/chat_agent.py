@@ -46,7 +46,7 @@ SYSTEM_PROMPT_DOCTOR = """Ты — ассистент врача сети кли
 PATIENT_TOOLS = [
     {"type": "function", "function": {
         "name": "get_profile",
-        "description": "Профиль пациента: имя, возраст, пол, рост, филиал",
+        "description": "Обезличенный профиль пациента: «Пациент N, X лет», рост, филиал",
         "parameters": {"type": "object", "properties": {}, "required": []},
     }},
     {"type": "function", "function": {
@@ -89,7 +89,7 @@ PATIENT_TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "get_doctor_notes",
-        "description": "Заметки врача к вашим разборам: кто, когда, текст и уровень риска",
+        "description": "Заметки врача к вашим разборам: когда, текст и уровень риска (без имени врача)",
         "parameters": {"type": "object", "properties": {}, "required": []},
     }},
     {"type": "function", "function": {
@@ -117,7 +117,8 @@ PATIENT_TOOLS = [
 DOCTOR_TOOLS = [
     {"type": "function", "function": {
         "name": "get_patients_overview",
-        "description": "Пациенты филиала врача: имя, возраст, последний замер, последний риск, требует ли внимания",
+        "description": "Пациенты филиала врача (обезличены: «Пациент N, X лет»): "
+                       "последний замер, последний риск, требует ли внимания",
         "parameters": {"type": "object", "properties": {}, "required": []},
     }},
     {"type": "function", "function": {
@@ -173,12 +174,18 @@ def _rows_to_json(rows: list[sqlite3.Row]) -> str:
 
 
 def _get_profile(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
+    # F034: имя и пол во внешний LLM не уходят — вместо них «Пациент N, X лет»
     row = db.execute(
-        """SELECT u.name, u.age, u.sex, u.height_cm, b.city AS branch_city
+        """SELECT u.age, u.height_cm, b.city AS branch_city
            FROM users u LEFT JOIN branches b ON b.id = u.branch_id WHERE u.id = ?""",
         (user["id"],),
     ).fetchone()
-    return json.dumps(dict(row), ensure_ascii=False)
+    profile = {
+        "пациент": llm_service.patient_alias(user["id"], user["age"]),
+        "height_cm": row["height_cm"],
+        "branch_city": row["branch_city"],
+    }
+    return json.dumps(profile, ensure_ascii=False)
 
 
 def _recent_measurements(db: sqlite3.Connection, user_id: int, args: dict) -> str:
@@ -266,8 +273,9 @@ def _my_visits(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
 
 
 def _doctor_notes(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
+    # F034: имя врача (doctor_name) модели не отдаём — только текст заметки
     rows = db.execute(
-        """SELECT n.doctor_name, n.text, n.created_at, a.risk_level
+        """SELECT n.text, n.created_at, a.risk_level
            FROM doctor_notes n
            JOIN analyses a ON a.id = n.analysis_id
            WHERE a.user_id = ? ORDER BY n.id DESC LIMIT 20""",
@@ -324,8 +332,10 @@ PATIENT_EXECUTORS: dict[str, Callable] = {
 
 
 def _exec_patients_overview(db: sqlite3.Connection, doctor: sqlite3.Row, _: dict) -> str:
+    # F034: имена пациентов модели не уходят — «Пациент N, X лет»; id остаётся,
+    # чтобы модель могла обратиться к пациенту через get_patient_* инструменты.
     rows = db.execute(
-        """SELECT u.id, u.name, u.age,
+        """SELECT u.id, u.age,
                   MAX(m.recorded_at) AS last_measurement_at,
                   (SELECT a.risk_level FROM analyses a
                    JOIN measurements m2 ON m2.id = a.measurement_id
@@ -337,7 +347,15 @@ def _exec_patients_overview(db: sqlite3.Connection, doctor: sqlite3.Row, _: dict
            GROUP BY u.id ORDER BY u.id""",
         (doctor["branch_id"],),
     ).fetchall()
-    return _rows_to_json(rows)
+    items = []
+    for r in rows:
+        items.append({
+            "id": r["id"],
+            "пациент": llm_service.patient_alias(r["id"], r["age"]),
+            "last_measurement_at": r["last_measurement_at"],
+            "last_risk": r["last_risk"],
+        })
+    return json.dumps(items, ensure_ascii=False, default=str)
 
 
 def _exec_patient_measurements(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
@@ -398,7 +416,7 @@ def _exec_patients_needing_attention(db: sqlite3.Connection, doctor: sqlite3.Row
     красным флагом). Врач видит только свой филиал — как в /api/doctor/signals."""
     days = max(1, min(365, int(args.get("days") or 30)))
     rows = db.execute(
-        """SELECT u.id AS patient_id, u.name AS patient_name,
+        """SELECT u.id AS patient_id, u.age,
                   m.recorded_at, a.risk_level, a.findings,
                   a.doctor_seen_at IS NULL AS unseen
            FROM analyses a
@@ -417,7 +435,8 @@ def _exec_patients_needing_attention(db: sqlite3.Connection, doctor: sqlite3.Row
         top = next((f for f in findings if f.get("status") == "alarm"), None)
         items.append({
             "patient_id": r["patient_id"],
-            "patient_name": r["patient_name"],
+            # F034: вместо реального имени — «Пациент N, X лет»
+            "пациент": llm_service.patient_alias(r["patient_id"], r["age"]),
             "recorded_at": r["recorded_at"],
             "risk_level": r["risk_level"],
             "unseen": bool(r["unseen"]),

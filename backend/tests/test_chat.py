@@ -6,7 +6,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -24,6 +23,8 @@ def client(tmp_path, monkeypatch):
 
 
 def _register(c: TestClient, email: str, **extra) -> dict:
+    # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
+    extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
         "email": email, "password": "secret1", "name": "Тест", **extra,
     })
@@ -44,8 +45,10 @@ def _make_invite(client: TestClient, code: str) -> None:
 
 def _doctor(client: TestClient, email: str, branch_id: int | None = None) -> dict:
     _make_invite(client, f"invite-{email}")
-    return _register(client, email, invite_code=f"invite-{email}", name="Доктор",
-                     branch_id=branch_id)
+    extra = {"invite_code": f"invite-{email}", "name": "Доктор"}
+    if branch_id is not None:
+        extra["branch_id"] = branch_id  # иначе _register подставит филиал по умолчанию
+    return _register(client, email, **extra)
 
 
 class _MockLLM:
@@ -142,7 +145,6 @@ class TestChatAgent:
 
         monkeypatch.setattr("app.services.chat_agent.llm_service.chat_completion", spy)
         client.post("/api/chat/send", json={"message": "дай все замеры"}, headers=_auth(p))
-        tool_msg = [m for m in captured[0]["messages"] if m["role"] == "tool"]
         # следующего вызова не будет — check: замер другого в tool-результате отсутствует
         first = client.get("/api/chat/history", headers=_auth(p)).json()["items"]
         assistant_reply = [i for i in first if i["role"] == "assistant"][0]["content"]
@@ -287,7 +289,7 @@ class TestPatientToolsExtended:
         assert "пенициллин" in result["allergies"]
 
     def test_my_medcard_empty_is_honest(self, client):
-        p = _register(client, "mc2@test.ru")
+        _register(client, "mc2@test.ru")
         from app.database import connect
         db = connect()
         user_row = db.execute("SELECT * FROM users WHERE email = ?", ("mc2@test.ru",)).fetchone()
@@ -338,7 +340,7 @@ class TestPatientToolsExtended:
 
     def test_my_documents_metadata_only(self, client):
         """Документы: только метаданные, содержимое файла модели не отдаём."""
-        p = _register(client, "d1@test.ru")
+        _register(client, "d1@test.ru")
         from app.database import connect
         db = connect()
         user_row = db.execute("SELECT * FROM users WHERE email = ?", ("d1@test.ru",)).fetchone()
@@ -371,7 +373,7 @@ class TestDoctorToolsExtended:
     def test_patient_visits_for_doctor(self, client):
         branches = client.get("/api/auth/branches").json()["items"]
         vrn = next(b for b in branches if b["city"] == "Воронеж")["id"]
-        doc = _doctor(client, "dv@test.ru", branch_id=vrn)
+        _doctor(client, "dv@test.ru", branch_id=vrn)
         pat = _register(client, "pv1@test.ru", branch_id=vrn)
         client.post("/api/visits", json={"visit_date": "2026-12-01", "reason": "Осмотр",
                                         "complaints": "Кашель"}, headers=_auth(pat))
@@ -388,7 +390,7 @@ class TestDoctorToolsExtended:
         branches = client.get("/api/auth/branches").json()["items"]
         vrn = next(b for b in branches if b["city"] == "Воронеж")["id"]
         bld = next(b for b in branches if b["city"] == "Белгород")["id"]
-        doc = _doctor(client, "dv2@test.ru", branch_id=vrn)
+        _doctor(client, "dv2@test.ru", branch_id=vrn)
         foreign = _register(client, "pbg1@test.ru", branch_id=bld)
         from app.database import connect
         db = connect()
@@ -401,7 +403,7 @@ class TestDoctorToolsExtended:
     def test_patients_needing_attention(self, client):
         branches = client.get("/api/auth/branches").json()["items"]
         vrn = next(b for b in branches if b["city"] == "Воронеж")["id"]
-        doc = _doctor(client, "dv3@test.ru", branch_id=vrn)
+        _doctor(client, "dv3@test.ru", branch_id=vrn)
         bad = _register(client, "bad1@test.ru", branch_id=vrn)
         good = _register(client, "good1@test.ru", branch_id=vrn)
         client.post("/api/measurements", json={"systolic": 190, "diastolic": 120},
@@ -415,4 +417,78 @@ class TestDoctorToolsExtended:
         ids = [r["patient_id"] for r in rows]
         assert bad["user"]["id"] in ids
         assert good["user"]["id"] not in ids
+
+
+class TestChatDeidentified:
+    """F034: tool-результаты чата уходят в тот же внешний LLM (PlusVibe),
+    поэтому реальные имена/пол пациентов и имена врачей в них не попадают —
+    вместо них «Пациент N, X лет» (llm_service.patient_alias)."""
+
+    @staticmethod
+    def _tool_contents(mock: _MockLLM) -> str:
+        return "\n".join(m["content"] for call in mock.calls
+                         for m in call["messages"] if m["role"] == "tool")
+
+    def test_patient_tool_results_deidentified(self, client, monkeypatch):
+        p = _register(client, "deid-p@test.ru", name="Анна Демо")
+        client.put("/api/auth/me", json={"age": 46, "sex": "female"}, headers=_auth(p))
+        client.post("/api/measurements", json={"systolic": 185, "diastolic": 115},
+                    headers=_auth(p))
+        # заметка врача с реальным именем из seed-данных (medai.db, users id 1)
+        from app.database import connect
+        db = connect()
+        analysis = db.execute("SELECT id FROM analyses ORDER BY id DESC LIMIT 1").fetchone()
+        db.execute("""INSERT INTO doctor_notes (analysis_id, doctor_id, doctor_name, text)
+                      VALUES (?, ?, ?, ?)""",
+                   (analysis["id"], p["user"]["id"], "Ирина Ивановна", "Следите за давлением"))
+        db.commit()
+        db.close()
+
+        mock = _MockLLM([
+            _tool_call("get_profile", "c1"),
+            _tool_call("get_doctor_notes", "c2"),
+            {"content": "Ваши показатели требуют внимания."},
+        ])
+        monkeypatch.setattr("app.services.chat_agent.llm_service.chat_completion", mock)
+        resp = client.post("/api/chat/send", json={"message": "Что с моим давлением?"},
+                           headers=_auth(p))
+        assert resp.status_code == 200
+        assert resp.json()["tools_used"] == ["get_profile", "get_doctor_notes"]
+        joined = self._tool_contents(mock)
+        assert "Анна" not in joined
+        assert "Демо" not in joined
+        assert "женский" not in joined  # пол — тоже ПДн
+        assert "Ирина Ивановна" not in joined  # имя врача модели не нужно
+        assert f"Пациент {p['user']['id']}, 46 лет" in joined
+
+    def test_doctor_tool_results_deidentified(self, client, monkeypatch):
+        branches = client.get("/api/auth/branches").json()["items"]
+        vrn = next(b for b in branches if b["city"] == "Воронеж")["id"]
+        d = _doctor(client, "deid-d@test.ru", branch_id=vrn)
+        bad = _register(client, "deid-bad@test.ru", branch_id=vrn, name="Анна Демо")
+        client.put("/api/auth/me", json={"age": 46, "sex": "female"}, headers=_auth(bad))
+        good = _register(client, "deid-good@test.ru", branch_id=vrn, name="Мария Сидорова")
+        client.post("/api/measurements", json={"systolic": 190, "diastolic": 120}, headers=_auth(bad))
+        client.post("/api/measurements", json={"pulse": 70}, headers=_auth(good))
+
+        mock = _MockLLM([
+            _tool_call("get_patients_overview", "c1"),
+            _tool_call("get_patients_needing_attention", "c2", {"days": 30}),
+            {"content": "Есть пациент с тревожным разбором."},
+        ])
+        monkeypatch.setattr("app.services.chat_agent.llm_service.chat_completion", mock)
+        resp = client.post("/api/chat/send", json={"message": "Кого показать врачу?"},
+                           headers=_auth(d))
+        assert resp.status_code == 200
+        assert resp.json()["tools_used"] == ["get_patients_overview",
+                                             "get_patients_needing_attention"]
+        joined = self._tool_contents(mock)
+        # реальные имена обоих пациентов (seed-имена из medai.db) не уходят в LLM
+        assert "Анна" not in joined
+        assert "Демо" not in joined
+        assert "Мария" not in joined
+        assert "Сидорова" not in joined
+        # обезличенные подписи с id на месте — модель может вызвать get_patient_*
+        assert f"Пациент {bad['user']['id']}, 46 лет" in joined
+        assert f"Пациент {good['user']['id']}" in joined
 

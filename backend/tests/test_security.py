@@ -23,6 +23,8 @@ def client(tmp_path, monkeypatch):
 
 
 def _register(c: TestClient, email: str, **extra) -> dict:
+    # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
+    extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
         "email": email, "password": "secret1", "name": "Тест", **extra,
     })
@@ -36,7 +38,7 @@ def _auth(session: dict) -> dict:
 
 class TestLoginRateLimit:
     def test_blocks_after_5_fails_and_recovers(self, client):
-        s = _register(client, "rl1@test.ru")
+        _register(client, "rl1@test.ru")
         # 5 неудачных попыток
         for i in range(5):
             r = client.post("/api/auth/login", json={
@@ -56,7 +58,7 @@ class TestLoginRateLimit:
                 "email": "rl2@test.ru", "password": "wrong",
             })
         # другой email — не затронут
-        s = _register(client, "rl3@test.ru")
+        _register(client, "rl3@test.ru")
         r = client.post("/api/auth/login", json={
             "email": "rl3@test.ru", "password": "secret1",
         })

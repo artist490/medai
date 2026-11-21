@@ -16,10 +16,10 @@ def run_analysis(measurement: sqlite3.Row, user: sqlite3.Row) -> dict:
 
     rule_result = rules.analyze(indicators, height_cm=user["height_cm"]).to_dict()
 
+    # F034: ПДн (имя, пол, возраст) во внешний LLM не уходят —
+    # вместо них обезличенная подпись «Пациент N, X лет».
     profile = {
-        "имя": user["name"],
-        "возраст": user["age"],
-        "пол": "мужской" if user["sex"] == "male" else "женский" if user["sex"] == "female" else None,
+        "пациент": llm_service.patient_alias(user["id"], user["age"]),
         "рост_см": user["height_cm"],
     }
 
