@@ -45,7 +45,7 @@ export default function Login() {
         className="auth-card w-full max-w-sm flex flex-col gap-4 anim-rise"
         style={{ animationDelay: '90ms' }}
       >
-        <h1 className="text-2xl text-center">Вход <Icon name="login" size={22} className="inline-block align-[-3px]" /></h1>
+        <h1 className="page-title text-center">Вход <Icon name="login" size={22} className="inline-block align-[-3px]" /></h1>
 
         {error && (
           <div className="badge badge-red justify-center normal-case tracking-normal">
@@ -83,7 +83,7 @@ export default function Login() {
           {busy ? 'Входим…' : (<span className="inline-flex items-center gap-2">Войти <Icon name="arrow" size={16} /></span>)}
         </button>
 
-        <p className="text-center text-sm text-teal-dark/70">
+        <p className="text-center text-sm text-ink-soft">
           Ещё нет аккаунта?{' '}
           <Link to="/register" className="font-extrabold text-teal hover:text-teal-light">
             Зарегистрироваться
@@ -91,7 +91,7 @@ export default function Login() {
         </p>
       </form>
 
-      <p className="text-center text-xs text-teal-dark/50 font-bold mt-4">
+      <p className="text-center text-xs text-ink-soft font-bold mt-4">
         {brand.name} · {brand.site} · не заменяет консультацию врача
       </p>
     </div>

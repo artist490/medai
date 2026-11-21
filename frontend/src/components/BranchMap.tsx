@@ -251,7 +251,7 @@ export default function BranchMap({ slug, lat, lon, city }: {
     clinicBtn.className = 'maplibregl-ctrl maplibregl-ctrl-group'
     clinicBtn.innerHTML =
       '<button type="button" title="Показать клинику" aria-label="Показать клинику" ' +
-      'style="width:29px;height:29px;display:grid;place-items:center;border:0;background:none;cursor:pointer;color:#17504a">' +
+      'style="width:29px;height:29px;display:grid;place-items:center;border:0;background:none;cursor:pointer;color:var(--color-teal-deep)">' +
       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
       'stroke-linecap="round"><circle cx="12" cy="12" r="3.2"></circle><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"></path></svg></button>'
     clinicBtn.querySelector('button')!.addEventListener('click', () => {
@@ -267,7 +267,7 @@ export default function BranchMap({ slug, lat, lon, city }: {
     dimBtn.innerHTML =
       '<button type="button" title="Переключить 2D/3D" aria-label="Переключить 2D/3D" ' +
       'style="width:29px;height:29px;display:grid;place-items:center;border:0;background:none;cursor:pointer;' +
-      'color:#17504a;font-size:11px;font-weight:800;font-family:Inter,system-ui,sans-serif">3D</button>'
+      'color:var(--color-teal-deep);font-size:11px;font-weight:800;font-family:Inter,system-ui,sans-serif">3D</button>'
     dimBtn.querySelector('button')!.addEventListener('click', () => setThreeD((v) => !v))
     dimBtnRef.current = dimBtn.querySelector('button')
     map.addControl({ onAdd: () => dimBtn, onRemove: () => { dimBtn.remove() } }, 'top-left')

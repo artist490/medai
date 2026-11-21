@@ -148,6 +148,7 @@ export interface MedCard {
   survey: string | null   // JSON ответов опросника Минздрава (404н)
   updated_by: 'patient' | 'doctor' | null
   updated_at: string | null
+  alarm_keys?: string[]   // тревожные ключи опросника из API (signals.ALARM_SURVEY_KEYS); нет поля — фронт берёт fallback
 }
 
 export interface MedCardInput {

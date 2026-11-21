@@ -19,7 +19,7 @@ export default function BookingMenu({ reason, onAppBooking, onClose }: {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-extrabold text-teal-dark">Записаться: {reason}</div>
-          <div className="text-xs font-bold text-teal-dark/55 mt-0.5">
+          <div className="text-xs font-bold text-ink-soft mt-0.5">
             Выберите удобный способ. Запись ведёт к врачу «Спектр-Диагностики»
           </div>
         </div>
@@ -31,20 +31,20 @@ export default function BookingMenu({ reason, onAppBooking, onClose }: {
         <span className="emoji-box"><Icon name="care" size={20} /></span>
         <span className="min-w-0">
           <span className="block text-sm font-extrabold text-teal-dark">Онлайн-запись на сайте клиники</span>
-          <span className="block text-xs font-bold text-teal-dark/55">
+          <span className="block text-xs font-bold text-ink-soft">
             {branch ? `${branch.city} · ` : ''}откроется spdmed.ru: выберите врача и время
           </span>
         </span>
-        <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />
+        <Icon name="chevron" size={14} className="ml-auto text-teal-deep" />
       </a>
 
       <a href={telHref} className="flip-card flip-card--sky flex items-center gap-3 hover:opacity-90 transition-quick">
         <span className="emoji-box"><Icon name="help" size={20} /></span>
         <span className="min-w-0">
           <span className="block text-sm font-extrabold text-teal-dark">Позвонить филиалу</span>
-          <span className="block text-xs font-bold text-teal-dark/55">{phone}</span>
+          <span className="block text-xs font-bold text-ink-soft">{phone}</span>
         </span>
-        <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />
+        <Icon name="chevron" size={14} className="ml-auto text-teal-deep" />
       </a>
 
       <button onClick={onAppBooking}
@@ -52,9 +52,9 @@ export default function BookingMenu({ reason, onAppBooking, onClose }: {
         <span className="emoji-box"><Icon name="calendar" size={20} /></span>
         <span className="min-w-0">
           <span className="block text-sm font-extrabold text-teal-dark">Оставить жалобу в приложении</span>
-          <span className="block text-xs font-bold text-teal-dark/55">врач вашего филиала увидит её до приёма</span>
+          <span className="block text-xs font-bold text-ink-soft">врач вашего филиала увидит её до приёма</span>
         </span>
-        <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />
+        <Icon name="chevron" size={14} className="ml-auto text-teal-deep" />
       </button>
     </div>
   )

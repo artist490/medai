@@ -1,5 +1,5 @@
 // Кабинет врача: пациенты клиники, требующие внимания — сверху.
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import * as api from '../api'
 import { Icon } from '../components/Icon'
@@ -49,7 +49,7 @@ function AttentionCard({ p }: { p: PatientRow }) {
         </span>
         <span className="badge badge-red">тревога</span>
       </div>
-      <p className="text-sm text-teal-dark/85">
+      <p className="text-sm text-ink-soft">
         {(p.survey_alarms ?? 0) > 0
           ? `Опросник: ${p.survey_alarms} ${p.survey_alarms === 1 ? 'тревожный пункт' : 'тревожных пункта'}. `
           : `Последний замер ${shortDate(p.last_measurement_at)} — риск «Тревога». `}
@@ -74,14 +74,23 @@ export default function DoctorPatients() {
       .finally(() => setLoading(false))
   }, [])
 
-  const attention = useMemo(() => items.filter((p) => p.requires_attention), [items])
-  const others = useMemo(() => {
-    const rest = items.filter((p) => !p.requires_attention)
-    if (!query) return rest
-    return rest.filter(
-      (p) => (p.name || '').toLowerCase().includes(query) || p.email.toLowerCase().includes(query),
-    )
-  }, [items, query])
+  // Один и тот же предикат поиска для обеих секций: найденный тревожный
+  // пациент остаётся карточкой в «Требуют внимания», а не исчезает из выдачи
+  const matchesQuery = useCallback(
+    (p: PatientRow) =>
+      !query ||
+      (p.name || '').toLowerCase().includes(query) ||
+      p.email.toLowerCase().includes(query),
+    [query],
+  )
+  const attention = useMemo(
+    () => items.filter((p) => p.requires_attention && matchesQuery(p)),
+    [items, matchesQuery],
+  )
+  const others = useMemo(
+    () => items.filter((p) => !p.requires_attention && matchesQuery(p)),
+    [items, matchesQuery],
+  )
 
   return (
     <div className="flex flex-col gap-6 stagger">
@@ -107,12 +116,12 @@ export default function DoctorPatients() {
             </section>
           )}
 
-          <section className="bg-white rounded-[20px] p-6" style={{ boxShadow: '0 6px 24px rgba(23,46,42,.06)' }}>
+          <section className="bg-white rounded-lg p-6 shadow-float">
             <div className="flex items-center justify-between gap-3 mb-2">
-              <h2 className="text-xl">
-                Все пациенты {others.length > 0 && <span className="text-teal-dark/40 text-base">· {others.length}</span>}
+              <h2 className="text-[18px]">
+                Все пациенты {others.length > 0 && <span className="text-ink-soft text-base">· {others.length}</span>}
               </h2>
-              {query && <span className="text-sm text-teal-dark/60">поиск: «{query}»</span>}
+              {query && <span className="text-sm text-ink-soft">поиск: «{query}»</span>}
             </div>
             <div className="overflow-x-auto">
               <table className="data-table">
@@ -127,9 +136,11 @@ export default function DoctorPatients() {
                   </tr>
                 </thead>
                 <tbody>
-                  {others.length === 0 && (
+                  {/* «Никого не найдено» — только когда после фильтра пусты оба списка:
+                      совпадение может остаться карточкой в «Требуют внимания» выше */}
+                  {others.length === 0 && attention.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center text-sm text-teal-dark/60 py-8">
+                      <td colSpan={6} className="text-center text-sm text-ink-soft py-8">
                         {query
                           ? `Никого не найдено по «${query}»`
                           : 'Пациентов пока нет — они появятся после регистрации'}
@@ -143,20 +154,20 @@ export default function DoctorPatients() {
                           <PatientAvatar p={p} />
                           <div className="min-w-0">
                             <div className="font-extrabold">{p.name || '(без имени)'}</div>
-                            <div className="text-xs text-teal-dark/60">{p.email}</div>
+                            <div className="text-xs text-ink-soft">{p.email}</div>
                           </div>
                         </div>
                       </td>
                       <td>{p.age ?? '—'}</td>
                       <td>
                         <div className="font-extrabold">{shortDate(p.last_measurement_at)}</div>
-                        <div className="text-xs text-teal-dark/60">всего: {p.total}</div>
+                        <div className="text-xs text-ink-soft">всего: {p.total}</div>
                       </td>
                       <td>
                         <div className="flex flex-col gap-1 items-start">
                           {p.last_risk ? (
                             <span className={`${riskBadge[p.last_risk]} badge`}>{riskLabels[p.last_risk]}</span>
-                          ) : <span className="text-teal-dark/40">—</span>}
+                          ) : <span className="text-ink-soft">—</span>}
                           {(p.unread_signals ?? 0) > 0 && (
                             <span className="mt-1 flex items-center gap-1.5 text-xs font-bold text-coral">
                               <span className="w-1.5 h-1.5 rounded-full bg-coral" aria-hidden />
@@ -175,7 +186,7 @@ export default function DoctorPatients() {
                           )}
                         </div>
                       </td>
-                      <td className="text-xs text-teal-dark/70 whitespace-nowrap">
+                      <td className="text-xs text-ink-soft whitespace-nowrap">
                         <span className="mr-2 inline-flex items-center gap-1"><Icon name="check" size={12} />{p.counts.green}</span>
                         <span className="mr-2 inline-flex items-center gap-1"><Icon name="warning" size={12} />{p.counts.yellow}</span>
                         <span className="inline-flex items-center gap-1"><Icon name="alarm" size={12} />{p.counts.red}</span>
@@ -183,7 +194,7 @@ export default function DoctorPatients() {
                       <td className="!text-right">
                         <Link
                           to={`/patients/${p.id}`}
-                          className="font-bold text-teal-dark hover:text-teal-dark/80 whitespace-nowrap inline-flex items-center gap-1"
+                          className="font-bold text-teal-dark hover:text-teal-deep whitespace-nowrap inline-flex items-center gap-1"
                         >
                           Открыть <Icon name="chevron" size={13} />
                         </Link>
@@ -195,7 +206,7 @@ export default function DoctorPatients() {
             </div>
           </section>
 
-          <p className="text-[11px] font-semibold text-teal-dark/40 text-center">
+          <p className="text-[11px] font-semibold text-ink-soft text-center">
             <Icon name="cross" size={12} className="inline-block align-[-1px] mr-1" />Данные пациентов конфиденциальны — доступ только у врачей {brand.name}
           </p>
         </>

@@ -12,10 +12,10 @@ export default function PageHeader({ eyebrow, title, sub, actions }: {
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
         {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-        <h1 className="mt-1 leading-tight" style={{ fontSize: 'clamp(26px, 4vw, 32px)', letterSpacing: '-0.02em' }}>
+        <h1 className="page-title mt-1 leading-tight">
           {title}
         </h1>
-        {sub && <p className="text-sm text-teal-dark/60 mt-1.5">{sub}</p>}
+        {sub && <p className="text-sm text-teal-deep mt-1.5">{sub}</p>}
       </div>
       {actions && <div className="flex items-center gap-3 shrink-0">{actions}</div>}
     </div>

@@ -8,7 +8,7 @@ export default function Disclaimer({ urgent = false, phone }: { urgent?: boolean
       className={`rounded-xl p-3 text-xs leading-relaxed border-2 border-dashed ${
         urgent
           ? 'border-coral/40 bg-coral/5 text-coral-dark'
-          : 'border-teal/25 bg-teal-bg/60 text-teal-dark/75'
+          : 'border-teal/25 bg-teal-bg/60 text-ink-soft'
       }`}
     >
       <Icon name="cross" size={12} className="inline-block align-[-1px] mr-1" />{brand.name} не ставит диагнозы и не заменяет консультацию врача. Рекомендации носят

@@ -5,6 +5,7 @@ import { useAuth } from '../auth'
 import { Icon } from '../components/Icon'
 import EmptyArt from '../components/EmptyArt'
 import PageHeader from '../components/PageHeader'
+import { Skeleton } from '../components/Skeleton'
 import type { ChatMessage } from '../types'
 
 const TOOL_LABELS: Record<string, string> = {
@@ -62,12 +63,21 @@ export default function Chat() {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [historyLoading, setHistoryLoading] = useState(true)
   const boxRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  function loadHistory() {
+    setHistoryLoading(true)
+    setError('')
     api.fetchChatHistory()
       .then((d) => setItems(d.items))
-      .catch(() => {})
+      .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось загрузить историю'))
+      .finally(() => setHistoryLoading(false))
+  }
+
+  useEffect(() => {
+    loadHistory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -119,13 +129,13 @@ export default function Chat() {
         />
       </div>
 
-      <p className="text-sm text-teal-dark/80 -mt-3 hidden sm:block shrink-0">
+      <p className="text-sm text-teal-deep -mt-3 hidden sm:block shrink-0">
         Ассистент видит {user?.role === 'doctor'
           ? 'данные пациентов вашего филиала'
           : 'ваши замеры и разборы'} и отвечает с опорой на них.
         Не ставит диагнозы. При тревожных показателях обратитесь к врачу.
       </p>
-      <p className="text-xs text-teal-dark/75 -mt-4 sm:hidden shrink-0">
+      <p className="text-xs text-teal-deep -mt-4 sm:hidden shrink-0">
         Ассистент видит ваши данные и не ставит диагнозы.
       </p>
 
@@ -134,11 +144,24 @@ export default function Chat() {
         ref={boxRef}
         className="flex-1 min-h-0 flex flex-col gap-3 rounded-2xl border border-[#eef3f2] bg-white p-3 sm:p-4 sm:max-h-[58vh] overflow-y-auto shadow-soft [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {items.length === 0 && (
+        {historyLoading && (
+          <div className="flex flex-col gap-3 py-4" aria-busy>
+            <Skeleton w="30%" h={12} />
+            <Skeleton w="70%" h={38} r={12} />
+            <Skeleton w="55%" h={38} r={12} className="ml-auto" />
+          </div>
+        )}
+        {!historyLoading && items.length === 0 && error && (
+          <div className="grid place-items-center py-8 text-center">
+            <div className="badge badge-red normal-case tracking-normal w-fit mb-3">{error}</div>
+            <button className="btn btn-ghost" onClick={loadHistory}>Повторить</button>
+          </div>
+        )}
+        {!historyLoading && items.length === 0 && !error && (
           <div className="grid place-items-center py-8 text-center">
             <EmptyArt className="mx-auto mb-2" />
             <p className="text-base font-bold text-[#1b2622]">Пока нет сообщений</p>
-            <p className="text-sm text-teal-dark/60 max-w-sm mt-1">
+            <p className="text-sm text-ink-soft max-w-sm mt-1">
               Задайте вопрос о показателях. Ассистент сам посмотрит нужные замеры
               и разборы через инструменты.
             </p>
@@ -155,7 +178,7 @@ export default function Chat() {
               }`}
             >
               <Md text={m.content} />
-              <div className={`mt-1 text-[10px] font-bold ${m.role === 'user' ? 'text-white/60' : 'text-teal-dark/45'}`}>
+              <div className={`mt-1 text-[10px] font-bold ${m.role === 'user' ? 'text-white/60' : 'text-ink-soft'}`}>
                 {m.created_at.slice(5, 16)}
               </div>
             </div>
@@ -168,13 +191,14 @@ export default function Chat() {
               <span className="typing-dot" />
               <span className="typing-dot" />
               <span className="typing-dot" />
-              <span className="ml-1.5 text-xs font-bold text-teal-dark/55">ИИ смотрит данные…</span>
+              <span className="ml-1.5 text-xs font-bold text-ink-soft">ИИ смотрит данные…</span>
             </div>
           </div>
         )}
       </div>
 
-      {error && <div className="badge badge-red w-fit normal-case tracking-normal">{error}</div>}
+      {/* Ошибка отправки: история ошибок пустой ленты показывается внутри ленты с «Повторить» */}
+      {error && items.length > 0 && <div className="badge badge-red w-fit normal-case tracking-normal">{error}</div>}
 
       {/* Подсказки */}
       <div className="shrink-0 flex gap-2 -mt-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
@@ -210,7 +234,7 @@ export default function Chat() {
             }
           }}
         />
-        <button className="btn btn-gold shrink-0 !min-h-[36px] !px-3.5" disabled={busy || !input.trim()}>
+        <button className="btn btn-gold shrink-0" disabled={busy || !input.trim()}>
           <Icon name="send" size={16} />
           <span className="hidden sm:inline">Отправить</span>
         </button>

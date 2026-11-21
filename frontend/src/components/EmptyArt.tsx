@@ -10,8 +10,8 @@ export default function EmptyArt({ className }: { className?: string }) {
           <stop offset="1" stopColor="#007b83" />
         </linearGradient>
       </defs>
-      {/* мягкая тень-подложка */}
-      <ellipse cx="92" cy="118" rx="64" ry="9" fill="#0b3d3a" opacity="0.07" />
+      {/* мягкая тень-подложка (fill через CSS-класс: var() не работает в SVG-атрибутах) */}
+      <ellipse className="emptyart-shadow" cx="92" cy="118" rx="64" ry="9" opacity="0.07" />
       {/* дальняя карточка */}
       <rect x="44" y="30" width="86" height="70" rx="12" fill="url(#emptyart-teal)" opacity="0.13" />
       {/* ближняя карточка */}

@@ -33,7 +33,7 @@ const HABIT_GROUPS: Array<{ key: keyof CardFormState; label: string; options: st
 ]
 
 function toggleClass(active: boolean): string {
-  return `btn btn-sm flex-1 ${active ? 'btn-teal' : 'btn-ghost'}`
+  return `btn btn-sm flex-1 ${active ? 'btn-gold' : 'btn-ghost'}`
 }
 
 export function CardFormFields({ form, setField }: {
@@ -116,10 +116,10 @@ export function CardCompleteness({ card, compact }: { card: MedCard; compact?: b
   return (
     <div className={compact ? '' : 'mb-4'}>
       <div className="flex items-center justify-between text-xs font-extrabold mb-1.5">
-        <span className={done ? 'text-teal' : 'text-teal-dark/70'}>
+        <span className={done ? 'text-teal' : 'text-ink-soft'}>
           {done ? 'Анкета заполнена полностью' : `Заполнено ${percent}%`}
         </span>
-        <span className="text-teal-dark/45">{filled.length} из {VIEW_FIELDS.length} разделов</span>
+        <span className="text-ink-soft">{filled.length} из {VIEW_FIELDS.length} разделов</span>
       </div>
       <div className="h-1.5 rounded-full bg-[#e5e7eb] overflow-hidden">
         <div
@@ -129,9 +129,9 @@ export function CardCompleteness({ card, compact }: { card: MedCard; compact?: b
       </div>
       {!done && !compact && missing.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
-          <span className="text-[11px] font-bold text-teal-dark/45 leading-5">не заполнено:</span>
+          <span className="text-[11px] font-bold text-ink-soft leading-5">не заполнено:</span>
           {missing.map((f) => (
-            <span key={f.key} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#e9f7f6] text-teal-dark/70">
+            <span key={f.key} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#e9f7f6] text-teal-deep">
               {f.label}
             </span>
           ))}
@@ -141,8 +141,10 @@ export function CardCompleteness({ card, compact }: { card: MedCard; compact?: b
   )
 }
 
-export function CardView({ card }: { card: MedCard }) {
+export function CardView({ card, alarmKeys }: { card: MedCard; alarmKeys?: string[] }) {
   const filled = VIEW_FIELDS.filter((f) => card[f.key])
+  // F007: живые ключи приходят из API (MedCard.alarm_keys); fallback — ALARM_KEYS из AnamnesisSurvey
+  const activeAlarmKeys = alarmKeys ? new Set(alarmKeys) : ALARM_KEYS
 
   // Тревожные ответы опросника Минздрава — врачу первым делом
   let surveyAlarm: string[] = []
@@ -151,7 +153,7 @@ export function CardView({ card }: { card: MedCard }) {
   if (card.survey) {
     try {
       const s = JSON.parse(card.survey) as Record<string, unknown>
-      surveyAlarm = Array.from(ALARM_KEYS).filter((k) => s[k] === true).map((k) => SURVEY_SHORT[k] ?? k)
+      surveyAlarm = Array.from(activeAlarmKeys).filter((k) => s[k] === true).map((k) => SURVEY_SHORT[k] ?? k)
       surveyAudit = (Number(s.alcohol_freq) || 0) + (Number(s.alcohol_portions) || 0) + (Number(s.alcohol_binge) || 0)
       surveyOther = String(s.other_complaints ?? '').trim()
     } catch { /* повреждённый JSON — блок пропускается */ }
@@ -173,29 +175,29 @@ export function CardView({ card }: { card: MedCard }) {
             ))}
           </div>
           {surveyAudit >= 6 && (
-            <div className="text-xs font-bold text-teal-dark/70 mt-2">AUDIT-C: {surveyAudit} баллов — риск пагубного потребления алкоголя</div>
+            <div className="text-xs font-bold text-ink-soft mt-2">AUDIT-C: {surveyAudit} баллов — риск пагубного потребления алкоголя</div>
           )}
           {surveyOther && (
-            <div className="text-xs font-bold text-teal-dark/70 mt-2">Другие жалобы: {surveyOther}</div>
+            <div className="text-xs font-bold text-ink-soft mt-2">Другие жалобы: {surveyOther}</div>
           )}
         </div>
       )}
       {filled.length === 0 ? (
-        <div className="text-sm font-bold text-teal-dark/55">
+        <div className="text-sm font-bold text-ink-soft">
           Пациент ещё не вводил анамнез — попросите заполнить анкету в его кабинете.
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 gap-x-10 gap-y-3">
           {filled.map((f) => (
             <div key={f.key} className="border-b border-[#e5e7eb] pb-2">
-              <div className="text-[11px] font-semibold text-teal-dark/45">{f.label}</div>
+              <div className="text-[11px] font-semibold text-ink-soft">{f.label}</div>
               <div className="text-sm font-bold text-teal-dark whitespace-pre-wrap mt-0.5">{card[f.key]}</div>
             </div>
           ))}
         </div>
       )}
       {card.updated_at && (
-        <div className="text-xs font-bold text-teal-dark/50">
+        <div className="text-xs font-bold text-ink-soft">
           {card.updated_by === 'doctor' ? 'Анкету дополнял врач' : 'Анкету заполнял пациент'} · {card.updated_at.slice(0, 10)}
         </div>
       )}

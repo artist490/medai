@@ -79,6 +79,7 @@ function AssistantSlot() {
 export default function Layout() {
   const { user, logout } = useAuth()
   const [signalCount, setSignalCount] = useState(0)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   useEffect(() => {
     if (user?.role !== 'doctor') return
@@ -91,6 +92,8 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [query, setQuery] = useState('')
+  // Меню аватара закрывается при смене маршрута
+  useEffect(() => { setUserMenuOpen(false) }, [location.pathname])
   // Перетекающий индикатор: белая карточка в сайдбаре и плашка в мобильном баре
   const navRef = useRef<HTMLElement>(null)
   const navRect = useFlowRect(navRef, '.sidebar-link.active', location.pathname)
@@ -103,6 +106,7 @@ export default function Layout() {
   const onChat = location.pathname.startsWith('/chat')
 
   async function handleLogout() {
+    if (!window.confirm('Выйти из аккаунта?')) return
     await logout()
     navigate('/login')
   }
@@ -133,8 +137,8 @@ export default function Layout() {
             </div>
           </NavLink>
 
-          {/* Профиль-карточка: аватар, имя, роль */}
-          <div className="profile-card mt-7 flex items-center gap-3 px-3 py-3 anim-rise" style={{ animationDelay: '60ms' }}>
+          {/* Профиль-карточка: аватар, имя, роль — ведёт на страницу профиля */}
+          <NavLink to="/profile" className="profile-card mt-7 flex items-center gap-3 px-3 py-3 anim-rise" style={{ animationDelay: '60ms' }}>
             {isDoctor ? (
               <AvatarDoctor size={44} />
             ) : (
@@ -144,11 +148,11 @@ export default function Layout() {
             )}
             <div className="min-w-0">
               <div className="text-sm font-bold text-[#1b2622] truncate">{user?.name || user?.email}</div>
-              <div className="text-xs text-[#8aa09c]">
+              <div className="text-xs text-ink-soft">
                 {user?.age ? `${user.age} ${ageWord(user.age)}` : (isDoctor ? 'врач клиники' : 'пациент')}
               </div>
             </div>
-          </div>
+          </NavLink>
 
           <div className="mx-1 my-4 h-px bg-[#e9efed]" />
 
@@ -165,7 +169,7 @@ export default function Layout() {
                 <span className={`sidebar-icon sidebar-icon--${item.accent}`}><Icon name={item.icon} size={20} /></span>
                 <span className="flex flex-col leading-tight min-w-0">
                   <span>{item.label}</span>
-                  <span className="text-[10px] font-semibold text-[#8aa09c] truncate">{item.sub}</span>
+                  <span className="text-[11px] font-semibold text-ink-soft truncate">{item.sub}</span>
                 </span>
               </NavLink>
             ))}
@@ -173,7 +177,7 @@ export default function Layout() {
         </div>
 
         {isDoctor ? (
-          <div className="text-xs font-bold text-[#8aa09c] px-2 leading-relaxed">
+          <div className="text-xs font-bold text-ink-soft px-2 leading-relaxed">
             Кабинет врача{user?.name ? ` · ${user.name}` : ''}
           </div>
         ) : (
@@ -214,32 +218,48 @@ export default function Layout() {
                   </button>
                 </span>
               )}
-              <button className="topbar-icon" title="Уведомления" aria-label="Уведомления">
-                <Icon name="bell" size={20} /><span className="dot" />
-              </button>
-              <button className="topbar-icon" title="Справка" aria-label="Справка">
-                <Icon name="help" size={20} />
-              </button>
-              {isDoctor ? (
-                <button
-                  className="cursor-pointer bg-transparent border-none p-0"
-                  title={`${user?.name || user?.email} · выйти`}
-                  onClick={handleLogout}
-                  aria-label="Профиль, выйти"
-                >
-                  <AvatarDoctor size={40} />
-                </button>
-              ) : (
-                <button
-                  className="doctor-avatar text-white cursor-pointer"
-                  style={{ width: 40, height: 40 }}
-                  title={`${user?.name || user?.email} · выйти`}
-                  onClick={handleLogout}
-                  aria-label="Профиль, выйти"
-                >
-                  <AvatarPatient size={33} />
-                </button>
-              )}
+              {/* Аватар: меню профиля (профиль / выход) вместо мгновенного logout */}
+              <div className="relative">
+                {isDoctor ? (
+                  <button
+                    className="cursor-pointer bg-transparent border-none p-0"
+                    onClick={() => setUserMenuOpen((v) => !v)}
+                    aria-label="Меню профиля"
+                    aria-expanded={userMenuOpen}
+                  >
+                    <AvatarDoctor size={40} />
+                  </button>
+                ) : (
+                  <button
+                    className="doctor-avatar text-white cursor-pointer"
+                    style={{ width: 40, height: 40 }}
+                    onClick={() => setUserMenuOpen((v) => !v)}
+                    aria-label="Меню профиля"
+                    aria-expanded={userMenuOpen}
+                  >
+                    <AvatarPatient size={33} />
+                  </button>
+                )}
+                {userMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40 cursor-default" onClick={() => setUserMenuOpen(false)} aria-hidden />
+                    <div className="absolute right-0 top-[46px] z-50 w-48 bg-white border border-[#e5e7eb] rounded-lg shadow-float p-1.5 flex flex-col">
+                      <button
+                        className="text-left text-sm font-semibold text-[#1b2622] px-3 py-2 rounded-lg hover:bg-[#f1f6f5] transition-quick"
+                        onClick={() => { setUserMenuOpen(false); navigate('/profile') }}
+                      >
+                        Профиль
+                      </button>
+                      <button
+                        className="text-left text-sm font-semibold text-[#1b2622] px-3 py-2 rounded-lg hover:bg-[#f1f6f5] transition-quick"
+                        onClick={handleLogout}
+                      >
+                        Выйти
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -252,10 +272,10 @@ export default function Layout() {
         </main>
 
         <footer className="hidden lg:flex px-5 sm:px-8 py-7 flex-wrap items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold text-teal-dark/45">
+          <span className="text-[11px] font-semibold text-ink-soft">
             © 2026 {brand.name} · не заменяет консультацию врача
           </span>
-          <span className="text-[11px] font-semibold text-teal-dark/45">
+          <span className="text-[11px] font-semibold text-ink-soft">
             {brand.site} · {brand.phone}
           </span>
         </footer>

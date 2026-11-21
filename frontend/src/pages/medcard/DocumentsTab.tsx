@@ -14,10 +14,20 @@ export default function DocumentsTab() {
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [listError, setListError] = useState('')
   const fileRef = useRef<HTMLInputElement | null>(null)
 
+  function loadDocs() {
+    setListError('')
+    setDocs(null)
+    api.fetchDocuments()
+      .then((d) => setDocs(d.items))
+      .catch((e) => setListError(e instanceof Error ? e.message : 'Не удалось загрузить документы'))
+  }
+
   useEffect(() => {
-    api.fetchDocuments().then((d) => setDocs(d.items)).catch(() => setDocs([]))
+    loadDocs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function upload() {
@@ -80,13 +90,18 @@ export default function DocumentsTab() {
           onChange={(e) => setTitle(e.target.value)}
         />
         {error && <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>}
-        <button className="btn btn-teal w-fit" disabled={busy}>
+        <button className="btn btn-gold w-fit" disabled={busy}>
           {busy ? 'Загружаем…' : 'Загрузить документ'}
         </button>
         <div className="flip-hint">PDF или фото до 8 МБ. Документы видны только вам.</div>
       </form>
 
-      {docs === null ? (
+      {listError ? (
+        <div className="flex flex-col items-start gap-3">
+          <div className="badge badge-red normal-case tracking-normal w-fit">{listError}</div>
+          <button className="btn btn-ghost" onClick={loadDocs}>Повторить</button>
+        </div>
+      ) : docs === null ? (
         <div className="flex flex-col gap-3" aria-busy>
           {[0, 1, 2].map((i) => (
             <div key={i} className="py-1 flex items-center gap-3">
@@ -103,7 +118,7 @@ export default function DocumentsTab() {
         <div className="grid place-items-center py-8 text-center">
           <EmptyArt className="mx-auto mb-2" />
           <p className="text-base font-bold text-[#1b2622]">Документов пока нет</p>
-          <p className="text-sm text-teal-dark/70 max-w-sm mt-1">
+          <p className="text-sm text-ink-soft max-w-sm mt-1">
             Загрузите первый результат исследования — он будет виден только вам
             и всегда под рукой в медкарте.
           </p>
@@ -115,7 +130,7 @@ export default function DocumentsTab() {
               <span className="emoji-box"><Icon name="doc" size={18} /></span>
               <div className="min-w-0">
                 <div className="text-sm font-bold text-[#1b2622] truncate">{d.title}</div>
-                <div className="text-xs text-[#8aa09c]">
+                <div className="text-xs text-ink-soft">
                   {fmtSize(d.size)} · {d.uploaded_at.slice(0, 16).replace('T', ' ')}
                 </div>
               </div>

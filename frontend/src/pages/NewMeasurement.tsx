@@ -152,7 +152,7 @@ export default function NewMeasurement() {
           <div className="badge badge-red justify-center normal-case tracking-normal">{error}</div>
         )}
 
-        <button className="btn btn-gold w-full text-base" disabled={busy || !hasAnyValue(form)}>
+        <button className="btn btn-gold w-full" disabled={busy || !hasAnyValue(form)}>
           {busy ? 'ИИ анализирует…' : (<span className="inline-flex items-center gap-2">Проанализировать <Icon name="sparkle" size={16} /></span>)}
         </button>
       </form>

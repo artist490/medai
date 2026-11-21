@@ -13,10 +13,16 @@
   --color-teal: #00b8a9;
   --color-teal-light: #2fd0c2;
   --color-teal-dark: #007b83;
+  /* Глубокий тил для акцентных подписей/иконок (WCAG AA на белом) */
+  --color-teal-deep: #0d5f60;
   --color-teal-bg: #e9f7f6;
   --color-gold: #facc15;
   --color-gold-light: #ffe47a;
   --color-gold-dark: #eab308;
+  /* Текстовые/иконочные тона статусов gold/sky: светлый шаг внутри того же hue
+     до 4.5:1 на подложках (брендовые декоративные золота не трогаются) */
+  --color-gold-ink: #7a5f00;
+  --color-sky-ink: #26719e;
   --color-coral: #dc2626;
   --color-coral-light: #f87171;
   --color-coral-dark: #b91c1c;
@@ -27,7 +33,8 @@
   --color-success: #16a34a;
   --color-danger: #dc2626;
   --color-ink: #161a1d;
-  --color-ink-soft: #4b5563;
+  /* Мета-текст: сплошной цвет вместо прозрачных тилов — 7.35:1 на белом */
+  --color-ink-soft: #465a56;
 
   /* --- Радиусы: крупнее — часть премиальной пластики --- */
   --radius-sm: 6px;
@@ -132,6 +139,15 @@ h1, h2, h3, h4 {
   color: var(--color-ink);
 }
 
+/* Один размер h1 во всём продукте (бывший инлайн clamp в PageHeader) */
+:root {
+  --fs-h1: clamp(26px, 4vw, 32px);
+}
+.page-title {
+  font-size: var(--fs-h1);
+  letter-spacing: -0.02em;
+}
+
 /* ---------- Мета-строка над заголовком ---------- */
 
 .eyebrow {
@@ -150,11 +166,11 @@ h1, h2, h3, h4 {
   line-height: 1;
 }
 .wordmark-sub {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 1.1px;
   text-transform: uppercase;
-  color: #8aa09c;
+  color: var(--color-ink-soft);
   margin-top: 6px;
 }
 
@@ -169,7 +185,7 @@ h1, h2, h3, h4 {
   justify-content: center;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #ffffff;
   border: 1px solid #e9efed;
   box-shadow: 0 1px 2px rgba(23, 46, 42, 0.05);
@@ -178,14 +194,14 @@ h1, h2, h3, h4 {
 .profile-card {
   background: #ffffff;
   border: 1px solid #e9efed;
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04);
+  border-radius: 16px;
+  box-shadow: var(--shadow-rest);
 }
 .sidebar-link {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 9px 12px;
+  padding: 8px 12px;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
@@ -201,7 +217,7 @@ h1, h2, h3, h4 {
 .sidebar-link.active {
   background: transparent;
   border-color: transparent;
-  color: #0d5f60;
+  color: var(--color-teal-deep);
   box-shadow: none;
 }
 .sidebar-icon {
@@ -210,7 +226,7 @@ h1, h2, h3, h4 {
   justify-content: center;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid #e9efed;
   color: #35605c;
@@ -219,11 +235,11 @@ h1, h2, h3, h4 {
 }
 /* Цветные акценты пунктов (как у Сбер Здоровья) */
 .sidebar-icon--coral { color: #d94f43; }
-.sidebar-icon--sky   { color: #3a8fc7; }
-.sidebar-icon--gold  { color: #c29400; }
+.sidebar-icon--sky   { color: var(--color-sky-ink); }
+.sidebar-icon--gold  { color: var(--color-gold-ink); }
 .sidebar-link:hover .sidebar-icon { background: #ffffff; }
 .sidebar-link.active .sidebar-icon {
-  background: #007b83;
+  background: var(--color-teal-dark);
   border-color: transparent;
   color: #ffffff;
   box-shadow: 0 1px 2px rgba(23, 46, 42, 0.10);
@@ -236,12 +252,12 @@ h1, h2, h3, h4 {
   gap: 10px;
   flex: 1;
   max-width: 560px;
-  height: 42px;
+  height: 40px;
   padding: 0 16px;
   background: #ffffff;
   border: 1px solid #e8eeec;
   border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04);
+  box-shadow: var(--shadow-rest);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .search-pill:focus-within {
@@ -257,7 +273,7 @@ h1, h2, h3, h4 {
   font-weight: 400;
   color: var(--color-ink);
 }
-.search-pill input::placeholder { color: color-mix(in srgb, #1b2622 40%, white); }
+.search-pill input::placeholder { color: var(--color-ink-soft); }
 /* На телефонах поиск в топбаре выдавливает кнопки за экран — убираем */
 @media (max-width: 639px) {
   .search-pill { display: none; }
@@ -279,16 +295,6 @@ h1, h2, h3, h4 {
   transition: background 0.15s ease;
 }
 .topbar-icon:hover { background: #f1f6f5; }
-.topbar-icon .dot {
-  position: absolute;
-  top: 9px;
-  right: 10px;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--color-coral);
-  box-shadow: 0 0 0 2px #ffffff;
-}
 .avatar-circle {
   display: inline-flex;
   align-items: center;
@@ -311,34 +317,44 @@ h1, h2, h3, h4 {
   justify-content: center;
   border-radius: 999px;
   overflow: hidden;
-  background: #007b83;
+  background: var(--color-teal-dark);
   box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.30);
   flex-shrink: 0;
 }
 .doctor-avatar svg { display: block; }
 
-/* ---------- Тени: слоистая мягкая глубина ---------- */
+/* ---------- Тени: слоистая мягкая глубина ----------
+   Три уровня: покой (плитки/панели), парение (карточки над контентом), модалка. */
 
-.shadow-soft  { box-shadow: 0 1px 2px rgba(23, 46, 42, 0.05); }
-.shadow-float { box-shadow: 0 1px 3px rgba(23, 46, 42, 0.10); }
+:root {
+  /* Один внутренний паддинг однотипных карточек одного ряда (дашборд) */
+  --pad-card: 24px;
+  --shadow-rest: 0 1px 2px rgba(23, 46, 42, 0.05);
+  --shadow-float: 0 1px 2px rgba(23, 46, 42, 0.05), 0 12px 24px -12px rgba(23, 46, 42, 0.14);
+  --shadow-modal: 0 2px 4px rgba(23, 46, 42, 0.05), 0 32px 64px -24px rgba(23, 46, 42, 0.28);
+}
 
-.glow-teal  { box-shadow: 0 1px 2px rgba(23, 46, 42, 0.05); }
-.glow-gold  { box-shadow: 0 1px 2px rgba(23, 46, 42, 0.05); }
-.glow-coral { box-shadow: 0 1px 2px rgba(23, 46, 42, 0.05); }
-.glow-sky   { box-shadow: 0 1px 2px rgba(23, 46, 42, 0.05); }
-.glow-soft  { box-shadow: 0 1px 2px rgba(23, 46, 42, 0.05); }
+.shadow-soft  { box-shadow: var(--shadow-rest); }
+.shadow-float { box-shadow: var(--shadow-float); }
+
+/* Тоновые алиасы уровня «покой»: классы glow-* остаются валидными в TSX */
+.glow-teal  { box-shadow: var(--shadow-rest); }
+.glow-gold  { box-shadow: var(--shadow-rest); }
+.glow-coral { box-shadow: var(--shadow-rest); }
+.glow-sky   { box-shadow: var(--shadow-rest); }
+.glow-soft  { box-shadow: var(--shadow-rest); }
 
 /* --- Стат-карточки и полоса показателей --- */
 .stat-card {
   background: #ffffff;
   border: 1px solid #e9efed;
   border-radius: 16px;
-  padding: 20px 22px;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04);
+  padding: 20px 20px;
+  box-shadow: var(--shadow-rest);
 }
 .stat-card--hero {
-  /* Давление: белая карточка с огромной цифрой */
-  padding: 26px 28px;
+  /* Давление: белая карточка с огромной цифрой — паддинг вровень с .panel */
+  padding: var(--pad-card);
 }
 .stat-card--hero .stat-label { color: #6b7a77; }
 .stat-card--hero .stat-value { font-size: 46px; }
@@ -386,9 +402,9 @@ h1, h2, h3, h4 {
   background: #ffffff;
   border: 1px solid #e9efed;
   border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04);
+  box-shadow: var(--shadow-rest);
 }
-.stat-strip > * { padding: 20px 22px; min-width: 0; }
+.stat-strip > * { padding: 20px 20px; min-width: 0; }
 .stat-strip > * + * { border-left: 1px solid #edf2f1; }
 @media (max-width: 640px) {
   .stat-strip { grid-template-columns: 1fr; }
@@ -408,7 +424,7 @@ h1, h2, h3, h4 {
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
-.stat-unit { color: #8aa09c; }
+.stat-unit { color: var(--color-ink-soft); }
 .icon-tile {
   display: inline-flex;
   align-items: center;
@@ -419,18 +435,18 @@ h1, h2, h3, h4 {
   line-height: 1;
 }
 /* Тинтовые плитки: мягкие заливки + цвет иконки */
-.icon-tile--teal  { background: rgba(0, 184, 169, 0.13);  color: #047c7c; }
-.icon-tile--gold  { background: rgba(250, 204, 21, 0.20); color: #96760a; }
+.icon-tile--teal  { background: rgba(0, 184, 169, 0.13);  color: var(--color-teal-dark); }
+.icon-tile--gold  { background: rgba(250, 204, 21, 0.20); color: var(--color-gold-ink); }
 .icon-tile--coral { background: rgba(220, 38, 38, 0.11);  color: var(--color-coral); }
-.icon-tile--sky   { background: rgba(93, 173, 226, 0.16); color: #2f7fb5; }
+.icon-tile--sky   { background: rgba(93, 173, 226, 0.16); color: var(--color-sky-ink); }
 
 /* --- Панели и чарты --- */
 .panel {
   background: #ffffff;
   border: 1px solid #e9efed;
   border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04);
+  padding: var(--pad-card, 24px);
+  box-shadow: var(--shadow-rest);
 }
 .chart-box {
   background: #ffffff;
@@ -445,12 +461,12 @@ h1, h2, h3, h4 {
   background: #ffffff;
   border: 1px solid #e8eeec;
   border-radius: 999px;
-  padding: 5px 12px;
+  padding: 4px 12px;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
   color: #1b2622;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04);
+  box-shadow: var(--shadow-rest);
 }
 .legend-dot {
   width: 9px;
@@ -471,7 +487,7 @@ h1, h2, h3, h4 {
   border-bottom: 1px solid var(--color-line);
 }
 .data-table td {
-  padding: 14px 16px;
+  padding: 16px 16px;
   border-bottom: 1px solid #f0f4f3;
   font-size: 14px;
   color: #1b2622;
@@ -492,7 +508,7 @@ h1, h2, h3, h4 {
   flex-shrink: 0;
 }
 .row-avatar--green { background: rgba(0, 184, 169, 0.15); color: var(--color-teal-dark); }
-.row-avatar--yellow { background: rgba(250, 204, 21, 0.25); color: #9a7a00; }
+.row-avatar--yellow { background: rgba(250, 204, 21, 0.25); color: var(--color-gold-ink); }
 .row-avatar--red { background: rgba(220, 38, 38, 0.16); color: var(--color-coral-dark); }
 
 /* --- Заголовки секций --- */
@@ -500,10 +516,10 @@ h1, h2, h3, h4 {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: 0;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
   border-bottom: 1px solid #eef3f2;
 }
 
@@ -522,8 +538,8 @@ h1, h2, h3, h4 {
 }
 .flip-card--coral .emoji-box,
 .flip-card--danger .emoji-box { color: var(--color-coral); }
-.flip-card--gold .emoji-box { color: #96760a; }
-.flip-card--sky .emoji-box { color: #2f7fb5; }
+.flip-card--gold .emoji-box { color: var(--color-gold-ink); }
+.flip-card--sky .emoji-box { color: var(--color-sky-ink); }
 
 /* ---------- Кнопки: сплошной цвет + тихая тень ---------- */
 
@@ -533,7 +549,7 @@ h1, h2, h3, h4 {
   justify-content: center;
   gap: 8px;
   min-height: 40px;
-  padding: 9px 18px;
+  padding: 8px 16px;
   border-radius: 12px;
   border: none;
   font-size: 14px;
@@ -549,25 +565,18 @@ h1, h2, h3, h4 {
 
 .btn-gold {
   /* Первичная: сплошной глубокий тил */
-  background: #00727a;
+  background: var(--color-teal-dark);
   color: #ffffff;
   box-shadow: 0 1px 2px rgba(23, 46, 42, 0.12);
 }
 .btn-gold:hover { filter: brightness(1.06); }
 .btn-gold:active { transform: scale(0.98); }
 
-.btn-teal {
-  background: #00727a;
-  color: #ffffff;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.12);
-}
-.btn-teal:hover { filter: brightness(1.06); }
-
 .btn-ghost {
   background: #ffffff;
   border: 1px solid #e2e9e8;
   color: #3f4f4c;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04);
+  box-shadow: var(--shadow-rest);
 }
 .btn-ghost:hover { background: #f1f6f5; border-color: #d8e2e0; }
 
@@ -578,7 +587,7 @@ h1, h2, h3, h4 {
 }
 .btn-danger:hover { filter: brightness(1.06); transform: translateY(-1px); }
 
-.btn-sm { min-height: 32px; padding: 5px 12px; font-size: 12px; border-radius: 10px; }
+.btn-sm { min-height: 32px; padding: 4px 12px; font-size: 12px; border-radius: 12px; }
 
 /* Кнопка-пилюля (фильтры-табы, как у Сбер Здоровья) */
 .btn-pill { border-radius: 999px !important; }
@@ -604,7 +613,7 @@ h1, h2, h3, h4 {
 /* Пилюля для вкладок (медкарта, период замера) */
 .flow-indicator--pill {
   border-radius: 999px;
-  background: #00727a;
+  background: var(--color-teal-dark);
   box-shadow: 0 1px 2px rgba(23, 46, 42, 0.12);
 }
 
@@ -613,12 +622,12 @@ h1, h2, h3, h4 {
   border-radius: 12px;
   background: #ffffff;
   border: 1px solid #e9efed;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04), 0 10px 26px -12px rgba(23, 46, 42, 0.14);
+  box-shadow: var(--shadow-float);
 }
 
 /* Плашка для мобильного таб-бара */
 .flow-indicator--bar {
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-teal-dark);
 }
 
@@ -644,7 +653,7 @@ h1, h2, h3, h4 {
   border-radius: 999px;
   border: none;
   cursor: pointer;
-  background: #007b83;
+  background: var(--color-teal-dark);
   color: #ffffff;
   box-shadow: 0 2px 8px rgba(23, 46, 42, 0.16);
   transition: box-shadow 0.15s ease, filter 0.15s ease;
@@ -659,10 +668,10 @@ h1, h2, h3, h4 {
 
 .flip-card {
   background: #ffffff;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid #edf2f1;
   padding: 14px 16px;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04);
+  box-shadow: var(--shadow-rest);
 }
 
 .flip-card--coral { border-left: 3px solid var(--color-coral); }
@@ -673,7 +682,7 @@ h1, h2, h3, h4 {
 .flip-input {
   width: 100%;
   min-height: 44px;
-  padding: 10px 14px;
+  padding: 12px 12px;
   background: #ffffff;
   border: 1px solid #dfe8e6;
   border-radius: 12px;
@@ -683,7 +692,7 @@ h1, h2, h3, h4 {
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.flip-input::placeholder { color: color-mix(in srgb, var(--color-teal-dark) 45%, white); font-weight: 400; }
+.flip-input::placeholder { color: var(--color-ink-soft); font-weight: 400; }
 .flip-input:focus {
   border-color: rgba(0, 123, 131, 0.6);
   box-shadow: 0 0 0 3px rgba(0, 123, 131, 0.12);
@@ -694,11 +703,11 @@ h1, h2, h3, h4 {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
-  color: #465a56;
+  color: var(--color-ink-soft);
   margin-bottom: 4px;
 }
 
-.flip-hint { font-size: 11px; color: #8aa09c; margin-top: 4px; }
+.flip-hint { font-size: 11px; color: var(--color-ink-soft); margin-top: 4px; }
 
 /* ---------- Статусы: тихий вид — цветная точка + цветной текст, без пилюль ---------- */
 
@@ -723,21 +732,21 @@ h1, h2, h3, h4 {
   flex-shrink: 0;
 }
 .badge-green { color: #15803d; }
-.badge-gold  { color: #9a7a00; }
+.badge-gold  { color: var(--color-gold-ink); }
 .badge-red   { color: #c62828; }
 .badge-teal  { color: var(--color-teal-dark); }
-.badge-sky   { color: #2f7fb5; }
+.badge-sky   { color: var(--color-sky-ink); }
 
 /* Кнопки-подсказки (чипы чата): интерактивные, с рамкой — не статусы */
 .chip-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 8px 12px;
   border-radius: 999px;
   background: #ffffff;
   border: 1px solid #e2e9e8;
-  color: #0d5f60;
+  color: var(--color-teal-deep);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.1px;
@@ -756,7 +765,7 @@ h1, h2, h3, h4 {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: #007b83;
+  background: var(--color-teal-dark);
   color: #ffffff;
   flex-shrink: 0;
   box-shadow: 0 1px 2px rgba(23, 46, 42, 0.10);
@@ -771,10 +780,10 @@ h1, h2, h3, h4 {
   background: #ffffff;
   border: 1px solid #e9efed;
   border-radius: 16px 16px 16px 6px;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04), 0 8px 24px -12px rgba(23, 46, 42, 0.12);
+  box-shadow: var(--shadow-float);
 }
 .chat-bubble-user {
-  background: #00727a;
+  background: var(--color-teal-dark);
   border-radius: 16px 16px 6px 16px;
   box-shadow: 0 1px 2px rgba(23, 46, 42, 0.10);
 }
@@ -798,14 +807,14 @@ h1, h2, h3, h4 {
   background: #ffffff;
   border: 1px solid #e9efed;
   border-radius: 16px;
-  padding: 6px 6px 6px 4px;
-  box-shadow: 0 1px 2px rgba(23, 46, 42, 0.04), 0 12px 32px -14px rgba(23, 46, 42, 0.18);
+  padding: 8px 8px 8px 8px;
+  box-shadow: var(--shadow-float);
 }
 .composer-card .flip-input {
   border: none;
   box-shadow: none;
   background: transparent;
-  min-height: 40px;
+  min-height: 44px;
 }
 .composer-card .flip-input:focus { box-shadow: none; }
 
@@ -836,8 +845,8 @@ h1, h2, h3, h4 {
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.85);
   border-radius: 20px;
-  padding: 28px 26px;
-  box-shadow: 0 2px 4px rgba(11, 60, 56, 0.05), 0 32px 64px -24px rgba(11, 60, 56, 0.28);
+  padding: 28px 28px;
+  box-shadow: var(--shadow-modal);
 }
 .auth-logo { filter: drop-shadow(0 10px 24px rgba(0, 123, 131, 0.18)); }
 
@@ -869,7 +878,7 @@ h1, h2, h3, h4 {
   width: 50px;
   height: 50px;
   border-radius: 999px;
-  background: #007b83;
+  background: var(--color-teal-dark);
   color: #ffffff;
   box-shadow:
     0 2px 8px rgba(23, 46, 42, 0.16),
@@ -935,7 +944,7 @@ html { scroll-behavior: smooth; }
   position: relative;
   overflow: hidden;
   background: #e7eeec;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 .skeleton::after {
   content: '';
@@ -989,6 +998,13 @@ html { scroll-behavior: smooth; }
 .maplibregl-ctrl-group button:hover { background: #f1f6f5 !important; }
 .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: saturate(0.85); }
 
+/* Столбец графика аналитики: fill берётся из токена (var() не работает
+   в SVG-атрибутах, поэтому цвет назначается CSS-правилом) */
+.analytics-bar { fill: var(--color-teal-dark); }
+
+/* Тень-подложка иллюстрации пустых состояний (EmptyArt) */
+.emptyart-shadow { fill: var(--color-teal-deep); }
+
 .maplibregl-ctrl-scale {
   background: rgba(255, 255, 255, 0.85) !important;
   border-color: #d9e2df !important;
@@ -999,7 +1015,7 @@ html { scroll-behavior: smooth; }
 
 .maplibregl-ctrl-attrib {
   background: rgba(255, 255, 255, 0.85) !important;
-  border-radius: 10px 0 0 0 !important;
+  border-radius: 12px 0 0 0 !important;
   font-size: 10px !important;
 }
 .maplibregl-ctrl-attrib a { color: #5b6b68 !important; }

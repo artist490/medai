@@ -45,12 +45,12 @@ export default function AnamnesisForm({ card }: { card: MedCard }) {
       {error && <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>}
       {saved && <div className="badge badge-green normal-case tracking-normal w-fit"><Icon name="check" size={12} className="inline-block align-[-1px] mr-1" />Сохранено</div>}
 
-      <button className="btn btn-teal w-fit" disabled={busy}>
+      <button className="btn btn-gold w-fit" disabled={busy}>
         {busy ? 'Сохраняем…' : 'Сохранить анкету'}
       </button>
 
       {card.updated_by === 'doctor' && card.updated_at && (
-        <div className="text-xs font-bold text-teal-dark/50">
+        <div className="text-xs font-bold text-ink-soft">
           Анкету дополнял врач · {fmtDate(card.updated_at)}
         </div>
       )}

@@ -2,6 +2,7 @@
 // Формат по наброску юзера; данные — те же (updateProfile), вес приходит
 // из последнего замера (в профиле он не хранится — он в measurements).
 import { FormEvent, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
 import * as api from '../api'
 import { Icon } from '../components/Icon'
@@ -84,7 +85,8 @@ const CITY_SLUG: Record<string, string> = {
 }
 
 export default function Profile() {
-  const { user, setUser } = useAuth()
+  const { user, setUser, logout } = useAuth()
+  const navigate = useNavigate()
   const [name, setName] = useState(user?.name ?? '')
   const [sex, setSex] = useState<'male' | 'female' | ''>(user?.sex ?? '')
   const [age, setAge] = useState(user?.age ?? 0)
@@ -110,6 +112,12 @@ export default function Profile() {
 
   const bmi = lastWeight && height >= 50 ? lastWeight / (height / 100) ** 2 : null
   const status = bmi !== null ? bmiStatus(bmi) : null
+
+  async function handleLogout() {
+    if (!window.confirm('Выйти из аккаунта?')) return
+    await logout()
+    navigate('/login')
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -162,7 +170,7 @@ export default function Profile() {
         </div>
 
         <div className="min-w-[240px] flex-1">
-          <h2 className="text-xl font-extrabold">
+          <h2 className="text-[18px] font-extrabold">
             {pct === 100 ? 'Ваш профиль готов' : 'Ещё немного до персонального плана'}
           </h2>
           <p className="text-sm text-white/70 mt-1 max-w-[46ch]">
@@ -189,7 +197,7 @@ export default function Profile() {
         <section className="bg-white rounded-2xl glow-soft p-6">
           <div className="flex items-baseline justify-between gap-3 mb-5">
             <h3 className="text-lg font-extrabold">Личное</h3>
-            <p className="text-xs font-bold text-[#8aa09c]">Видно только вам и врачу филиала</p>
+            <p className="text-xs font-bold text-ink-soft">Видно только вам и врачу филиала</p>
           </div>
 
           <div className="flex flex-col gap-5">
@@ -215,7 +223,7 @@ export default function Profile() {
                     aria-checked={sex === value}
                     onClick={() => setSex(value)}
                     className={`relative z-[1] rounded-full py-2.5 text-sm font-bold transition-colors ${
-                      sex === value ? 'text-[#1b2622]' : 'text-[#8aa09c]'
+                      sex === value ? 'text-[#1b2622]' : 'text-ink-soft'
                     }`}
                   >
                     <span className="inline-flex items-center justify-center gap-1.5">
@@ -230,7 +238,7 @@ export default function Profile() {
             <div>
               <span className="flip-label">Возраст</span>
               <div className="text-4xl font-extrabold tabular-nums leading-none text-[#1b2622] mt-1">
-                {age > 0 ? age : '—'}<span className="text-base font-bold text-[#8aa09c] ml-1">лет</span>
+                {age > 0 ? age : '—'}<span className="text-base font-bold text-ink-soft ml-1">лет</span>
               </div>
               <div className="flex items-center gap-2.5 mt-3">
                 <button type="button" aria-label="Уменьшить возраст"
@@ -251,20 +259,20 @@ export default function Profile() {
         <section className="bg-white rounded-2xl glow-soft p-6">
           <div className="flex items-baseline justify-between gap-3 mb-5">
             <h3 className="text-lg font-extrabold">Рост и вес</h3>
-            <p className="text-xs font-bold text-[#8aa09c]">Для расчёта ИМТ</p>
+            <p className="text-xs font-bold text-ink-soft">Для расчёта ИМТ</p>
           </div>
 
           <div className="grid grid-cols-2 gap-5">
             <div>
               <span className="flip-label">Рост</span>
               <div className="text-4xl font-extrabold tabular-nums leading-none text-[#1b2622] mt-1">
-                {height > 0 ? height : '—'}<span className="text-base font-bold text-[#8aa09c] ml-1">см</span>
+                {height > 0 ? height : '—'}<span className="text-base font-bold text-ink-soft ml-1">см</span>
               </div>
             </div>
             <div>
               <span className="flip-label">Вес</span>
               <div className="text-4xl font-extrabold tabular-nums leading-none text-[#1b2622] mt-1">
-                {lastWeight ?? '—'}<span className="text-base font-bold text-[#8aa09c] ml-1">кг</span>
+                {lastWeight ?? '—'}<span className="text-base font-bold text-ink-soft ml-1">кг</span>
               </div>
             </div>
           </div>
@@ -309,7 +317,7 @@ export default function Profile() {
       <section className="bg-white rounded-2xl glow-soft p-6">
         <div className="flex items-baseline justify-between gap-3 mb-4">
           <h3 className="text-lg font-extrabold">Индекс массы тела</h3>
-          <p className="text-xs font-bold text-[#8aa09c]">Считается по росту и последнему весу</p>
+          <p className="text-xs font-bold text-ink-soft">Считается по росту и последнему весу</p>
         </div>
 
         {bmi !== null && status ? (
@@ -332,7 +340,7 @@ export default function Profile() {
               <span className="absolute -top-[7px] w-[22px] h-[22px] rounded-full bg-white border-4 border-[#1b2622] transition-[left] duration-500"
                     style={{ left: `${clamp((bmi - 16) / 19, 0, 1) * 100}%`, transform: 'translateX(-50%)' }} />
             </div>
-            <div className="flex justify-between text-xs text-[#8aa09c] mt-2" aria-hidden>
+            <div className="flex justify-between text-xs text-ink-soft mt-2" aria-hidden>
               <span>16</span><span>18.5</span><span>25</span><span>30</span><span>35+</span>
             </div>
           </>
@@ -348,7 +356,7 @@ export default function Profile() {
       <section className="bg-white rounded-2xl glow-soft p-6">
         <div className="flex items-baseline justify-between gap-3 mb-4">
           <h3 className="text-lg font-extrabold">Филиал</h3>
-          <p className="text-xs font-bold text-[#8aa09c]">Для записи и результатов</p>
+          <p className="text-xs font-bold text-ink-soft">Для записи и результатов</p>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] items-stretch">
@@ -376,7 +384,7 @@ export default function Profile() {
               </>
             ) : (
               <div className="h-[260px] lg:h-[340px] grid place-items-center bg-[#f4f8f7]">
-                <p className="text-sm text-[#8aa09c] font-bold px-6 text-center">
+                <p className="text-sm text-ink-soft font-bold px-6 text-center">
                   Выберите филиал — покажу его на карте
                 </p>
               </div>
@@ -402,7 +410,7 @@ export default function Profile() {
                 <span className="min-w-0">
                   <span className="text-sm font-bold text-[#1b2622]">{b.city}</span>
                   {CITY_ADDR[b.city] && (
-                    <span className="block text-xs text-[#8aa09c]">{CITY_ADDR[b.city]}</span>
+                    <span className="block text-xs text-ink-soft">{CITY_ADDR[b.city]}</span>
                   )}
                 </span>
                 <span aria-hidden className={`w-5 h-5 rounded-full border-2 relative ${
@@ -428,11 +436,16 @@ export default function Profile() {
                 : 'Изменения сохранятся в вашей карте'}
           </p>
           <button onClick={submit} disabled={busy}
-                  className={`btn btn-sm ${saved ? 'bg-[#2E7D4F] text-white hover:bg-[#2E7D4F]' : 'btn-teal'} min-w-[180px]`}>
+                  className={`btn btn-sm ${saved ? 'bg-[#2E7D4F] text-white hover:bg-[#2E7D4F]' : 'btn-gold'} min-w-[180px]`}>
             {busy ? 'Сохраняем…' : saved ? 'Сохранено ✓' : 'Сохранить профиль'}
           </button>
         </div>
       </div>
+
+      {/* Выход: подтверждение перед действием — как во всех разрушительных действиях */}
+      <button className="btn btn-ghost w-fit" onClick={handleLogout}>
+        Выйти из аккаунта
+      </button>
     </div>
   )
 }

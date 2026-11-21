@@ -43,7 +43,9 @@ export const SURVEY_SHORT: Record<string, string> = {
   salting: 'подсаливает пищу',
 }
 
-// Тревожные симптомы: «Да» обязывает показать врача (скрининг ХНИЗ)
+// Тревожные симптомы: «Да» обязывает показать врача (скрининг ХНИЗ).
+// F007: живой список приходит из API (GET /api/medcard → alarm_keys, источник —
+// signals.ALARM_SURVEY_KEYS на бэке); этот Set — только fallback, когда API недоступен.
 export const ALARM_KEYS = new Set([
   'sym_chest_pain', 'sym_sudden_weakness', 'sym_sudden_numbness', 'sym_vision_loss',
   'sym_hemoptysis', 'sym_black_stool', 'sym_blood_in_stool', 'sym_weight_loss',
@@ -96,7 +98,7 @@ function YesNo({ value, onChange }: { value: boolean | undefined; onChange: (v: 
     <div className="flex gap-2">
       {[true, false].map((v) => (
         <button key={String(v)} type="button" onClick={() => onChange(v)}
-                className={`btn btn-sm flex-1 ${value === v ? 'btn-teal' : 'btn-ghost'}`}>
+                className={`btn btn-sm flex-1 ${value === v ? 'btn-gold' : 'btn-ghost'}`}>
           {v ? 'Да' : 'Нет'}
         </button>
       ))}
@@ -109,7 +111,7 @@ function YesNo({ value, onChange }: { value: boolean | undefined; onChange: (v: 
 function DiagnosesStep({ a, set }: { a: SurveyAnswers; set: (k: string, v: boolean | number | string) => void }) {
   return (
     <div className="flex flex-col gap-2.5">
-      <p className="text-sm font-bold text-teal-dark/70">Говорил ли Вам когда-либо врач, что у Вас имеется:</p>
+      <p className="text-sm font-bold text-ink-soft">Говорил ли Вам когда-либо врач, что у Вас имеется:</p>
       {DX_ITEMS.map((item) => {
         const checked = a[item.key] === true
         return (
@@ -121,7 +123,7 @@ function DiagnosesStep({ a, set }: { a: SurveyAnswers; set: (k: string, v: boole
             </label>
             {checked && item.rx && (
               <div className="mt-2.5 ml-8">
-                <div className="text-xs font-extrabold text-teal-dark/60 mb-1.5">Принимаете ли Вы препараты?</div>
+                <div className="text-xs font-extrabold text-ink-soft mb-1.5">Принимаете ли Вы препараты?</div>
                 <YesNo value={a[item.rx] as boolean | undefined} onChange={(v) => set(item.rx!, v)} />
               </div>
             )}
@@ -139,11 +141,11 @@ function DiagnosesStep({ a, set }: { a: SurveyAnswers; set: (k: string, v: boole
   )
 }
 
-function YesNoStep({ items, a, set }: { items: Array<{ key: string; label: string }>; a: SurveyAnswers; set: (k: string, v: boolean | number | string) => void }) {
+function YesNoStep({ items, a, set, alarmKeys }: { items: Array<{ key: string; label: string }>; a: SurveyAnswers; set: (k: string, v: boolean | number | string) => void; alarmKeys: Set<string> }) {
   return (
     <div className="flex flex-col gap-3">
       {items.map((item) => {
-        const alarmYes = ALARM_KEYS.has(item.key) && a[item.key] === true
+        const alarmYes = alarmKeys.has(item.key) && a[item.key] === true
         return (
           <div key={item.key} className={`rounded-xl border p-3.5 ${alarmYes ? 'border-coral bg-[#dc262608]' : 'border-[#e5e7eb]'}`}>
             <p className="text-sm font-bold text-teal-dark leading-snug mb-2.5">{item.label}</p>
@@ -175,7 +177,7 @@ function HabitsStep({ a, set }: { a: SurveyAnswers; set: (k: string, v: boolean 
         <div className="flex gap-2">
           {[['less', 'До 30 минут'], ['more', '30 минут и более']].map(([v, label]) => (
             <button key={v} type="button"
-                    className={`btn btn-sm flex-1 ${a.walking === v ? 'btn-teal' : 'btn-ghost'}`}
+                    className={`btn btn-sm flex-1 ${a.walking === v ? 'btn-gold' : 'btn-ghost'}`}
                     onClick={() => set('walking', v)}>
               {label}
             </button>
@@ -194,33 +196,33 @@ function HabitsStep({ a, set }: { a: SurveyAnswers; set: (k: string, v: boolean 
       </div>
 
       <div className="rounded-xl border border-[#e5e7eb] p-3.5 flex flex-col gap-3">
-        <div className="text-xs font-semibold text-teal-dark/50">Алкоголь (шкала AUDIT-C)</div>
+        <div className="text-xs font-semibold text-ink-soft">Алкоголь (шкала AUDIT-C)</div>
         <div>
-          <div className="text-xs font-bold text-teal-dark/70 mb-1.5">Как часто Вы употребляете алкогольные напитки?</div>
+          <div className="text-xs font-bold text-ink-soft mb-1.5">Как часто Вы употребляете алкогольные напитки?</div>
           <div className="flex flex-wrap gap-1.5">
             {AUDIT_FREQ.map((label, score) => (
               <button key={label} type="button"
-                      className={`btn btn-sm ${a.alcohol_freq === score ? 'btn-teal' : 'btn-ghost'}`}
+                      className={`btn btn-sm ${a.alcohol_freq === score ? 'btn-gold' : 'btn-ghost'}`}
                       onClick={() => set('alcohol_freq', score)}>{label}</button>
             ))}
           </div>
         </div>
         <div>
-          <div className="text-xs font-bold text-teal-dark/70 mb-1.5">Сколько порций обычно за один раз? (1 порция = 30 мл крепкого, 100 мл вина, 300 мл пива)</div>
+          <div className="text-xs font-bold text-ink-soft mb-1.5">Сколько порций обычно за один раз? (1 порция = 30 мл крепкого, 100 мл вина, 300 мл пива)</div>
           <div className="flex flex-wrap gap-1.5">
             {AUDIT_PORTIONS.map((label, score) => (
               <button key={label} type="button"
-                      className={`btn btn-sm ${a.alcohol_portions === score ? 'btn-teal' : 'btn-ghost'}`}
+                      className={`btn btn-sm ${a.alcohol_portions === score ? 'btn-gold' : 'btn-ghost'}`}
                       onClick={() => set('alcohol_portions', score)}>{label}</button>
             ))}
           </div>
         </div>
         <div>
-          <div className="text-xs font-bold text-teal-dark/70 mb-1.5">Как часто за один раз — 6 и более порций?</div>
+          <div className="text-xs font-bold text-ink-soft mb-1.5">Как часто за один раз — 6 и более порций?</div>
           <div className="flex flex-wrap gap-1.5">
             {AUDIT_FREQ.map((label, score) => (
               <button key={label} type="button"
-                      className={`btn btn-sm ${a.alcohol_binge === score ? 'btn-teal' : 'btn-ghost'}`}
+                      className={`btn btn-sm ${a.alcohol_binge === score ? 'btn-gold' : 'btn-ghost'}`}
                       onClick={() => set('alcohol_binge', score)}>{label}</button>
             ))}
           </div>
@@ -244,8 +246,9 @@ const STEP_TITLES = [
   'Другие жалобы',
 ]
 
-export default function AnamnesisSurvey({ initial, onSaved, onCancel }: {
+export default function AnamnesisSurvey({ initial, alarmKeys, onSaved, onCancel }: {
   initial: string | null
+  alarmKeys?: string[]   // из API (MedCard.alarm_keys); не пришло — fallback на ALARM_KEYS
   onSaved: (surveyJson: string, chronicText: string) => void
   onCancel: () => void
 }) {
@@ -259,9 +262,13 @@ export default function AnamnesisSurvey({ initial, onSaved, onCancel }: {
     setA((prev) => ({ ...prev, [key]: v }))
   }
 
+  const activeAlarmKeys = useMemo(
+    () => (alarmKeys ? new Set(alarmKeys) : ALARM_KEYS),
+    [alarmKeys],
+  )
   const alarms = useMemo(
-    () => Array.from(ALARM_KEYS).filter((k) => a[k] === true),
-    [a],
+    () => Array.from(activeAlarmKeys).filter((k) => a[k] === true),
+    [activeAlarmKeys, a],
   )
   const auditC = (Number(a.alcohol_freq) || 0) + (Number(a.alcohol_portions) || 0) + (Number(a.alcohol_binge) || 0)
 
@@ -289,10 +296,10 @@ export default function AnamnesisSurvey({ initial, onSaved, onCancel }: {
   function renderStep() {
     switch (step) {
       case 0: return <DiagnosesStep a={a} set={set} />
-      case 1: return <YesNoStep items={HX_ITEMS} a={a} set={set} />
+      case 1: return <YesNoStep items={HX_ITEMS} a={a} set={set} alarmKeys={activeAlarmKeys} />
       case 2:
-        return <YesNoStep items={CARDIO_ITEMS.filter((i) => i.key !== 'sym_chest_pain_relieves' || a.sym_chest_pain === true)} a={a} set={set} />
-      case 3: return <YesNoStep items={LUNG_GI_ITEMS} a={a} set={set} />
+        return <YesNoStep items={CARDIO_ITEMS.filter((i) => i.key !== 'sym_chest_pain_relieves' || a.sym_chest_pain === true)} a={a} set={set} alarmKeys={activeAlarmKeys} />
+      case 3: return <YesNoStep items={LUNG_GI_ITEMS} a={a} set={set} alarmKeys={activeAlarmKeys} />
       case 4: return <HabitsStep a={a} set={set} />
       default:
         return (
@@ -325,7 +332,7 @@ export default function AnamnesisSurvey({ initial, onSaved, onCancel }: {
                 Сумма баллов AUDIT-C: {auditC} — риск пагубного потребления алкоголя
               </div>
             )}
-            <button type="button" className="btn btn-teal w-fit" onClick={finish}>
+            <button type="button" className="btn btn-gold w-fit" onClick={finish}>
               Завершить опросник
             </button>
           </div>
@@ -338,7 +345,7 @@ export default function AnamnesisSurvey({ initial, onSaved, onCancel }: {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm font-extrabold text-teal-dark">{STEP_TITLES[step]}</div>
-          <div className="text-xs font-bold text-teal-dark/50 mt-0.5">
+          <div className="text-xs font-bold text-ink-soft mt-0.5">
             Опросник Минздрава РФ (приказ № 404н) · шаг {step + 1} из {STEP_TOTAL}
           </div>
         </div>
@@ -361,7 +368,7 @@ export default function AnamnesisSurvey({ initial, onSaved, onCancel }: {
           </button>
         )}
         {step < STEP_TOTAL - 1 && (
-          <button type="button" className="btn btn-teal btn-sm ml-auto" onClick={() => setStep((s) => s + 1)}>
+          <button type="button" className="btn btn-gold btn-sm ml-auto" onClick={() => setStep((s) => s + 1)}>
             Далее →
           </button>
         )}

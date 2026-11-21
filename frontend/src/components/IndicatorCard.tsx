@@ -23,12 +23,12 @@ export default function IndicatorCard({ finding }: { finding: Finding }) {
       </div>
       <div className="flex items-baseline gap-1 mb-1">
         <span className="text-2xl font-extrabold text-teal-dark">{finding.value}</span>
-        <span className="text-xs text-teal-dark/70 font-bold">{finding.unit}</span>
-        <span className="ml-auto text-[11px] text-teal-dark/50 font-bold">
+        <span className="text-xs text-ink-soft font-bold">{finding.unit}</span>
+        <span className="ml-auto text-[11px] text-ink-soft font-bold">
           норма: {finding.norm}
         </span>
       </div>
-      <p className="text-sm text-teal-dark/85">{finding.message}</p>
+      <p className="text-sm text-ink-soft">{finding.message}</p>
     </div>
   )
 }

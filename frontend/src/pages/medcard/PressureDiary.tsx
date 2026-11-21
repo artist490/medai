@@ -11,7 +11,7 @@ export default function PressureDiary({ items }: { items: Measurement[] }) {
   const list = [...days.entries()].slice(0, 7)
 
   if (list.length === 0) {
-    return <p className="text-sm text-[#8aa09c] font-semibold mt-2">Замеров давления пока нет</p>
+    return <p className="text-sm text-ink-soft font-semibold mt-2">Замеров давления пока нет</p>
   }
   return (
     <div className="mt-2 divide-y divide-[#eef4f3]">
@@ -23,11 +23,11 @@ export default function PressureDiary({ items }: { items: Measurement[] }) {
           <div className="flex flex-col gap-1">
             {ms.map((m) => (
               <div key={m.id} className="flex items-baseline gap-2 text-sm">
-                <span className="text-xs font-bold text-[#8aa09c] w-14">
+                <span className="text-xs font-bold text-ink-soft w-14">
                   {m.period === 'evening' ? 'вечер' : m.period === 'morning' ? 'утро' : ''}
                 </span>
                 <span className="font-bold text-[#1b2622] tabular-nums">{m.systolic}/{m.diastolic}</span>
-                <span className="text-[#8aa09c] text-xs">пульс {m.pulse ?? '—'}</span>
+                <span className="text-ink-soft text-xs">пульс {m.pulse ?? '—'}</span>
               </div>
             ))}
           </div>

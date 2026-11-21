@@ -41,18 +41,33 @@ export default function MedCard() {
   const [showSurvey, setShowSurvey] = useState(false)
   const [error, setError] = useState('')
   const [goals, setGoals] = useState<Goals>({ steps: null, sleep: null, water: null, weight: null })
+  const [goalsLoaded, setGoalsLoaded] = useState(false)
+  const [goalsError, setGoalsError] = useState('')
   const [diaryBusy, setDiaryBusy] = useState('')
+  const [diaryMsg, setDiaryMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+
+  // Цели грузятся асинхронно: «Сохранить» активна только после успешной загрузки —
+  // иначе пустая форма молча перезапишет цели на сервере. При сбое — ошибка и «Повторить».
+  function loadGoals() {
+    setGoalsError('')
+    setGoalsLoaded(false)
+    api.fetchGoals()
+      .then(setGoals)
+      .then(() => setGoalsLoaded(true))
+      .catch(() => setGoalsError('Не удалось загрузить цели'))
+  }
 
   useEffect(() => {
     api.fetchMedCard().then(setCard).catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
     api.fetchMyVisits().then((d) => setVisits(d.items)).catch(() => {})
     api.listMeasurements(30).then((d) => setItems(d.items)).catch(() => {})
-    api.fetchGoals().then(setGoals).catch(() => {})
+    loadGoals()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (error && !card) {
     return (
-      <div className="bg-white rounded-xl p-8 text-center glow-coral">
+      <div className="bg-white rounded-lg p-8 text-center glow-coral">
         <p className="font-bold text-coral-dark">{error}</p>
       </div>
     )
@@ -134,13 +149,13 @@ export default function MedCard() {
       <div key={tab} className="tab-enter stagger flex flex-col gap-6">
         {tab === 'overview' && (
           <>
-            <RiskSystems items={items} survey={card.survey} onBook={bookFromRisk} />
+            <RiskSystems items={items} survey={card.survey} alarmKeys={card.alarm_keys} onBook={bookFromRisk} />
 
             <section id="visits-section">
               <div className="section-title mb-3 flex items-center gap-2">
                 <span className="emoji-box"><Icon name="calendar" size={20} /></span>
                 <span>Приёмы</span>
-                {plannedCount > 0 && <span className="text-xs font-semibold text-teal-dark/50">· {plannedCount} запланировано</span>}
+                {plannedCount > 0 && <span className="text-xs font-semibold text-ink-soft">· {plannedCount} запланировано</span>}
               </div>
 
               <div className="flex flex-col gap-3">
@@ -169,10 +184,10 @@ export default function MedCard() {
                 )}
 
                 {visits.length === 0 && !showVisitForm && (
-                  <div className="bg-white rounded-xl p-6 text-center glow-soft">
+                  <div className="bg-white rounded-lg p-6 text-center glow-soft">
                     <EmptyArt className="mx-auto mb-2" />
                     <p className="text-base font-bold text-[#1b2622]">Приёмов пока нет</p>
-                    <p className="text-sm text-teal-dark/70 mt-1">
+                    <p className="text-sm text-ink-soft mt-1">
                       Запишитесь и опишите жалобы — врач подготовится заранее.
                     </p>
                   </div>
@@ -183,7 +198,7 @@ export default function MedCard() {
                     <VisitCard visit={visit} onChanged={(v) => setVisits((prev) => prev.map((x) => (x.id === v.id ? v : x)))} />
                     {visit.status === 'planned' && !showVisitForm && (
                       <button
-                        className="text-xs font-extrabold text-teal-dark hover:text-teal-dark/80 mt-1 ml-1 min-h-[32px] inline-flex items-center"
+                        className="text-xs font-extrabold text-teal-dark hover:text-teal-deep mt-1 ml-1 min-h-[32px] inline-flex items-center"
                         onClick={() => startEdit(visit)}
                       >
                         Изменить жалобу или дату
@@ -205,6 +220,7 @@ export default function MedCard() {
             {showSurvey ? (
               <AnamnesisSurvey
                 initial={card.survey}
+                alarmKeys={card.alarm_keys}
                 onSaved={onSurveySaved}
                 onCancel={() => setShowSurvey(false)}
               />
@@ -217,11 +233,11 @@ export default function MedCard() {
                     <span className="block text-sm font-extrabold text-teal-dark">
                       {card.survey ? 'Пройти опросник Минздрава заново' : 'Пройти опросник Минздрава (5 минут)'}
                     </span>
-                    <span className="block text-xs font-bold text-teal-dark/55">
+                    <span className="block text-xs font-bold text-ink-soft">
                       28 вопросов как на диспансеризации: диагнозы, симптомы, привычки — заполняет форму автоматически
                     </span>
                   </span>
-                  <Icon name="chevron" size={14} className="ml-auto text-teal-dark/40" />
+                  <Icon name="chevron" size={14} className="ml-auto text-teal-deep" />
                 </button>
                 <AnamnesisForm card={card} />
               </div>
@@ -240,22 +256,39 @@ export default function MedCard() {
                     <button key={pt} className="btn btn-ghost btn-sm" disabled={diaryBusy !== ''}
                             onClick={async () => {
                               setDiaryBusy(pt)
+                              setDiaryMsg(null)
                               try {
                                 const m = await repeatLastMeasurement(pt)
                                 setItems((prev) => [m, ...prev])
-                              } finally { setDiaryBusy('') }
+                                setDiaryMsg({ kind: 'ok', text: 'Замер добавлен' })
+                              } catch (err) {
+                                setDiaryMsg({ kind: 'err', text: err instanceof Error ? err.message : 'Не удалось добавить замер' })
+                              } finally {
+                                setDiaryBusy('')
+                              }
                             }}>
-                      {pt === 'morning' ? 'Повторить как утренний' : 'Повторить как вечерний'}
+                      {diaryBusy === pt ? 'Добавляем…' : (pt === 'morning' ? 'Повторить как утренний' : 'Повторить как вечерний')}
                     </button>
                   ))}
                 </div>
               </div>
+              {diaryMsg && (
+                <div className={`badge ${diaryMsg.kind === 'ok' ? 'badge-green' : 'badge-red'} normal-case tracking-normal w-fit mb-3`}>
+                  {diaryMsg.text}
+                </div>
+              )}
               <PressureDiary items={items} />
             </section>
 
             {/* Мои цели */}
             <section className="panel">
-              <GoalsEditor goals={goals} onSaved={setGoals} />
+              <GoalsEditor goals={goals} onSaved={setGoals} loaded={goalsLoaded} />
+              {goalsError && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="badge badge-red normal-case tracking-normal">{goalsError}</div>
+                  <button className="btn btn-ghost btn-sm" onClick={loadGoals}>Повторить</button>
+                </div>
+              )}
             </section>
 
             <MeasurementsHistory />

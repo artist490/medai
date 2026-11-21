@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import * as api from '../api'
 import { useAuth } from '../auth'
 import { Icon } from '../components/Icon'
+import { Skeleton } from '../components/Skeleton'
 import { brand } from '../brand'
 import type { Branch } from '../types'
 
@@ -13,6 +14,8 @@ export default function Register() {
   const [inviteCode, setInviteCode] = useState('')
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchId, setBranchId] = useState('')
+  const [branchesLoading, setBranchesLoading] = useState(true)
+  const [branchesError, setBranchesError] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
@@ -20,8 +23,18 @@ export default function Register() {
 
   // Хуки — строго до условных выходов (Rules of Hooks): иначе у нового
   // посетителя (loading: true → false) порядок хуков меняется и React падает.
+  function loadBranches() {
+    setBranchesLoading(true)
+    setBranchesError('')
+    api.fetchBranches()
+      .then((d) => setBranches(d.items))
+      .catch(() => setBranchesError('Не удалось загрузить список филиалов'))
+      .finally(() => setBranchesLoading(false))
+  }
+
   useEffect(() => {
-    api.fetchBranches().then((d) => setBranches(d.items)).catch(() => {})
+    loadBranches()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loading) {
@@ -59,7 +72,7 @@ export default function Register() {
         className="auth-card w-full max-w-sm flex flex-col gap-4 anim-rise"
         style={{ animationDelay: '90ms' }}
       >
-        <h1 className="text-2xl text-center">Регистрация</h1>
+        <h1 className="page-title text-center">Регистрация</h1>
 
         {error && (
           <div className="badge badge-red justify-center normal-case tracking-normal">
@@ -119,6 +132,18 @@ export default function Register() {
               <option key={b.id} value={b.id}>{b.city}</option>
             ))}
           </select>
+          {branchesLoading && (
+            <div className="flex items-center gap-2 mt-2" aria-busy>
+              <Skeleton w={90} h={12} />
+              <span className="text-xs text-[#5b6b68]">Загружаем филиалы…</span>
+            </div>
+          )}
+          {branchesError && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="badge badge-red normal-case tracking-normal">{branchesError}</div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={loadBranches}>Повторить</button>
+            </div>
+          )}
           <div className="flip-hint">Город ближайшего центра «Спектр-Диагностика».</div>
         </div>
 
@@ -139,7 +164,7 @@ export default function Register() {
           {busy ? 'Создаём…' : (<span className="inline-flex items-center gap-2">Создать аккаунт <Icon name="user-plus" size={16} /></span>)}
         </button>
 
-        <p className="text-center text-sm text-teal-dark/70">
+        <p className="text-center text-sm text-ink-soft">
           Уже есть аккаунт?{' '}
           <Link to="/login" className="font-extrabold text-teal hover:text-teal-light">
             Войти
@@ -147,7 +172,7 @@ export default function Register() {
         </p>
       </form>
 
-      <p className="text-center text-xs text-teal-dark/50 font-bold mt-4">
+      <p className="text-center text-xs text-ink-soft font-bold mt-4">
         {brand.name} · {brand.site} · не заменяет консультацию врача
       </p>
     </div>

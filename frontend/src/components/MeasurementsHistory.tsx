@@ -9,6 +9,7 @@ import { Summary } from '../components/Summary'
 import type { IconName } from '../components/Icon'
 import type { Measurement, Stats } from '../types'
 import type { RiskLevel } from '../types'
+import { SkeletonCard, SkeletonRows } from '../components/Skeleton'
 
 const riskLabels: Record<RiskLevel, string> = {
   green: 'Норма',
@@ -48,10 +49,10 @@ function Chart({ title, subtitle, icon, data, series }: {
     <section className="panel">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
-          <h2 className="text-xl flex items-center gap-2.5">
+          <h2 className="text-[18px] flex items-center gap-2.5">
             <span className="emoji-box"><Icon name={icon} size={20} /></span> {title}
           </h2>
-          {subtitle && <p className="text-sm text-teal-dark/60 mt-0.5">{subtitle}</p>}
+          {subtitle && <p className="text-sm text-teal-deep mt-0.5">{subtitle}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           {series.map((s) => (
@@ -83,12 +84,28 @@ export default function MeasurementsHistory() {
   const [items, setItems] = useState<Measurement[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const query = (searchParams.get('q') ?? '').trim().toLowerCase()
 
+  function load() {
+    setLoading(true)
+    setError('')
+    Promise.all([
+      api.listMeasurements(100).then((d) => d.items),
+      api.fetchStats(),
+    ])
+      .then(([ms, st]) => {
+        setItems(ms)
+        setStats(st)
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
+      .finally(() => setLoading(false))
+  }
+
   useEffect(() => {
-    api.listMeasurements(100).then((d) => setItems(d.items)).catch(() => {})
-    api.fetchStats().then(setStats).catch(() => {})
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Поиск: по дате и любому значению показателей
@@ -115,13 +132,29 @@ export default function MeasurementsHistory() {
     [stats],
   )
 
-  if (error) return <p className="badge badge-red">{error}</p>
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6" aria-busy>
+        <SkeletonCard lines={2} />
+        <SkeletonCard lines={3} />
+        <SkeletonRows rows={5} />
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>
+        <button className="btn btn-ghost" onClick={load}>Повторить</button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          {query && <p className="text-xs text-[#8aa09c] mt-0.5">Поиск: «{query}»</p>}
+          {query && <p className="text-xs text-ink-soft mt-0.5">Поиск: «{query}»</p>}
         </div>
         <Link to="/new" className="btn btn-gold btn-sm">Новый замер</Link>
       </div>
@@ -148,9 +181,9 @@ export default function MeasurementsHistory() {
                       { key: 'water_ml', name: 'Вода, мл', color: '#5DADE2' }]} />
 
       {/* Все замеры */}
-      <section className="bg-white rounded-[20px] p-6" style={{ boxShadow: '0 6px 24px rgba(23,46,42,.06)' }}>
+      <section className="bg-white rounded-lg p-6 shadow-float">
         <div className="flex items-center justify-between gap-3 mb-2">
-          <h2 className="text-xl">Все замеры {filtered.length > 0 && <span className="text-teal-dark/40 text-base">· {filtered.length}</span>}</h2>
+          <h2 className="text-[18px]">Все замеры {filtered.length > 0 && <span className="text-ink-soft text-base">· {filtered.length}</span>}</h2>
         </div>
         <div className="overflow-x-auto" data-full-bleed>
           <table className="data-table">
@@ -164,7 +197,7 @@ export default function MeasurementsHistory() {
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="text-center text-sm text-teal-dark/60 py-8">
+                  <td colSpan={3} className="text-center text-sm text-ink-soft py-8">
                     {query ? `Ничего не найдено по «${query}»` : (<span className="inline-flex items-center gap-1">Замеров пока нет. Сделайте первый во вкладке «Замер» <Icon name="stethoscope" size={14} /></span>)}
                   </td>
                 </tr>
@@ -178,7 +211,7 @@ export default function MeasurementsHistory() {
                       </span>
                       <div className="min-w-0">
                         <div className="font-extrabold">{humanDate(m.recorded_at)}</div>
-                        <div className="text-xs text-teal-dark/60 truncate max-w-[420px]"><Summary m={m} /></div>
+                        <div className="text-xs text-ink-soft truncate max-w-[420px]"><Summary m={m} /></div>
                       </div>
                     </div>
                   </td>
@@ -190,7 +223,7 @@ export default function MeasurementsHistory() {
                     ) : '—'}
                   </td>
                   <td className="!text-right whitespace-nowrap">
-                    <span className="text-sm text-teal-dark/60 mr-4">{humanTime(m.recorded_at)}</span>
+                    <span className="text-sm text-ink-soft mr-4">{humanTime(m.recorded_at)}</span>
                     <Link to={`/result/${m.id}`} className="font-extrabold text-teal hover:text-teal-light mr-3">
                       Открыть
                     </Link>

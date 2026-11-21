@@ -31,7 +31,7 @@ export default function Result() {
       <div className="bg-white rounded-xl p-8 text-center glow-coral">
         <div className="mb-2" aria-hidden><Icon name="help" size={40} /></div>
         <p className="font-bold text-coral-dark mb-4">{error}</p>
-        <Link to="/" className="btn btn-teal">На главную</Link>
+        <Link to="/" className="btn btn-gold">На главную</Link>
       </div>
     )
   }
@@ -62,7 +62,7 @@ export default function Result() {
           <div className="font-extrabold text-coral-dark mb-1 flex items-center gap-2">
             <Icon name="warning" size={20} /> Обратитесь к врачу
           </div>
-          <p className="text-sm text-teal-dark/85">
+          <p className="text-sm text-ink-soft">
             Есть тревожные показатели. Не ждите ухудшения — запишитесь к терапевту
             или позвоните в клинику: <span className="font-extrabold">{user?.branch?.phone || brand.phone}</span>.
             При критических значениях вызывайте 103.
@@ -91,10 +91,10 @@ export default function Result() {
           <div className="flex flex-col gap-2">
             {a.notes.map((n) => (
               <div key={n.id} className="flip-card flip-card--gold">
-                <div className="text-xs font-extrabold text-teal-dark/60 flex items-center gap-1.5">
+                <div className="text-xs font-extrabold text-ink-soft flex items-center gap-1.5">
                   <AvatarDoctor size={20} /> {n.doctor_name} · {n.created_at.slice(0, 16)}
                 </div>
-                <p className="text-sm text-teal-dark/90 mt-1">{n.text}</p>
+                <p className="text-sm text-ink-soft mt-1">{n.text}</p>
               </div>
             ))}
           </div>
@@ -109,17 +109,17 @@ export default function Result() {
 
         {a.llm_summary ? (
           <div className="flex flex-col gap-3">
-            <p className="text-[11px] text-teal-dark/50 font-bold px-1">
+            <p className="text-[11px] text-ink-soft font-bold px-1">
               Рекомендации сгенерированы нейросетью DeepSeek; для этого показатели
               передаются внешнему провайдеру (хранение данных в РФ).
             </p>
             <div className="flip-card flip-card--gold">
-              <p className="text-sm text-teal-dark/90 leading-relaxed">{a.llm_summary}</p>
+              <p className="text-sm text-ink-soft leading-relaxed">{a.llm_summary}</p>
             </div>
             <div className="bg-white rounded-xl p-4 glow-soft">
               <ul className="flex flex-col gap-2">
                 {a.llm_items!.map((item, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-teal-dark/90">
+                  <li key={i} className="flex gap-2 text-sm text-ink-soft">
                     <span className="emoji-box !w-6 !h-6" aria-hidden><Icon name={(['bulb', 'run', 'water', 'salad', 'sleep', 'clock'] as IconName[])[i % 6]} size={12} /></span>
                     {item}
                   </li>
@@ -135,7 +135,7 @@ export default function Result() {
             <div className="bg-white rounded-xl p-4 glow-soft">
               <ul className="flex flex-col gap-2">
                 {a.recommendations.map((rec, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-teal-dark/90">
+                  <li key={i} className="flex gap-2 text-sm text-ink-soft">
                     <span className="emoji-box !w-6 !h-6" aria-hidden><Icon name={(['bulb', 'run', 'water', 'salad', 'sleep', 'clock'] as IconName[])[i % 6]} size={12} /></span>
                     {rec}
                   </li>
@@ -148,7 +148,7 @@ export default function Result() {
 
       <Disclaimer urgent={a.risk_level === 'red'} phone={user?.branch?.phone} />
 
-      <p className="text-center text-xs text-teal-dark/50 font-bold">
+      <p className="text-center text-xs text-ink-soft font-bold">
         Источник анализа: {a.source === 'rules+llm' ? 'база правил + языковая модель' : 'база правил'} · история во вкладке «История»
       </p>
     </div>

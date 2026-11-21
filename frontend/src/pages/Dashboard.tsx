@@ -13,6 +13,7 @@ import EmptyArt from '../components/EmptyArt'
 import AvatarDoctor from '../components/AvatarDoctor'
 import { Summary } from '../components/Summary'
 import PageHeader from '../components/PageHeader'
+import { Skeleton, SkeletonCard, SkeletonRows } from '../components/Skeleton'
 
 const riskColors: Record<RiskLevel, string> = {
   green: '#00b8a9',
@@ -87,12 +88,12 @@ function StripSegment(props: {
           <div className="h-1.5 rounded-full bg-[#f1f6f5] overflow-hidden">
             <div className="h-full rounded-full bg-teal-dark" style={{ width: progress + '%' }} />
           </div>
-          <div className="mt-1 text-[11px] text-[#8aa09c]">
+          <div className="mt-1 text-[11px] text-ink-soft">
             {progress}% до цели {props.goal} {props.goalUnit ?? ''}
           </div>
         </div>
       )}
-      {progress === null && props.hint && <div className="mt-1 text-xs text-[#8aa09c]">{props.hint}</div>}
+      {progress === null && props.hint && <div className="mt-1 text-xs text-ink-soft">{props.hint}</div>}
     </div>
   )
 }
@@ -102,15 +103,34 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [nextVisit, setNextVisit] = useState<Visit | null>(null)
   const [goals, setGoals] = useState<Goals>({ steps: null, sleep: null, water: null, weight: null })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [repeatBusy, setRepeatBusy] = useState(false)
+  const [repeatMsg, setRepeatMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+
+  function load() {
+    setLoading(true)
+    setError('')
+    Promise.all([
+      api.listMeasurements(10).then((d) => d.items),
+      api.fetchStats(),
+      api.fetchGoals(),
+      // Ближайший запланированный приём — сверху списка
+      api.fetchMyVisits().then((d) => d.items),
+    ])
+      .then(([ms, st, gl, visits]) => {
+        setItems(ms)
+        setStats(st)
+        setGoals(gl)
+        setNextVisit(visits.find((v) => v.status === 'planned') ?? null)
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
+      .finally(() => setLoading(false))
+  }
 
   useEffect(() => {
-    api.listMeasurements(10).then((d) => setItems(d.items)).catch(() => {})
-    api.fetchStats().then(setStats).catch(() => {})
-    api.fetchGoals().then(setGoals).catch(() => {})
-    // Ближайший запланированный приём — сверху списка
-    api.fetchMyVisits()
-      .then((d) => setNextVisit(d.items.find((v) => v.status === 'planned') ?? null))
-      .catch(() => {})
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Напоминание о вечернем замере: после 18:00, если вечернего замера сегодня нет
@@ -122,10 +142,17 @@ export default function Dashboard() {
   }, [items])
 
   async function repeatEvening() {
+    setRepeatBusy(true)
+    setRepeatMsg(null)
     try {
       const m = await api.repeatLastMeasurement('evening')
       setItems((prev) => [m, ...prev])
-    } catch { /* нечего повторять */ }
+      setRepeatMsg({ kind: 'ok', text: 'Замер добавлен' })
+    } catch (err) {
+      setRepeatMsg({ kind: 'err', text: err instanceof Error ? err.message : 'Не удалось добавить замер' })
+    } finally {
+      setRepeatBusy(false)
+    }
   }
 
   const latest = items[0] ?? null
@@ -185,6 +212,25 @@ export default function Dashboard() {
         }
       />
 
+      {/* Загрузка: скелетон вместо тихого пустого состояния */}
+      {loading && (
+        <div className="flex flex-col gap-6" aria-busy>
+          <Skeleton w="45%" h={30} r={10} />
+          <SkeletonCard lines={4} />
+          <SkeletonRows rows={4} />
+        </div>
+      )}
+
+      {/* Сбой загрузки: ошибка с «Повторить» вместо пустого состояния */}
+      {!loading && error && (
+        <div className="flex flex-col items-start gap-3">
+          <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>
+          <button className="btn btn-ghost" onClick={load}>Повторить</button>
+        </div>
+      )}
+
+      {!loading && !error && (
+      <>
       {/* Ближайший приём */}
       {nextVisit && (
         <Link to="/medcard" className="flip-card flip-card--sky flex flex-wrap items-center gap-2 hover:opacity-90 transition-quick">
@@ -195,20 +241,27 @@ export default function Dashboard() {
               : 'приём без даты'}
             {nextVisit.reason ? ` · ${nextVisit.reason}` : ''}
           </span>
-          <span className="text-xs font-bold text-teal-dark/55 inline-flex items-center gap-1">подробнее в медкарте <Icon name="chevron" size={12} /></span>
+          <span className="text-xs font-bold text-ink-soft inline-flex items-center gap-1">подробнее в медкарте <Icon name="chevron" size={12} /></span>
         </Link>
       )}
 
       {latest && a ? (
         <>
           {showEveningReminder && (
-            <div className="rounded-xl border border-[#e4ebe9] bg-white px-5 py-3.5 flex flex-wrap items-center gap-3">
+            <div className="rounded-lg border border-[#e4ebe9] bg-white px-5 py-3 flex flex-wrap items-center gap-3">
               <span className="text-sm font-semibold text-[#1b2622]">
                 Вечерний замер ещё не сделан — добавьте его в дневник
               </span>
-              <button className="btn btn-gold btn-sm ml-auto" onClick={repeatEvening}>
-                Повторить вечерний
+              <button className="btn btn-gold btn-sm ml-auto" disabled={repeatBusy} onClick={repeatEvening}>
+                {repeatBusy ? 'Добавляем…' : 'Повторить вечерний'}
               </button>
+            </div>
+          )}
+          {/* Подтверждение/ошибка повтора — вне плашки-напоминания: при успехе
+              плашка размонтируется (вечерний замер появился), бейдж остаётся виден */}
+          {repeatMsg && (
+            <div className={`badge ${repeatMsg.kind === 'ok' ? 'badge-green' : 'badge-red'} normal-case tracking-normal w-fit`}>
+              {repeatMsg.text}
             </div>
           )}
 
@@ -252,12 +305,12 @@ export default function Dashboard() {
                     <div className="absolute inset-0 grid place-items-center pointer-events-none">
                       <div className="text-center">
                         <div className="text-2xl font-bold text-[#1b2622]">{totalMeasured}</div>
-                        <div className="text-[10px] font-semibold text-[#8aa09c]">замеров</div>
+                        <div className="text-[10px] font-semibold text-ink-soft">замеров</div>
                       </div>
                     </div>
                   </>
                 ) : (
-                  <div className="h-full grid place-items-center text-sm text-[#8aa09c] font-bold">Нет данных</div>
+                  <div className="h-full grid place-items-center text-sm text-ink-soft font-bold">Нет данных</div>
                 )}
               </div>
               <div className="mt-3 flex flex-col gap-1.5">
@@ -265,7 +318,7 @@ export default function Dashboard() {
                   <div key={d.name} className="flex items-center gap-2.5 text-sm font-semibold text-[#1b2622]">
                     <span className="legend-dot" style={{ background: d.color }} />
                     {d.name}
-                    <span className="ml-auto text-[#8aa09c]">
+                    <span className="ml-auto text-ink-soft">
                       {totalMeasured ? Math.round((d.value / totalMeasured) * 100) : 0}%
                     </span>
                   </div>
@@ -323,7 +376,7 @@ export default function Dashboard() {
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full grid place-items-center text-sm text-[#8aa09c] font-bold">
+                  <div className="h-full grid place-items-center text-sm text-ink-soft font-bold">
                     <span className="inline-flex items-center gap-1.5">
                       Нужно минимум 2 замера с давлением <Icon name="chart" size={14} className="inline-block align-[-2px]" />
                     </span>
@@ -336,13 +389,13 @@ export default function Dashboard() {
               <h2 className="text-lg">Комментарий врача</h2>
               {lastNote ? (
                 <div className="flip-card flip-card--gold mt-3">
-                  <div className="text-xs font-bold text-[#8aa09c] flex items-center gap-1.5">
+                  <div className="text-xs font-bold text-ink-soft flex items-center gap-1.5">
                     <AvatarDoctor size={20} /> {lastNote.doctor_name} · {lastNote.created_at.slice(0, 16)}
                   </div>
                   <p className="text-sm text-[#2c3e3b] mt-1">{lastNote.text}</p>
                 </div>
               ) : (
-                <p className="text-sm text-[#8aa09c] mt-3 font-semibold">
+                <p className="text-sm text-ink-soft mt-3 font-semibold">
                   Заметок пока нет — врач оставит их после разбора замеров.
                 </p>
               )}
@@ -374,7 +427,7 @@ export default function Dashboard() {
                           </span>
                           <div className="min-w-0">
                             <div className="font-bold">{humanDate(m.recorded_at)}</div>
-                            <div className="text-xs text-[#8aa09c]"><Summary m={m} /></div>
+                            <div className="text-xs text-ink-soft"><Summary m={m} /></div>
                           </div>
                         </div>
                       </td>
@@ -386,7 +439,7 @@ export default function Dashboard() {
                         )}
                       </td>
                       <td className="!text-right">
-                        <span className="text-sm text-[#8aa09c] mr-4">{shortDate(m.recorded_at).slice(-5)}</span>
+                        <span className="text-sm text-ink-soft mr-4">{shortDate(m.recorded_at).slice(-5)}</span>
                         <Link to={`/result/${m.id}`} className="font-bold text-teal-dark hover:underline whitespace-nowrap inline-flex items-center gap-1">
                           Открыть <Icon name="chevron" size={13} />
                         </Link>
@@ -398,19 +451,21 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <p className="text-xs text-[#8aa09c] text-center">
+          <p className="text-xs text-ink-soft text-center">
             Спектр-Диагностика не ставит диагнозы — при тревожных показателях обратитесь к врачу, при критических 103
           </p>
         </>
       ) : (
         <div className="panel p-10 text-center">
           <EmptyArt className="mx-auto mb-2" />
-          <h2 className="text-xl mb-2">Пока нет замеров</h2>
+          <h2 className="text-[18px] mb-2">Пока нет замеров</h2>
           <p className="text-sm text-[#5b6b68] mb-5 max-w-sm mx-auto">
             Внесите первый замер — давление, пульс, сон или шаги — и система разберёт показатели и даст рекомендации.
           </p>
           <Link to="/new" className="btn btn-gold">Сделать первый замер</Link>
         </div>
+      )}
+      </>
       )}
     </div>
   )

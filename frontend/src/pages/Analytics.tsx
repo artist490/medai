@@ -23,7 +23,7 @@ function Metric(props: { label: string; value: string | number; tone?: 'default'
   return (
     <div className="panel flex-1 min-w-[160px]">
       <div className="text-xs text-[#6b7a77]">{props.label}</div>
-      <div className={`text-4xl font-bold mt-1 tabular-nums ${props.tone === 'coral' ? 'text-coral' : 'text-[#1b2622]'}`}>
+      <div className={`stat-value mt-1 ${props.tone === 'coral' ? '!text-coral' : ''}`}>
         {props.value}
       </div>
     </div>
@@ -84,7 +84,8 @@ export default function Analytics() {
               <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#6b7a77' }} tickLine={false} axisLine={false} />
               <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#6b7a77' }} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e4ebe9', fontSize: 12 }} />
-              <Bar dataKey="count" name="Замеры" fill="#1e6f6a" radius={[6, 6, 0, 0]} />
+              {/* fill через CSS-класс: var() не работает в SVG-атрибутах */}
+              <Bar dataKey="count" name="Замеры" className="analytics-bar" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -115,7 +116,7 @@ export default function Analytics() {
       <section className="panel">
         <h2 className="text-lg">Пациенты и их статус</h2>
         {data.patients.length === 0 ? (
-          <p className="text-sm text-[#8aa09c] font-semibold mt-2">Пациентов в филиале пока нет</p>
+          <p className="text-sm text-ink-soft font-semibold mt-2">Пациентов в филиале пока нет</p>
         ) : (
           <div className="mt-3 divide-y divide-[#eef4f3]">
             {data.patients.map((p) => (
@@ -123,7 +124,7 @@ export default function Analytics() {
                 <Link to={`/patients/${p.id}`} className="font-semibold text-[#1b2622] hover:text-teal-dark">
                   {p.name || '(без имени)'}
                 </Link>
-                <span className="ml-auto text-xs text-[#8aa09c]">
+                <span className="ml-auto text-xs text-ink-soft">
                   {p.last_at ? `последний замер: ${p.last_at.slice(0, 16).replace('T', ' ')}` : 'замеров нет'}
                 </span>
                 {p.last_risk && (

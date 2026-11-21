@@ -57,7 +57,7 @@ function surveyFlagsOf(survey: string | null | undefined, def: SystemDef): strin
     .map((k) => (k === 'walking_30min' ? 'ходьба <30 мин/день' : SURVEY_SHORT[k] ?? k))
 }
 
-function computeRisks(items: Measurement[], survey: string | null | undefined): SystemRisk[] {
+function computeRisks(items: Measurement[], survey: string | null | undefined, alarmKeys: Set<string>): SystemRisk[] {
   // Самое свежее значение каждого показателя: API отдаёт замеры новыми сверху
   const latest = new Map<string, Finding>()
   for (const m of items) {
@@ -77,7 +77,7 @@ function computeRisks(items: Measurement[], survey: string | null | undefined): 
     // Анамнез: тревожный симптом → «Тревога», диагноз/фактор → минимум «Внимание»
     const flags = surveyFlagsOf(survey, def)
     if (flags.length > 0) {
-      const hasAlarm = def.surveyKeys?.some((k) => dataIsTrue(survey, k) && ALARM_KEYS.has(k)) ?? false
+      const hasAlarm = def.surveyKeys?.some((k) => dataIsTrue(survey, k) && alarmKeys.has(k)) ?? false
       const floor: Status = hasAlarm ? 'alarm' : 'warn'
       if (status === null || SEVERITY[floor] > SEVERITY[status]) status = floor
     }
@@ -94,12 +94,13 @@ function dataIsTrue(survey: string | null | undefined, key: string): boolean {
   }
 }
 
-export default function RiskSystems({ items, survey, onBook }: {
+export default function RiskSystems({ items, survey, alarmKeys, onBook }: {
   items: Measurement[]
   survey?: string | null
+  alarmKeys?: string[]   // из API (MedCard.alarm_keys); не пришло — fallback на ALARM_KEYS из AnamnesisSurvey
   onBook?: (reason: string) => void
 }) {
-  const risks = computeRisks(items, survey)
+  const risks = computeRisks(items, survey, alarmKeys ? new Set(alarmKeys) : ALARM_KEYS)
   const troubled = risks.filter((r) => r.status === 'alarm' || r.status === 'warn')
   const worst = troubled.find((r) => r.status === 'alarm') ?? troubled[0] ?? null
   const hasData = risks.some((r) => r.status !== null)
@@ -110,7 +111,7 @@ export default function RiskSystems({ items, survey, onBook }: {
         <span className="emoji-box"><Icon name="pulse" size={20} /></span>
         Риск по системам организма
       </div>
-      <div className="text-xs font-bold text-teal-dark/50 mb-4">
+      <div className="text-xs font-bold text-ink-soft mb-4">
         {hasData ? 'по последним замерам и анкете' : 'появится после замеров или опросника'}
       </div>
 
@@ -138,7 +139,7 @@ export default function RiskSystems({ items, survey, onBook }: {
                     </div>
                   ))}
                   {r.surveyFlags.map((flag) => (
-                    <div key={flag} className="text-xs text-teal-dark/60" title="Из опросника Минздрава">
+                    <div key={flag} className="text-xs text-ink-soft" title="Из опросника Минздрава">
                       из анкеты: {flag}
                     </div>
                   ))}
@@ -151,7 +152,7 @@ export default function RiskSystems({ items, survey, onBook }: {
 
       {onBook && worst && (
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <span className="text-sm font-bold text-teal-dark/70">
+          <span className="text-sm font-bold text-teal-deep">
             По системе «{worst.def.label}» стоит показаться врачу.
           </span>
           <button className="btn btn-gold btn-sm" onClick={() => onBook(`Консультация: ${worst.def.label.toLowerCase()}`)}>
