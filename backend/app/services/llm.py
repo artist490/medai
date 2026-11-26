@@ -7,6 +7,7 @@ LLM никогда не меняет risk_level и не отменяет тре�
 """
 import json
 import logging
+import re
 from typing import Optional
 
 import httpx
@@ -31,6 +32,20 @@ def _strip_fence(content: str) -> str:
         content = content[:-3]
     return content.strip()
 
+def redact_pii(text: str) -> str:
+    """Очищает очевидные идентификаторы; это не гарантирует полную анонимность."""
+    patterns = (
+        (r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", "[email скрыт]"),
+        (r"(?i)\b(?:https?://|www\.)\S+", "[ссылка скрыта]"),
+        (r"(?<!\w)(?:\+7|8)[\s(]*\d{3}[)\s-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}(?!\w)", "[телефон скрыт]"),
+        (r"(?i)\b(?:паспорт|снилс|инн|полис)\s*[:\-]?\s*[\d\s-]{4,}", "[документ скрыт]"),
+        (r"(?i)\bпациент\s+\d+\b", "пациент"),
+    )
+    for pattern, replacement in patterns:
+        text = re.sub(pattern, replacement, text)
+    return text[:4000]
+
+
 def patient_alias(patient_id: int, age: Optional[int] = None) -> str:
     """Обезличенная подпись пациента для промпта: «Пациент N, X лет» (F034).
 
@@ -39,8 +54,8 @@ def patient_alias(patient_id: int, age: Optional[int] = None) -> str:
     покидать контур клиники. Возраст без даты рождения сам по себе
     персонацию не раскрывает, поэтому остаётся в подписи."""
     if age:
-        return f"Пациент {patient_id}, {age} {_years_word(age)}"
-    return f"Пациент {patient_id}"
+        return f"Пациент, {age} {_years_word(age)}"
+    return "Пациент"
 
 
 def _years_word(age: int) -> str:
@@ -79,9 +94,16 @@ def chat_completion(payload: dict, timeout: Optional[float] = None) -> Optional[
         "Content-Type": "application/json",
     }
     try:
+        # Сообщения пользователя/истории проходят DLP-очистку до отправки.
+        safe_payload = dict(payload)
+        safe_payload["messages"] = [
+            {**message, "content": redact_pii(str(message.get("content") or ""))}
+            if message.get("role") == "user" else message
+            for message in payload.get("messages", [])
+        ]
         resp = httpx.post(
             f"{config.LLM_BASE_URL}/chat/completions",
-            json=payload,
+            json=safe_payload,
             headers=headers,
             timeout=timeout or config.LLM_TIMEOUT,
         )

@@ -1,4 +1,4 @@
-import { CSSProperties, RefObject, useEffect, useLayoutEffect, useState } from 'react'
+import { CSSProperties, RefObject, useCallback, useEffect, useLayoutEffect, useState } from 'react'
 
 export type FlowRect = { x: number; y: number; w: number; h: number }
 
@@ -8,16 +8,16 @@ export type FlowRect = { x: number; y: number; w: number; h: number }
 export function useFlowRect(ref: RefObject<HTMLElement | null>, selector: string, dep: unknown): FlowRect | null {
   const [rect, setRect] = useState<FlowRect | null>(null)
 
-  function measure() {
+  const measure = useCallback(() => {
     const el = ref.current?.querySelector<HTMLElement>(selector)
     if (!el) {
       setRect(null)
       return
     }
     setRect({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight })
-  }
+  }, [ref, selector])
 
-  useLayoutEffect(measure, [dep, selector])
+  useLayoutEffect(measure, [measure, dep])
   useEffect(() => {
     const ro = new ResizeObserver(() => measure())
     if (ref.current) ro.observe(ref.current)
@@ -27,7 +27,7 @@ export function useFlowRect(ref: RefObject<HTMLElement | null>, selector: string
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [selector])
+  }, [measure, ref])
 
   return rect
 }

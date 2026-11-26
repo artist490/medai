@@ -17,7 +17,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "LLM_API_KEY", "")  # без сети: анализ только по правилам
     database.init_db()
-    with TestClient(app) as c:
+    with TestClient(app, headers={"X-Client-Type": "api"}) as c:
         yield c
 
 
@@ -25,7 +25,7 @@ def _register(c: TestClient, email: str, **extra) -> dict:
     # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
     extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
-        "email": email, "password": "secret1", "name": "Тест", **extra,
+        "email": email, "password": "test-password-2026", "name": "Тест", **extra,
     })
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -63,7 +63,7 @@ class TestBranches:
 
     def test_register_unknown_branch_422(self, client):
         resp = client.post("/api/auth/register", json={
-            "email": "p2@test.ru", "password": "secret1", "branch_id": 99999,
+            "email": "p2@test.ru", "password": "test-password-2026", "branch_id": 99999,
         })
         assert resp.status_code == 422
 
@@ -72,14 +72,14 @@ class TestBranches:
         vrn = next(b for b in branches if b["city"] == "Воронеж")["id"]
         _register(client, "p5@test.ru", branch_id=vrn)
         login = client.post("/api/auth/login", json={
-            "email": "p5@test.ru", "password": "secret1",
+            "email": "p5@test.ru", "password": "test-password-2026",
         }).json()
         assert login["user"]["branch"]["city"] == "Воронеж"
 
     def test_register_without_branch_422(self, client):
         """С.3: филиал обязателен на сервере для любой роли — «невидимых» не создавать."""
         resp = client.post("/api/auth/register", json={
-            "email": "p3@test.ru", "password": "secret1", "name": "Тест",
+            "email": "p3@test.ru", "password": "test-password-2026", "name": "Тест",
         })
         assert resp.status_code == 422
         db = sqlite3.connect(config.DATABASE_PATH)
@@ -94,9 +94,12 @@ class TestBranches:
         p = _register(client, "p4@test.ru", branch_id=vrn)
         r = client.put("/api/auth/me", json={"branch_id": sochi}, headers=_auth(p))
         assert r.status_code == 200
+        assert r.json()["branch"]["city"] == "Воронеж"  # нельзя скрыто сменить через общий профиль
+        r = client.post("/api/auth/me/branch", json={"branch_id": sochi, "current_password": "test-password-2026"}, headers=_auth(p))
+        assert r.status_code == 200
         assert r.json()["branch"]["city"] == "Сочи"
         # несуществующий — 422
-        r = client.put("/api/auth/me", json={"branch_id": 424242}, headers=_auth(p))
+        r = client.post("/api/auth/me/branch", json={"branch_id": 424242, "current_password": "test-password-2026"}, headers=_auth(p))
         assert r.status_code == 422
 
     def test_doctor_isolated_by_branch(self, client):

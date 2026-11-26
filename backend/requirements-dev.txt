@@ -1,5 +1,8 @@
 # Инструменты разработки и тестирования (прод-запуск их не требует)
 -r requirements.txt
 pytest>=8.3
+pytest-asyncio>=0.23
+pytest-cov>=5.0
 ruff>=0.15
 mypy>=2.2
+alembic>=1.13

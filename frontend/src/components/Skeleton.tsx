@@ -26,10 +26,10 @@ export function SkeletonCard({ lines = 3, className = '' }: {
 }) {
   return (
     <div className={`panel flex flex-col gap-3.5 ${className}`} aria-hidden>
-      <Skeleton w="42%" h={11} />
-      <Skeleton w="62%" h={24} r={10} />
+      <Skeleton w="42%" h={10} />
+      <Skeleton w="62%" h={20} r={4} />
       {Array.from({ length: lines }, (_, i) => (
-        <Skeleton key={i} w={`${86 - i * 16}%`} h={11} />
+        <Skeleton key={i} w={`${86 - i * 16}%`} h={10} />
       ))}
     </div>
   )
@@ -50,10 +50,10 @@ export function SkeletonRows({ rows = 5, className = '' }: {
         </div>
         {Array.from({ length: rows }, (_, i) => (
           <div key={i} className="flex items-center gap-4">
-            <Skeleton w={40} h={40} r={999} />
-            <Skeleton w={`${30 - (i % 3) * 4}%`} h={13} />
-            <Skeleton w="22%" h={11} />
-            <Skeleton w={90} h={26} r={8} className="ml-auto" />
+            <Skeleton w={34} h={34} r={6} />
+            <Skeleton w={`${30 - (i % 3) * 4}%`} h={12} />
+            <Skeleton w="22%" h={10} />
+            <Skeleton w={80} h={24} r={6} className="ml-auto" />
           </div>
         ))}
       </div>

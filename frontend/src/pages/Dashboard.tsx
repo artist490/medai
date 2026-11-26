@@ -1,6 +1,7 @@
-// Дашборд пациента — композиция направления A «Клинический свет»:
-// hero-карточка давления + donut, полоса показателей с хайрлайнами,
-// график + комментарий врача, таблица последних замеров.
+// Дашборд пациента: сводка по последним замерам.
+// Композиция — редакционная: заголовок, ключевой показатель, полоса
+// вторичных метрик, динамика, таблица. Один акцентный цвет, статусы —
+// точкой и словом, без цветных плашек.
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -16,33 +17,33 @@ import PageHeader from '../components/PageHeader'
 import { Skeleton, SkeletonCard, SkeletonRows } from '../components/Skeleton'
 
 const riskColors: Record<RiskLevel, string> = {
-  green: '#00b8a9',
-  yellow: '#facc15',
-  red: '#dc2626',
+  green: '#0b5c58',
+  yellow: '#a8760a',
+  red: '#a4231d',
 }
 const riskLabels: Record<RiskLevel, string> = {
   green: 'Норма',
   yellow: 'Внимание',
   red: 'Тревога',
 }
-const statusBadgeClass: Record<Status, string> = {
-  ok: 'badge-green',
-  warn: 'badge-gold',
-  alarm: 'badge-red',
-}
 const statusText: Record<Status, string> = {
   ok: 'норма',
   warn: 'внимание',
   alarm: 'тревога',
+}
+const statusClass: Record<Status, string> = {
+  ok: 'badge-green',
+  warn: 'badge-gold',
+  alarm: 'badge-red',
 }
 
 function findingByKey(findings: Finding[] | undefined, key: string): Finding | undefined {
   return findings?.find((f) => f.key === key)
 }
 
-function StatusPill({ status }: { status?: Status }) {
-  if (!status) return <span className="badge badge-teal">нет данных</span>
-  return <span className={`${statusBadgeClass[status]} badge`}>{statusText[status]}</span>
+function StatusText({ status }: { status?: Status }) {
+  if (!status) return <span className="badge text-ink-soft">нет данных</span>
+  return <span className={`${statusClass[status]} badge`}>{statusText[status]}</span>
 }
 
 function shortDate(iso: string): string {
@@ -55,8 +56,8 @@ function humanDate(iso: string): string {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
 }
 
-// Сегмент полосы показателей
-function StripSegment(props: {
+// Ячейка полосы вторичных показателей
+function MetricCell(props: {
   icon: IconName
   label: string
   value: string
@@ -72,28 +73,37 @@ function StripSegment(props: {
     : null
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <span className="stat-label flex items-center gap-2">
-          <Icon name={props.icon} size={16} className="opacity-60" />
+      <div className="flex items-center justify-between gap-2">
+        <span className="stat-label flex items-center gap-1.5">
+          <Icon name={props.icon} size={14} className="opacity-50" />
           {props.label}
         </span>
-        <StatusPill status={props.status} />
+        <StatusText status={props.status} />
       </div>
-      <div className="stat-value mt-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-        <span className="whitespace-nowrap">{props.value}</span>
-        {props.unit && <span className="stat-unit text-xs font-bold whitespace-nowrap">{props.unit}</span>}
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5 min-h-[30px]">
+        {props.value === '—' ? (
+          <span className="text-[13px] text-ink-soft">нет данных</span>
+        ) : (
+          <>
+            <span className="text-[24px] font-semibold tracking-[-0.02em] tabular-nums whitespace-nowrap">
+              {props.value}
+            </span>
+            {props.unit && <span className="text-[12px] text-ink-soft whitespace-nowrap">{props.unit}</span>}
+          </>
+        )}
       </div>
-      {progress !== null && (
+      {progress !== null ? (
         <div className="mt-2">
-          <div className="h-1.5 rounded-full bg-[#f1f6f5] overflow-hidden">
+          <div className="h-1 rounded-full bg-[#eceeec] overflow-hidden">
             <div className="h-full rounded-full bg-teal-dark" style={{ width: progress + '%' }} />
           </div>
-          <div className="mt-1 text-[11px] text-ink-soft">
+          <div className="mt-1.5 text-[11.5px] text-ink-soft tabular-nums">
             {progress}% до цели {props.goal} {props.goalUnit ?? ''}
           </div>
         </div>
+      ) : (
+        props.hint && <div className="mt-1.5 text-[11.5px] text-ink-soft">{props.hint}</div>
       )}
-      {progress === null && props.hint && <div className="mt-1 text-xs text-ink-soft">{props.hint}</div>}
     </div>
   )
 }
@@ -115,7 +125,6 @@ export default function Dashboard() {
       api.listMeasurements(10).then((d) => d.items),
       api.fetchStats(),
       api.fetchGoals(),
-      // Ближайший запланированный приём — сверху списка
       api.fetchMyVisits().then((d) => d.items),
     ])
       .then(([ms, st, gl, visits]) => {
@@ -130,7 +139,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Напоминание о вечернем замере: после 18:00, если вечернего замера сегодня нет
@@ -158,7 +166,6 @@ export default function Dashboard() {
   const latest = items[0] ?? null
   const a = latest?.analysis
 
-  // Donut: распределение замеров по уровню риска
   const riskCounts = useMemo(() => {
     const c = { green: 0, yellow: 0, red: 0 }
     items.forEach((m) => {
@@ -189,7 +196,6 @@ export default function Dashboard() {
   const bmiItem = items.find((m) => m.analysis?.bmi != null)
   const bmiFinding = findingByKey(bmiItem?.analysis?.findings, 'bmi')
 
-  // Последний комментарий врача
   const lastNote = useMemo(() => {
     const all = items.flatMap((m) => (m.analysis?.notes ?? []).map((n) => ({ ...n })))
     all.sort((x, y) => (x.created_at < y.created_at ? 1 : -1))
@@ -199,273 +205,335 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col gap-6 stagger">
       <PageHeader
+        eyebrow={latest ? `Последний замер · ${shortDate(latest.recorded_at)}` : undefined}
         title="Обзор здоровья"
         actions={
           <>
             {latest && (
               <Link to={`/result/${latest.id}`} className="btn btn-ghost">
-                <Icon name="pulse" size={16} /> Последний замер
+                Последний разбор
               </Link>
             )}
-            <Link to="/new" className="btn btn-gold"><Icon name="pressure" size={16} /> Новый замер</Link>
+            <Link to="/new" className="btn btn-gold">
+              <Icon name="pressure" size={16} /> Новый замер
+            </Link>
           </>
         }
       />
 
-      {/* Загрузка: скелетон вместо тихого пустого состояния */}
       {loading && (
-        <div className="flex flex-col gap-6" aria-busy>
-          <Skeleton w="45%" h={30} r={10} />
+        <div className="flex flex-col gap-5" aria-busy>
+          <Skeleton w="45%" h={26} r={4} />
           <SkeletonCard lines={4} />
           <SkeletonRows rows={4} />
         </div>
       )}
 
-      {/* Сбой загрузки: ошибка с «Повторить» вместо пустого состояния */}
       {!loading && error && (
         <div className="flex flex-col items-start gap-3">
-          <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>
+          <div className="text-[13px] text-coral-dark">{error}</div>
           <button className="btn btn-ghost" onClick={load}>Повторить</button>
         </div>
       )}
 
       {!loading && !error && (
-      <>
-      {/* Ближайший приём */}
-      {nextVisit && (
-        <Link to="/medcard" className="flip-card flip-card--sky flex flex-wrap items-center gap-2 hover:opacity-90 transition-quick">
-          <span className="badge badge-teal normal-case tracking-normal">Вы записаны</span>
-          <span className="text-sm font-extrabold text-teal-dark">
-            {nextVisit.visit_date
-              ? `приём ${nextVisit.visit_date.slice(8, 10)}.${nextVisit.visit_date.slice(5, 7)}.${nextVisit.visit_date.slice(0, 4)}`
-              : 'приём без даты'}
-            {nextVisit.reason ? ` · ${nextVisit.reason}` : ''}
-          </span>
-          <span className="text-xs font-bold text-ink-soft inline-flex items-center gap-1">подробнее в медкарте <Icon name="chevron" size={12} /></span>
-        </Link>
-      )}
-
-      {latest && a ? (
         <>
-          {showEveningReminder && (
-            <div className="rounded-lg border border-[#e4ebe9] bg-white px-5 py-3 flex flex-wrap items-center gap-3">
-              <span className="text-sm font-semibold text-[#1b2622]">
-                Вечерний замер ещё не сделан — добавьте его в дневник
+          {nextVisit && (
+            <Link
+              to="/medcard"
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-line rounded-lg px-4 py-3 bg-white hover:border-[#cfd6d2] transition-quick"
+            >
+              <span className="text-[12px] uppercase tracking-[0.06em] text-teal-dark font-medium">
+                Приём назначен
               </span>
-              <button className="btn btn-gold btn-sm ml-auto" disabled={repeatBusy} onClick={repeatEvening}>
-                {repeatBusy ? 'Добавляем…' : 'Повторить вечерний'}
-              </button>
-            </div>
-          )}
-          {/* Подтверждение/ошибка повтора — вне плашки-напоминания: при успехе
-              плашка размонтируется (вечерний замер появился), бейдж остаётся виден */}
-          {repeatMsg && (
-            <div className={`badge ${repeatMsg.kind === 'ok' ? 'badge-green' : 'badge-red'} normal-case tracking-normal w-fit`}>
-              {repeatMsg.text}
-            </div>
+              <span className="text-[13.5px] text-ink">
+                {nextVisit.visit_date
+                  ? `${nextVisit.visit_date.slice(8, 10)}.${nextVisit.visit_date.slice(5, 7)}.${nextVisit.visit_date.slice(0, 4)}`
+                  : 'дата уточняется'}
+                {nextVisit.reason ? ` · ${nextVisit.reason}` : ''}
+              </span>
+              <span className="ml-auto text-[12px] text-ink-soft inline-flex items-center gap-1">
+                Медкарта <Icon name="chevron" size={12} />
+              </span>
+            </Link>
           )}
 
-          {/* Ряд 1: hero давления + donut */}
-          <div className="grid lg:grid-cols-[2fr_1fr] gap-4 items-stretch">
-            <div className="stat-card stat-card--hero stat-card--hero-gradient flex flex-col justify-between">
-              <div className="flex items-start justify-between gap-3">
-                <span className="stat-label flex items-center gap-2">
-                  <Icon name="pressure" size={16} className="opacity-70" />
-                  Давление
-                </span>
-                <span className={`hero-pill ${bpFinding ? `hero-pill--${bpFinding.status}` : ''}`}>
-                  {bpFinding ? statusText[bpFinding.status] : 'нет данных'}
-                </span>
-              </div>
-              <div className="stat-value mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="whitespace-nowrap">{bpItem ? `${bpItem.systolic}/${bpItem.diastolic ?? '—'}` : '—'}</span>
-                {bpItem && <span className="stat-unit text-sm font-bold whitespace-nowrap">мм рт. ст.</span>}
-              </div>
-              {bpFinding && <p className="mt-2 text-sm text-white/85 max-w-md">{bpFinding.message}</p>}
-              {bpItem && (
-                <div className="mt-4 text-xs text-white/60">
-                  Последний замер с давлением: {shortDate(bpItem.recorded_at)}
+          {latest && a ? (
+            <>
+              {showEveningReminder && (
+                <div className="flex flex-wrap items-center gap-3 border border-line rounded-lg bg-white px-4 py-3">
+                  <span className="text-[13px] text-ink">
+                    Вечерний замер ещё не сделан.
+                  </span>
+                  <button className="btn btn-ghost btn-sm ml-auto" disabled={repeatBusy} onClick={repeatEvening}>
+                    {repeatBusy ? 'Добавляем…' : 'Повторить вечерний'}
+                  </button>
                 </div>
               )}
-            </div>
+              {repeatMsg && (
+                <div className={`text-[12.5px] ${repeatMsg.kind === 'ok' ? 'text-[#146c43]' : 'text-coral-dark'}`}>
+                  {repeatMsg.text}
+                </div>
+              )}
 
-            <section className="panel flex flex-col">
-              <h2 className="text-lg mb-3">Структура замеров</h2>
-              <div className="chart-box relative flex-1" style={{ minHeight: 190 }}>
-                {totalMeasured > 0 ? (
-                  <>
-                    <ResponsiveContainer>
-                      <PieChart>
-                        <Pie data={donutData} dataKey="value" innerRadius="72%" outerRadius="94%"
-                             startAngle={90} endAngle={-270} paddingAngle={2} stroke="none">
-                          {donutData.map((d) => <Cell key={d.name} fill={d.color} />)}
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="absolute inset-0 grid place-items-center pointer-events-none">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-[#1b2622]">{totalMeasured}</div>
-                        <div className="text-[10px] font-semibold text-ink-soft">замеров</div>
-                      </div>
+              {/* Ключевой показатель + структура замеров */}
+              <div className="grid lg:grid-cols-[1.9fr_1fr] gap-5 items-stretch">
+                <section className="panel flex flex-col justify-between">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="stat-label flex items-center gap-1.5">
+                      <Icon name="pressure" size={14} className="opacity-50" />
+                      Артериальное давление
+                    </span>
+                    <StatusText status={bpFinding?.status} />
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-baseline gap-x-2.5">
+                    {bpItem ? (
+                      <>
+                        <span className="text-[46px] leading-none font-semibold tracking-[-0.035em] tabular-nums">
+                          {bpItem.systolic}/{bpItem.diastolic ?? '—'}
+                        </span>
+                        <span className="text-[12.5px] text-ink-soft">мм рт. ст.</span>
+                      </>
+                    ) : (
+                      <span className="text-[15px] text-ink-soft">Нет замеров с давлением</span>
+                    )}
+                  </div>
+
+                  {bpFinding ? (
+                    <p className="mt-3 text-[13.5px] leading-relaxed text-ink-soft max-w-[54ch]">
+                      {bpFinding.message}
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-[13.5px] text-ink-soft">
+                      Норма для взрослых — 120/80 мм рт. ст.
+                    </p>
+                  )}
+
+                  {bpItem && (
+                    <div className="mt-5 pt-3 border-t border-line flex flex-wrap items-center justify-between gap-2 text-[12px] text-ink-soft">
+                      <span className="tabular-nums">{shortDate(bpItem.recorded_at)}</span>
+                      <Link to={`/result/${bpItem.id}`} className="hero-detail-link text-[12.5px]">
+                        Разбор замера <Icon name="chevron" size={12} />
+                      </Link>
                     </div>
-                  </>
-                ) : (
-                  <div className="h-full grid place-items-center text-sm text-ink-soft font-bold">Нет данных</div>
-                )}
-              </div>
-              <div className="mt-3 flex flex-col gap-1.5">
-                {donutData.map((d) => (
-                  <div key={d.name} className="flex items-center gap-2.5 text-sm font-semibold text-[#1b2622]">
-                    <span className="legend-dot" style={{ background: d.color }} />
-                    {d.name}
-                    <span className="ml-auto text-ink-soft">
-                      {totalMeasured ? Math.round((d.value / totalMeasured) * 100) : 0}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
+                  )}
+                </section>
 
-          {/* Ряд 2: полоса показателей с хайрлайнами */}
-          <div className="stat-strip">
-            <StripSegment
-              icon="pulse" label="Пульс"
-              value={pulseItem ? String(pulseItem.pulse) : '—'}
-              unit={pulseItem ? 'уд/мин' : undefined}
-              status={pulseFinding?.status}
-              hint={pulseFinding ? 'Норма 60–100' : undefined}
-            />
-            <StripSegment
-              icon="sleep" label="Сон"
-              value={sleepItem ? String(sleepItem.sleep_hours) : '—'}
-              unit={sleepItem ? 'ч' : undefined}
-              status={sleepFinding?.status}
-              goal={goals.sleep ?? undefined}
-              goalUnit="ч"
-              hint={sleepFinding ? 'Норма 7–9' : 'Здесь появится продолжительность сна'}
-            />
-            <StripSegment
-              icon="scale" label="ИМТ"
-              value={bmiItem ? String(bmiItem.analysis!.bmi) : '—'}
-              unit={bmiItem ? 'кг/м²' : undefined}
-              status={bmiFinding?.status}
-              hint={bmiFinding ? 'Норма 18.5–24.9' : 'Норма 18.5–24.9, нужен рост в профиле'}
-            />
-          </div>
-
-          {/* Ряд 3: график + комментарий врача */}
-          <div className="grid lg:grid-cols-[2fr_1fr] gap-4 items-stretch">
-            <section className="panel">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h2 className="text-lg">Давление в динамике</h2>
-                <div className="flex gap-2">
-                  <span className="legend-pill"><span className="legend-dot" style={{ background: '#dc2626' }} />Систолическое</span>
-                  <span className="legend-pill"><span className="legend-dot" style={{ background: '#00b8a9' }} />Диастолическое</span>
-                </div>
-              </div>
-              <div className="chart-box" style={{ height: 300 }}>
-                {bpData.length >= 2 ? (
-                  <ResponsiveContainer>
-                    <LineChart data={bpData} margin={{ top: 10, right: 16, bottom: 0, left: -12 }}>
-                      <XAxis dataKey="t" tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} domain={['auto', 'auto']} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 12 }} />
-                      <Line type="monotone" dataKey="systolic" name="Систолическое" stroke="#dc2626" strokeWidth={3} dot={{ r: 4, strokeWidth: 0, fill: '#dc2626' }} />
-                      <Line type="monotone" dataKey="diastolic" name="Диастолическое" stroke="#00b8a9" strokeWidth={3} dot={{ r: 4, strokeWidth: 0, fill: '#00b8a9' }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full grid place-items-center text-sm text-ink-soft font-bold">
-                    <span className="inline-flex items-center gap-1.5">
-                      Нужно минимум 2 замера с давлением <Icon name="chart" size={14} className="inline-block align-[-2px]" />
-                    </span>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="panel flex flex-col">
-              <h2 className="text-lg">Комментарий врача</h2>
-              {lastNote ? (
-                <div className="flip-card flip-card--gold mt-3">
-                  <div className="text-xs font-bold text-ink-soft flex items-center gap-1.5">
-                    <AvatarDoctor size={20} /> {lastNote.doctor_name} · {lastNote.created_at.slice(0, 16)}
-                  </div>
-                  <p className="text-sm text-[#2c3e3b] mt-1">{lastNote.text}</p>
-                </div>
-              ) : (
-                <p className="text-sm text-ink-soft mt-3 font-semibold">
-                  Заметок пока нет — врач оставит их после разбора замеров.
-                </p>
-              )}
-            </section>
-          </div>
-
-          {/* Ряд 4: последние замеры */}
-          <section className="panel">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <h2 className="text-lg">Последние замеры</h2>
-              <Link to="/history" className="btn btn-ghost btn-sm">Вся история <Icon name="chevron" size={13} /></Link>
-            </div>
-            <div className="overflow-x-auto" data-full-bleed>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Замер</th>
-                    <th>Статус</th>
-                    <th className="!text-right">Детали</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.slice(0, 6).map((m) => (
-                    <tr key={m.id}>
-                      <td>
-                        <div className="flex items-center gap-3">
-                          <span className={`row-avatar row-avatar--${m.analysis?.risk_level ?? 'green'}`}>
-                            {m.recorded_at.slice(8, 10)}
-                          </span>
-                          <div className="min-w-0">
-                            <div className="font-bold">{humanDate(m.recorded_at)}</div>
-                            <div className="text-xs text-ink-soft"><Summary m={m} /></div>
+                <section className="panel flex flex-col">
+                  <h2 className="text-[14px] font-medium text-ink">Структура замеров</h2>
+                  <div className="relative flex-1 mt-2" style={{ minHeight: 168 }}>
+                    {totalMeasured > 0 ? (
+                      <>
+                        <ResponsiveContainer>
+                          <PieChart>
+                            <Pie
+                              data={donutData}
+                              dataKey="value"
+                              innerRadius="74%"
+                              outerRadius="94%"
+                              startAngle={90}
+                              endAngle={-270}
+                              paddingAngle={2}
+                              stroke="none"
+                            >
+                              {donutData.map((d) => <Cell key={d.name} fill={d.color} />)}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 grid place-items-center pointer-events-none">
+                          <div className="text-center">
+                            <div className="text-[22px] font-semibold tabular-nums leading-none">{totalMeasured}</div>
+                            <div className="text-[10.5px] text-ink-soft mt-1">замеров</div>
                           </div>
                         </div>
-                      </td>
-                      <td>
-                        {m.analysis && (
-                          <span className={`${statusBadgeClass[m.analysis.risk_level === 'green' ? 'ok' : m.analysis.risk_level === 'yellow' ? 'warn' : 'alarm']} badge`}>
-                            {riskLabels[m.analysis.risk_level]}
-                          </span>
-                        )}
-                      </td>
-                      <td className="!text-right">
-                        <span className="text-sm text-ink-soft mr-4">{shortDate(m.recorded_at).slice(-5)}</span>
-                        <Link to={`/result/${m.id}`} className="font-bold text-teal-dark hover:underline whitespace-nowrap inline-flex items-center gap-1">
-                          Открыть <Icon name="chevron" size={13} />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                      </>
+                    ) : (
+                      <div className="h-full grid place-items-center text-[13px] text-ink-soft">Нет данных</div>
+                    )}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-line flex flex-col gap-1.5">
+                    {donutData.map((d) => (
+                      <div key={d.name} className="flex items-center gap-2 text-[12.5px] text-ink">
+                        <span className="legend-dot" style={{ background: d.color }} />
+                        {d.name}
+                        <span className="ml-auto text-ink-soft tabular-nums">
+                          {totalMeasured ? Math.round((d.value / totalMeasured) * 100) : 0}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
 
-          <p className="text-xs text-ink-soft text-center">
-            Спектр-Диагностика не ставит диагнозы — при тревожных показателях обратитесь к врачу, при критических 103
-          </p>
+              {/* Вторичные показатели */}
+              <div className="stat-strip">
+                <MetricCell
+                  icon="pulse" label="Пульс"
+                  value={pulseItem ? String(pulseItem.pulse) : '—'}
+                  unit={pulseItem ? 'уд/мин' : undefined}
+                  status={pulseFinding?.status}
+                  hint={pulseFinding ? 'Норма 60–100' : 'Норма 60–100 уд/мин'}
+                />
+                <MetricCell
+                  icon="sleep" label="Сон"
+                  value={sleepItem ? String(sleepItem.sleep_hours) : '—'}
+                  unit={sleepItem ? 'ч' : undefined}
+                  status={sleepFinding?.status}
+                  goal={goals.sleep ?? undefined}
+                  goalUnit="ч"
+                  hint={sleepFinding ? 'Норма 7–9' : 'Здесь появится продолжительность сна'}
+                />
+                <MetricCell
+                  icon="scale" label="ИМТ"
+                  value={bmiItem ? String(bmiItem.analysis!.bmi) : '—'}
+                  unit={bmiItem ? 'кг/м²' : undefined}
+                  status={bmiFinding?.status}
+                  hint={bmiFinding ? 'Норма 18.5–24.9' : 'Нужен рост в профиле'}
+                />
+              </div>
+
+              {/* Динамика + комментарий врача */}
+              <div className="grid lg:grid-cols-[1.9fr_1fr] gap-5 items-stretch">
+                <section className="panel">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h2 className="text-[14px] font-medium text-ink">Давление в динамике</h2>
+                    <div className="flex gap-4">
+                      <span className="legend-pill"><span className="legend-dot" style={{ background: riskColors.red }} />Систолическое</span>
+                      <span className="legend-pill"><span className="legend-dot" style={{ background: riskColors.green }} />Диастолическое</span>
+                    </div>
+                  </div>
+                  <div style={{ height: 260 }}>
+                    {bpData.length >= 2 ? (
+                      <ResponsiveContainer>
+                        <LineChart data={bpData} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+                          <XAxis
+                            dataKey="t"
+                            tick={{ fontSize: 10.5, fill: '#7b8681' }}
+                            tickLine={false}
+                            axisLine={{ stroke: '#e3e6e3' }}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 10.5, fill: '#7b8681' }}
+                            domain={['auto', 'auto']}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              borderRadius: 6,
+                              border: '1px solid #e3e6e3',
+                              fontSize: 12,
+                              boxShadow: '0 8px 24px -16px rgba(19,26,24,.3)',
+                            }}
+                          />
+                          <Line
+                            type="monotone" dataKey="systolic" name="Систолическое"
+                            stroke={riskColors.red} strokeWidth={1.6}
+                            dot={{ r: 2.5, strokeWidth: 0, fill: riskColors.red }}
+                            activeDot={{ r: 4 }}
+                          />
+                          <Line
+                            type="monotone" dataKey="diastolic" name="Диастолическое"
+                            stroke={riskColors.green} strokeWidth={1.6}
+                            dot={{ r: 2.5, strokeWidth: 0, fill: riskColors.green }}
+                            activeDot={{ r: 4 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full grid place-items-center text-[13px] text-ink-soft text-center px-6">
+                        Для графика нужно минимум два замера с давлением
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="panel flex flex-col">
+                  <h2 className="text-[14px] font-medium text-ink">Комментарий врача</h2>
+                  {lastNote ? (
+                    <div className="mt-3 pt-3 border-t border-line">
+                      <div className="text-[11.5px] text-ink-soft flex items-center gap-1.5">
+                        <AvatarDoctor size={18} /> {lastNote.doctor_name} · {lastNote.created_at.slice(0, 16)}
+                      </div>
+                      <p className="text-[13.5px] leading-relaxed text-ink mt-2">{lastNote.text}</p>
+                    </div>
+                  ) : (
+                    <p className="text-[13px] text-ink-soft mt-3 leading-relaxed">
+                      Заметок пока нет — врач оставит их после разбора замеров.
+                    </p>
+                  )}
+                </section>
+              </div>
+
+              {/* Последние замеры */}
+              <section className="panel">
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <h2 className="text-[14px] font-medium text-ink">Последние замеры</h2>
+                  <Link to="/history" className="text-[12.5px] text-teal-dark hover:underline underline-offset-2 inline-flex items-center gap-1">
+                    Вся история <Icon name="chevron" size={12} />
+                  </Link>
+                </div>
+                <div className="overflow-x-auto" data-full-bleed>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Замер</th>
+                        <th>Статус</th>
+                        <th className="!text-right">Детали</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.slice(0, 6).map((m) => (
+                        <tr key={m.id}>
+                          <td>
+                            <div className="flex items-center gap-3">
+                              <span className={`row-avatar row-avatar--${m.analysis?.risk_level ?? 'green'}`}>
+                                {m.recorded_at.slice(8, 10)}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="font-medium">{humanDate(m.recorded_at)}</div>
+                                <div className="text-[12px] text-ink-soft truncate max-w-[420px]"><Summary m={m} /></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            {m.analysis && (
+                              <span className={`${statusClass[m.analysis.risk_level === 'green' ? 'ok' : m.analysis.risk_level === 'yellow' ? 'warn' : 'alarm']} badge`}>
+                                {riskLabels[m.analysis.risk_level]}
+                              </span>
+                            )}
+                          </td>
+                          <td className="!text-right">
+                            <span className="text-[12px] text-ink-soft mr-4 tabular-nums">{shortDate(m.recorded_at).slice(-5)}</span>
+                            <Link to={`/result/${m.id}`} className="text-[12.5px] text-teal-dark hover:underline underline-offset-2 whitespace-nowrap">
+                              Открыть
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <p className="text-[11.5px] text-ink-soft">
+                Сервис не ставит диагноз. При тревожных показателях обратитесь к врачу,
+                при критических — звоните 103.
+              </p>
+            </>
+          ) : (
+            <section className="panel py-14 px-6 text-center">
+              <EmptyArt className="mx-auto mb-4 opacity-70" />
+              <h2 className="text-[17px] font-semibold">Пока нет замеров</h2>
+              <p className="text-[13.5px] text-ink-soft mt-2 mb-5 max-w-[46ch] mx-auto leading-relaxed">
+                Внесите первый замер — давление, пульс, сон или шаги — и система
+                разберёт показатели и покажет динамику.
+              </p>
+              <Link to="/new" className="btn btn-gold">Сделать первый замер</Link>
+            </section>
+          )}
         </>
-      ) : (
-        <div className="panel p-10 text-center">
-          <EmptyArt className="mx-auto mb-2" />
-          <h2 className="text-[18px] mb-2">Пока нет замеров</h2>
-          <p className="text-sm text-[#5b6b68] mb-5 max-w-sm mx-auto">
-            Внесите первый замер — давление, пульс, сон или шаги — и система разберёт показатели и даст рекомендации.
-          </p>
-          <Link to="/new" className="btn btn-gold">Сделать первый замер</Link>
-        </div>
-      )}
-      </>
       )}
     </div>
   )

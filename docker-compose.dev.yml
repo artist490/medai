@@ -1,0 +1,49 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medai-backend-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini
+      - medai-data-dev:/data
+      - medai-models-dev:/models
+    environment:
+      - DATABASE_PATH=/data/medai.db
+      - FRONTEND_DIST=/app/../frontend/dist
+      - APP_ENV=development
+      - ENFORCE_HTTPS=false
+      - SECURE_COOKIES=false
+      - SESSION_TTL_DAYS=7
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://plusvibeapi.ru/v1}
+      - LLM_MODEL=${LLM_MODEL:-deepseek-v4.1-flash-1017}
+      - OCR_ENABLED=${OCR_ENABLED:-false}
+      - LITEPARSE_MODEL_DIR=/models
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: medai-frontend-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE=/api
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  medai-data-dev:
+  medai-models-dev:

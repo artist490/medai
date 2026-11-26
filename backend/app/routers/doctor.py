@@ -10,6 +10,10 @@ from ..database import get_db
 from ..schemas import NoteIn, VisitCloseIn
 from ..services import llm as llm_service
 from ..services import signals
+from ..services.audit import record
+from ..security import SlidingRateLimiter
+
+_summary_limiter = SlidingRateLimiter(20, 3600)
 from ..services.payloads import (
     ORDER_SQL,
     PATIENT_FIELDS,
@@ -166,6 +170,8 @@ def patient_detail(
             analysis = analysis_payload(row, id_key="a_id", mid_key="a_mid", created_key="a_created")
             analysis["notes"] = notes_for(db, analysis["id"])
         items.append(measurement_payload(row, analysis))
+    record(db, "patient.measurements.read", user_id=user["id"], entity="patient", entity_id=patient_id)
+    db.commit()
     return {"patient": patient_payload(p), "items": items}
 
 
@@ -495,6 +501,10 @@ def ai_summary(
 ):
     """ИИ-сводка о пациенте к приёму (LLM, без изменения данных)."""
     patient = _branch_patient(db, patient_id, user)
+    if not _summary_limiter.allow(f"summary|{user['id']}"):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Лимит ИИ-сводок исчерпан — повторите позже")
+    record(db, "patient.summary.generate", user_id=user["id"], entity="patient", entity_id=patient_id)
+    db.commit()
     payload = _build_summary_payload(db, patient)
     summary = llm_service.patient_summary(payload)
     if summary is None:

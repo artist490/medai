@@ -8,17 +8,6 @@ import PageHeader from '../components/PageHeader'
 import { Skeleton } from '../components/Skeleton'
 import type { ChatMessage } from '../types'
 
-const TOOL_LABELS: Record<string, string> = {
-  get_profile: 'профиль',
-  get_recent_measurements: 'последние замеры',
-  get_last_analysis: 'последний разбор',
-  get_stats_summary: 'статистика за период',
-  get_risk_history: 'история рисков',
-  get_patients_overview: 'обзор пациентов',
-  get_patient_measurements: 'замеры пациента',
-  get_patient_last_analysis: 'разбор пациента',
-}
-
 const PATIENT_CHIPS = [
   'Как моё давление за последние замеры?',
   'Что показывает последний разбор?',
@@ -30,7 +19,6 @@ const DOCTOR_CHIPS = [
   'Сколько пациентов в моём филиале?',
   'Какие риски у моих пациентов?',
 ]
-
 
 // Безопасный рендер markdown-ответа модели (только жирный и пункты;
 // React экранирует текст — XSS от содержимого модели исключён).
@@ -44,11 +32,11 @@ function Md({ text }: { text: string }) {
         const clean = line.replace(/^\s*-\s/, "");
         const parts = clean.split(/\*\*([^*]+)\*\*/g);
         const body = parts.map((seg, j) =>
-          j % 2 === 1 ? <strong key={j}>{seg}</strong> : seg,
+          j % 2 === 1 ? <strong key={j} className="font-medium">{seg}</strong> : seg,
         );
         return (
           <div key={i} className={bullet ? "flex gap-2 items-start" : ""}>
-            {bullet && <span className="opacity-50" aria-hidden>•</span>}
+            {bullet && <span className="text-ink-soft" aria-hidden>•</span>}
             <span>{body}</span>
           </div>
         );
@@ -77,7 +65,6 @@ export default function Chat() {
 
   useEffect(() => {
     loadHistory()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -102,6 +89,7 @@ export default function Chat() {
         created_at: new Date().toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }),
       }])
     } catch (err) {
+      setInput(message)
       setError(err instanceof Error ? err.message : 'Ошибка чата')
     } finally {
       setBusy(false)
@@ -109,99 +97,110 @@ export default function Chat() {
   }
 
   async function clear() {
-    if (!window.confirm('Очистить всю переписку с ИИ?')) return
-    await api.clearChat().catch(() => {})
-    setItems([])
+    if (busy || !window.confirm('Очистить всю переписку с ИИ?')) return
+    setError('')
+    setBusy(true)
+    try {
+      await api.clearChat()
+      setItems([])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось очистить переписку')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const chips = user?.role === 'doctor' ? DOCTOR_CHIPS : PATIENT_CHIPS
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-3xl mx-auto h-[calc(100dvh-170px)] sm:h-auto sm:min-h-[480px] stagger">
+    <div className="flex flex-col gap-4 w-full max-w-3xl mx-auto h-[calc(100dvh-150px)] sm:h-auto sm:min-h-[520px]">
       <div className="shrink-0">
         <PageHeader
-          title={<>Ассистент <Icon name="sparkle" size={20} className="inline-block align-[-2px] text-teal" /></>}
+          eyebrow="Помощник по вашим данным"
+          title="Ассистент"
           actions={
-            <button className="btn btn-ghost btn-sm" onClick={clear}>
-              <Icon name="trash" size={14} /> Очистить
-            </button>
+            items.length > 0 ? (
+              <button className="btn btn-ghost btn-sm" onClick={clear} disabled={busy}>
+                <Icon name="trash" size={13} /> Очистить
+              </button>
+            ) : undefined
           }
         />
       </div>
 
-      <p className="text-sm text-teal-deep -mt-3 hidden sm:block shrink-0">
-        Ассистент видит {user?.role === 'doctor'
-          ? 'данные пациентов вашего филиала'
-          : 'ваши замеры и разборы'} и отвечает с опорой на них.
-        Не ставит диагнозы. При тревожных показателях обратитесь к врачу.
-      </p>
-      <p className="text-xs text-teal-deep -mt-4 sm:hidden shrink-0">
-        Ассистент видит ваши данные и не ставит диагнозы.
+      <p className="text-[11.5px] leading-relaxed text-ink-soft max-w-[74ch] shrink-0">
+        Ассистент видит {user?.role === 'doctor' ? 'данные пациентов вашего филиала' : 'ваши замеры и разборы'}.
+        Диагнозов не ставит. Не вводите ФИО, адреса и номера документов: текст уходит
+        внешней модели, контакты вырезаются автоматически.
       </p>
 
       {/* Лента сообщений */}
       <div
         ref={boxRef}
-        className="flex-1 min-h-0 flex flex-col gap-3 rounded-2xl border border-[#eef3f2] bg-white p-3 sm:p-4 sm:max-h-[58vh] overflow-y-auto shadow-soft [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex-1 min-h-0 flex flex-col gap-4 border border-line bg-white rounded-lg p-4 sm:max-h-[54vh] overflow-y-auto"
       >
         {historyLoading && (
-          <div className="flex flex-col gap-3 py-4" aria-busy>
-            <Skeleton w="30%" h={12} />
-            <Skeleton w="70%" h={38} r={12} />
-            <Skeleton w="55%" h={38} r={12} className="ml-auto" />
+          <div className="flex flex-col gap-3 py-2" aria-busy>
+            <Skeleton w="30%" h={11} />
+            <Skeleton w="68%" h={34} r={6} />
+            <Skeleton w="52%" h={34} r={6} className="ml-auto" />
           </div>
         )}
+
         {!historyLoading && items.length === 0 && error && (
           <div className="grid place-items-center py-8 text-center">
-            <div className="badge badge-red normal-case tracking-normal w-fit mb-3">{error}</div>
+            <div className="text-[12.5px] text-coral-dark mb-3" role="alert">{error}</div>
             <button className="btn btn-ghost" onClick={loadHistory}>Повторить</button>
           </div>
         )}
+
         {!historyLoading && items.length === 0 && !error && (
           <div className="grid place-items-center py-8 text-center">
-            <EmptyArt className="mx-auto mb-2" />
-            <p className="text-base font-bold text-[#1b2622]">Пока нет сообщений</p>
-            <p className="text-sm text-ink-soft max-w-sm mt-1">
-              Задайте вопрос о показателях. Ассистент сам посмотрит нужные замеры
-              и разборы через инструменты.
+            <EmptyArt className="mx-auto mb-3 opacity-70" />
+            <p className="text-[13.5px] font-medium text-ink">Переписки пока нет</p>
+            <p className="text-[12.5px] text-ink-soft max-w-[44ch] mt-1.5 leading-relaxed">
+              Спросите о показателях — ассистент сам поднимет нужные замеры и разборы.
             </p>
           </div>
         )}
+
         {items.map((m) => (
-          <div key={m.id} className={`flex items-start gap-2 ${m.role === 'user' ? 'justify-end' : ''}`}>
-            {m.role === 'assistant' && <span className="ai-avatar mt-0.5"><Icon name="sparkle" size={15} /></span>}
+          <div key={m.id} className={`flex items-start gap-2.5 ${m.role === 'user' ? 'justify-end' : ''}`}>
+            {m.role === 'assistant' && <span className="ai-avatar mt-0.5"><Icon name="sparkle" size={14} /></span>}
             <div
-              className={`max-w-[85%] px-4 py-2.5 text-sm leading-relaxed ${
+              className={`max-w-[85%] px-3.5 py-2.5 text-[13.5px] leading-relaxed ${
                 m.role === 'user'
                   ? 'chat-bubble-user text-white'
-                  : 'chat-bubble-ai text-[#2c3e3b]'
+                  : 'chat-bubble-ai text-ink'
               }`}
             >
               <Md text={m.content} />
-              <div className={`mt-1 text-[10px] font-bold ${m.role === 'user' ? 'text-white/60' : 'text-ink-soft'}`}>
+              <div className={`mt-1.5 text-[10.5px] tabular-nums ${m.role === 'user' ? 'text-white/70' : 'text-ink-soft'}`}>
                 {m.created_at.slice(5, 16)}
               </div>
             </div>
           </div>
         ))}
+
         {busy && (
-          <div className="flex items-start gap-2">
-            <span className="ai-avatar ai-avatar--pulsing"><Icon name="sparkle" size={15} /></span>
-            <div className="chat-bubble-ai px-4 py-3 flex items-center gap-1.5">
+          <div className="flex items-start gap-2.5" aria-busy="true" aria-live="polite">
+            <span className="ai-avatar ai-avatar--pulsing"><Icon name="sparkle" size={14} /></span>
+            <div className="chat-bubble-ai px-3.5 py-3 flex items-center gap-1.5">
               <span className="typing-dot" />
               <span className="typing-dot" />
               <span className="typing-dot" />
-              <span className="ml-1.5 text-xs font-bold text-ink-soft">ИИ смотрит данные…</span>
+              <span className="ml-2 text-[11.5px] text-ink-soft">Смотрит данные…</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Ошибка отправки: история ошибок пустой ленты показывается внутри ленты с «Повторить» */}
-      {error && items.length > 0 && <div className="badge badge-red w-fit normal-case tracking-normal">{error}</div>}
+      {error && items.length > 0 && (
+        <div className="text-[12.5px] text-coral-dark" role="alert" aria-live="polite">{error}</div>
+      )}
 
       {/* Подсказки */}
-      <div className="shrink-0 flex gap-2 -mt-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
+      <div className="shrink-0 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
         {chips.map((c) => (
           <button
             key={c}
@@ -214,31 +213,37 @@ export default function Chat() {
         ))}
       </div>
 
-      {/* Ввод: на телефоне прилипает над таб-баром с плавной белой подложкой */}
-      <div className="chat-dock shrink-0 sticky bottom-[82px] z-20 -mx-4 px-4 sm:static sm:mx-0 sm:px-0">
-      <form
-        className="composer-card flex items-end gap-1.5"
-        onSubmit={(e) => { e.preventDefault(); send(input) }}
-      >
-        <textarea
-          className="flip-input flex-1 resize-none"
-          rows={1}
-          placeholder="Спросите о своих показателях…"
-          value={input}
-          maxLength={2000}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              send(input)
-            }
-          }}
-        />
-        <button className="btn btn-gold shrink-0" disabled={busy || !input.trim()}>
-          <Icon name="send" size={16} />
-          <span className="hidden sm:inline">Отправить</span>
-        </button>
-      </form>
+      {/* Ввод */}
+      <div className="chat-dock shrink-0 sticky bottom-[74px] z-20 -mx-4 px-4 sm:static sm:mx-0 sm:px-0">
+        <form
+          className="composer-card flex items-end gap-1.5"
+          aria-busy={busy}
+          onSubmit={(e) => { e.preventDefault(); send(input) }}
+        >
+          <textarea
+            className="flip-input flex-1 resize-none"
+            aria-label="Сообщение ассистенту"
+            rows={1}
+            placeholder="Спросите о своих показателях…"
+            value={input}
+            maxLength={2000}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                send(input)
+              }
+            }}
+          />
+          <button
+            className="btn btn-gold shrink-0"
+            aria-label="Отправить сообщение"
+            aria-busy={busy}
+            disabled={busy || !input.trim()}
+          >
+            <Icon name="send" size={15} />
+          </button>
+        </form>
       </div>
     </div>
   )

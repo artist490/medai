@@ -1,9 +1,10 @@
 import type { Finding } from '../types'
 
-// Карточка показателя с левой акцент-полосой цвета статуса (Flip7)
+// Показатель в разборе замера: значение, норма и статус. Маркер слева —
+// только у отклонений, чтобы глаз находил их без чтения текста.
 const statusClass = {
-  ok: 'flip-card--ok',
-  warn: 'flip-card--coral',
+  ok: '',
+  warn: 'flip-card--warn',
   alarm: 'flip-card--danger',
 } as const
 
@@ -17,18 +18,18 @@ export default function IndicatorCard({ finding }: { finding: Finding }) {
   const badge = statusBadge[finding.status]
   return (
     <div className={`flip-card ${statusClass[finding.status]}`}>
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="font-extrabold text-teal-dark">{finding.label}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-medium text-ink">{finding.label}</span>
         <span className={`${badge.cls} badge`}>{badge.text}</span>
       </div>
-      <div className="flex items-baseline gap-1 mb-1">
-        <span className="text-2xl font-extrabold text-teal-dark">{finding.value}</span>
-        <span className="text-xs text-ink-soft font-bold">{finding.unit}</span>
-        <span className="ml-auto text-[11px] text-ink-soft font-bold">
-          норма: {finding.norm}
+      <div className="flex items-baseline gap-1.5 mt-2">
+        <span className="text-[24px] font-semibold tracking-[-0.02em] tabular-nums">{finding.value}</span>
+        <span className="text-[12px] text-ink-soft">{finding.unit}</span>
+        <span className="ml-auto text-[11.5px] text-ink-soft tabular-nums">
+          норма {finding.norm}
         </span>
       </div>
-      <p className="text-sm text-ink-soft">{finding.message}</p>
+      <p className="text-[12.5px] leading-relaxed text-ink-soft mt-2">{finding.message}</p>
     </div>
   )
 }

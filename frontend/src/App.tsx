@@ -19,8 +19,8 @@ function RequireAuth({ children }: { children: React.ReactElement }) {
   const location = useLocation()
   if (loading) {
     return (
-      <div className="min-h-screen grid place-items-center text-teal-dark">
-        <div className="text-lg font-extrabold tracking-wide animate-pulse">Загружается…</div>
+      <div className="min-h-screen grid place-items-center">
+        <div className="text-sm text-ink-soft" role="status">Загрузка…</div>
       </div>
     )
   }
@@ -41,18 +41,8 @@ function Home() {
 }
 
 export default function App() {
-  // На входе и регистрации аурора ярче: кроме одной карточки размывать нечего
-  const { pathname } = useLocation()
-  const onAuth = pathname === '/login' || pathname === '/register'
   return (
-    <>
-      {/* Анимированный градиентный фон: медленно дрейфующие мягкие пятна */}
-      <div className={`bg-aurora${onAuth ? ' bg-aurora--auth' : ''}`} aria-hidden>
-        <span className="b1" />
-        <span className="b2" />
-        <span className="b3" />
-      </div>
-      <Routes>
+    <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
@@ -68,7 +58,6 @@ export default function App() {
         <Route path="patients/:id" element={<RequireDoctor><DoctorPatient /></RequireDoctor>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </>
+    </Routes>
   )
 }

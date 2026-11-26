@@ -17,7 +17,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "LLM_API_KEY", "")  # без сети: анализ только по правилам
     database.init_db()
-    with TestClient(app) as c:
+    with TestClient(app, headers={"X-Client-Type": "api"}) as c:
         yield c
 
 
@@ -25,7 +25,7 @@ def _register(c: TestClient, email: str, **extra) -> dict:
     # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
     extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
-        "email": email, "password": "secret1", "name": "Тест", **extra,
+        "email": email, "password": "test-password-2026", "name": "Тест", **extra,
     })
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -49,7 +49,7 @@ class TestInviteFlow:
 
     def test_unknown_code_rejected(self, client):
         resp = client.post("/api/auth/register", json={
-            "email": "d0@test.ru", "password": "secret1", "invite_code": "no-such-code",
+            "email": "d0@test.ru", "password": "test-password-2026", "invite_code": "no-such-code",
             "branch_id": 1,
         })
         assert resp.status_code == 422
@@ -63,7 +63,7 @@ class TestInviteFlow:
         _make_invite(client, "invite-doc-2")
         _register(client, "d2@test.ru", invite_code="invite-doc-2")
         resp = client.post("/api/auth/register", json={
-            "email": "d3@test.ru", "password": "secret1", "invite_code": "invite-doc-2",
+            "email": "d3@test.ru", "password": "test-password-2026", "invite_code": "invite-doc-2",
             "branch_id": 1,
         })
         assert resp.status_code == 422

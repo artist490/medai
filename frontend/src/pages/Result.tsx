@@ -5,7 +5,6 @@ import RiskBadge from '../components/RiskBadge'
 import IndicatorCard from '../components/IndicatorCard'
 import AvatarDoctor from '../components/AvatarDoctor'
 import Disclaimer from '../components/Disclaimer'
-import Confetti from '../components/Confetti'
 import { Icon } from '../components/Icon'
 import type { IconName } from '../components/Icon'
 import PageHeader from '../components/PageHeader'
@@ -13,6 +12,8 @@ import { SkeletonCard } from '../components/Skeleton'
 import { brand } from '../brand'
 import { useAuth } from '../auth'
 import type { Measurement } from '../types'
+
+const ADVICE_ICONS: IconName[] = ['bulb', 'run', 'water', 'salad', 'sleep', 'clock']
 
 export default function Result() {
   const { id } = useParams()
@@ -28,53 +29,48 @@ export default function Result() {
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl p-8 text-center glow-coral">
-        <div className="mb-2" aria-hidden><Icon name="help" size={40} /></div>
-        <p className="font-bold text-coral-dark mb-4">{error}</p>
-        <Link to="/" className="btn btn-gold">На главную</Link>
+      <div className="panel p-8 text-center">
+        <p className="text-[13.5px] text-coral-dark mb-4">{error}</p>
+        <Link to="/" className="btn btn-ghost">На главную</Link>
       </div>
     )
   }
   if (!m) return <div aria-busy><SkeletonCard lines={4} /></div>
 
   const a = m.analysis!
-  const green = a.risk_level === 'green'
+  const hasAlarm = a.findings.some((f) => f.status === 'alarm')
 
   return (
     <div className="flex flex-col gap-6 stagger">
-      <Confetti fire={green} />
-
-      {/* Hero */}
       <PageHeader
+        eyebrow={`Разбор от ${a.created_at.slice(0, 16)}`}
         title="Разбор замера"
-        sub={`Анализ от ${a.created_at.slice(0, 16)}`}
         actions={
           <>
             <RiskBadge level={a.risk_level} big />
-            <Link to="/new" className="btn btn-gold"><Icon name="pressure" size={16} /> Новый замер</Link>
+            <Link to="/new" className="btn btn-ghost">
+              <Icon name="pressure" size={16} /> Новый замер
+            </Link>
           </>
         }
       />
 
-      {/* Срочный флаг */}
-      {a.findings.some((f) => f.status === 'alarm') && (
+      {hasAlarm && (
         <div className="flip-card flip-card--danger">
-          <div className="font-extrabold text-coral-dark mb-1 flex items-center gap-2">
-            <Icon name="warning" size={20} /> Обратитесь к врачу
+          <div className="flex items-center gap-2 text-[13.5px] font-medium text-coral-dark">
+            <Icon name="warning" size={17} /> Обратитесь к врачу
           </div>
-          <p className="text-sm text-ink-soft">
+          <p className="text-[13px] leading-relaxed text-ink-soft mt-1.5 max-w-[70ch]">
             Есть тревожные показатели. Не ждите ухудшения — запишитесь к терапевту
-            или позвоните в клинику: <span className="font-extrabold">{user?.branch?.phone || brand.phone}</span>.
-            При критических значениях вызывайте 103.
+            или позвоните в клинику:{' '}
+            <span className="text-ink font-medium">{user?.branch?.phone || brand.phone}</span>.
+            При критических значениях звоните 103.
           </p>
         </div>
       )}
 
-      {/* Показатели по карточкам */}
       <section>
-        <div className="section-title mb-3">
-          <span className="emoji-box"><Icon name="pulse" size={20} /></span> Ваши показатели
-        </div>
+        <h2 className="text-[14px] font-medium text-ink mb-3">Показатели</h2>
         <div className="grid md:grid-cols-2 gap-3">
           {a.findings.map((f) => (
             <IndicatorCard key={f.key} finding={f} />
@@ -82,74 +78,65 @@ export default function Result() {
         </div>
       </section>
 
-      {/* Комментарий врача (если оставил в кабинете) */}
       {a.notes && a.notes.length > 0 && (
         <section>
-          <div className="section-title mb-3">
-            <span className="emoji-box"><Icon name="stethoscope" size={20} /></span> Комментарий врача
-          </div>
+          <h2 className="text-[14px] font-medium text-ink mb-3">Комментарий врача</h2>
           <div className="flex flex-col gap-2">
             {a.notes.map((n) => (
-              <div key={n.id} className="flip-card flip-card--gold">
-                <div className="text-xs font-extrabold text-ink-soft flex items-center gap-1.5">
-                  <AvatarDoctor size={20} /> {n.doctor_name} · {n.created_at.slice(0, 16)}
+              <div key={n.id} className="flip-card">
+                <div className="text-[11.5px] text-ink-soft flex items-center gap-1.5">
+                  <AvatarDoctor size={18} /> {n.doctor_name} · {n.created_at.slice(0, 16)}
                 </div>
-                <p className="text-sm text-ink-soft mt-1">{n.text}</p>
+                <p className="text-[13.5px] leading-relaxed text-ink mt-2">{n.text}</p>
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {/* ИИ-блок: текст от LLM или честный fallback */}
       <section>
-        <div className="section-title mb-3">
-          <span className="emoji-box"><Icon name="robot" size={20} /></span> Рекомендации ИИ
+        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+          <h2 className="text-[14px] font-medium text-ink">Что можно сделать</h2>
+          {a.llm_summary && (
+            <span className="text-[11.5px] text-ink-soft">
+              Сформулировано языковой моделью по вашим показателям
+            </span>
+          )}
         </div>
 
-        {a.llm_summary ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-[11px] text-ink-soft font-bold px-1">
-              Рекомендации сгенерированы нейросетью DeepSeek; для этого показатели
-              передаются внешнему провайдеру (хранение данных в РФ).
+        <div className="panel">
+          {a.llm_summary && (
+            <p className="text-[13.5px] leading-relaxed text-ink max-w-[78ch] mb-4 pb-4 border-b border-line">
+              {a.llm_summary}
             </p>
-            <div className="flip-card flip-card--gold">
-              <p className="text-sm text-ink-soft leading-relaxed">{a.llm_summary}</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 glow-soft">
-              <ul className="flex flex-col gap-2">
-                {a.llm_items!.map((item, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-ink-soft">
-                    <span className="emoji-box !w-6 !h-6" aria-hidden><Icon name={(['bulb', 'run', 'water', 'salad', 'sleep', 'clock'] as IconName[])[i % 6]} size={12} /></span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <div className="badge badge-sky normal-case tracking-normal w-fit">
-              <Icon name="lock" size={12} className="inline-block align-[-1px] mr-1" />ИИ-текст недоступен — показаны рекомендации на основе медицинских норм
-            </div>
-            <div className="bg-white rounded-xl p-4 glow-soft">
-              <ul className="flex flex-col gap-2">
-                {a.recommendations.map((rec, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-ink-soft">
-                    <span className="emoji-box !w-6 !h-6" aria-hidden><Icon name={(['bulb', 'run', 'water', 'salad', 'sleep', 'clock'] as IconName[])[i % 6]} size={12} /></span>
-                    {rec}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
+          )}
+
+          <ul className="flex flex-col gap-3">
+            {(a.llm_items ?? a.recommendations).map((item, i) => (
+              <li key={i} className="flex gap-3 text-[13.5px] leading-relaxed text-ink">
+                <Icon
+                  name={ADVICE_ICONS[i % ADVICE_ICONS.length]}
+                  size={16}
+                  className="mt-0.5 text-teal-dark"
+                />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+
+          {!a.llm_summary && (
+            <p className="text-[11.5px] text-ink-soft mt-4 pt-3 border-t border-line">
+              Рекомендации составлены по медицинским нормам — без обращения к языковой модели.
+            </p>
+          )}
+        </div>
       </section>
 
       <Disclaimer urgent={a.risk_level === 'red'} phone={user?.branch?.phone} />
 
-      <p className="text-center text-xs text-ink-soft font-bold">
-        Источник анализа: {a.source === 'rules+llm' ? 'база правил + языковая модель' : 'база правил'} · история во вкладке «История»
+      <p className="text-[11.5px] text-ink-soft">
+        Источник анализа: {a.source === 'rules+llm' ? 'база правил и языковая модель' : 'база правил'}.
+        Показатели передаются внешнему провайдеру модели, данные хранятся в РФ.
       </p>
     </div>
   )

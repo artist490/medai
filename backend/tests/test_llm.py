@@ -19,7 +19,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "LLM_API_KEY", "sk-pv-test-key")  # чтобы llm_enabled() = True
     database.init_db()
-    with TestClient(app) as c:
+    with TestClient(app, headers={"X-Client-Type": "api"}) as c:
         yield c
 
 
@@ -27,7 +27,7 @@ def _register(c: TestClient, email: str, **extra) -> dict:
     # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
     extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
-        "email": email, "password": "secret1", "name": "Тест", **extra,
+        "email": email, "password": "test-password-2026", "name": "Тест", **extra,
     })
     assert resp.status_code == 201
     return resp.json()
@@ -111,9 +111,17 @@ class TestEnrich:
         assert "Анна" not in payload
         assert "Демо" not in payload
         assert "женский" not in payload  # пол — тоже ПДн
-        assert f"Пациент {s['user']['id']}, 46 лет" in payload
+        assert "Пациент, 46 лет" in payload
+        assert f"Пациент {s['user']['id']}" not in payload
         # клинические поля не пострадали
         assert "рост_см: 165" in payload
+
+    def test_user_message_pii_redacted_before_external_call(self, client):
+        from app.services.llm import redact_pii
+        cleaned = redact_pii("Почта test@example.com, телефон +7 (999) 123-45-67, https://private.example")
+        assert "test@example.com" not in cleaned
+        assert "999" not in cleaned
+        assert "https://" not in cleaned
 
     def test_enrich_json_in_markdown_fence(self, client):
         s = _register(client, "p3@test.ru")

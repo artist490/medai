@@ -1,15 +1,19 @@
-// API-клиент: bearer-токен в localStorage, единая обработка ошибок.
-import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DocumentItem, DoctorSignal, Goals, Measurement, MedCard, MedCardInput, PatientRow, Stats, User, Visit } from './types'
+// API-клиент: HttpOnly-сессия + CSRF; Bearer не хранится в браузерном storage.
+import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DocumentItem, DoctorSignal, Goals, Measurement, MedCard, MedCardInput, OcrResult, PatientRow, Stats, User, Visit } from './types'
 
 const TOKEN_KEY = 'medai_token'
 
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+function getCsrfToken(): string | null {
+  const item = document.cookie.split('; ').find((row) => row.startsWith('medai_csrf='))
+  return item ? decodeURIComponent(item.slice('medai_csrf='.length)) : null
 }
 
-export function setToken(token: string | null): void {
-  if (token) localStorage.setItem(TOKEN_KEY, token)
-  else localStorage.removeItem(TOKEN_KEY)
+export function setToken(_token: string | null): void {
+  // Токен веб-сессии не сохраняем нигде: только HttpOnly-cookie.
+  {
+    localStorage.removeItem(TOKEN_KEY)
+    sessionStorage.removeItem(TOKEN_KEY)
+  }
 }
 
 class ApiError extends Error {
@@ -29,10 +33,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   }
-  const token = getToken()
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  const method = (options.method ?? 'GET').toUpperCase()
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const csrf = getCsrfToken()
+    if (csrf) headers['X-CSRF-Token'] = csrf
+  }
 
-  const resp = await fetch(path, { ...options, headers })
+  const resp = await fetch(path, { ...options, headers, credentials: 'same-origin' })
 
   if (resp.status === 204) return undefined as T
   const body = await resp.json().catch(() => ({}))
@@ -60,8 +67,9 @@ export async function register(
   email: string, password: string, name: string,
   inviteCode?: string, branchId?: number,
 ) {
-  const data = await request<{ token: string; user: User }>('/api/auth/register', {
+  const data = await request<{ user: User }>('/api/auth/register', {
     method: 'POST',
+    headers: { 'X-Client-Type': 'web' },
     body: JSON.stringify({
       email,
       password,
@@ -70,7 +78,6 @@ export async function register(
       ...(branchId ? { branch_id: branchId } : {}),
     }),
   })
-  setToken(data.token)
   return data.user
 }
 
@@ -83,11 +90,11 @@ export async function fetchMe(): Promise<User> {
 }
 
 export async function login(email: string, password: string) {
-  const data = await request<{ token: string; user: User }>('/api/auth/login', {
+  const data = await request<{ user: User }>('/api/auth/login', {
     method: 'POST',
+    headers: { 'X-Client-Type': 'web' },
     body: JSON.stringify({ email, password }),
   })
-  setToken(data.token)
   return data.user
 }
 
@@ -100,6 +107,13 @@ export async function updateProfile(
   patch: Partial<User> & { branch_id?: number | null },
 ): Promise<User> {
   return request<User>('/api/auth/me', { method: 'PUT', body: JSON.stringify(patch) })
+}
+
+export async function changeBranch(branchId: number, currentPassword: string): Promise<User> {
+  return request('/api/auth/me/branch', {
+    method: 'POST',
+    body: JSON.stringify({ branch_id: branchId, current_password: currentPassword }),
+  })
 }
 
 // ---------- measurements ----------
@@ -280,6 +294,14 @@ export async function fetchDocuments(): Promise<{ items: DocumentItem[] }> {
 
 export async function deleteDocument(id: number): Promise<void> {
   return request<void>(`/api/documents/${id}`, { method: 'DELETE' })
+}
+
+export async function startDocumentOcr(id: number): Promise<OcrResult> {
+  return request(`/api/documents/${id}/ocr`, { method: 'POST' })
+}
+
+export async function fetchDocumentOcr(id: number): Promise<OcrResult> {
+  return request(`/api/documents/${id}/ocr`)
 }
 
 // ---------- сигналы и аналитика врача ----------

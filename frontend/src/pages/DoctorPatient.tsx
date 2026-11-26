@@ -91,7 +91,7 @@ function NoteForm({ analysisId, onAdded }: { analysisId: number; onAdded: (n: Do
         onChange={(e) => setText(e.target.value)}
         aria-label="Комментарий врача"
       />
-      {error && <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>}
+      {error && <div className="text-[12.5px] text-coral-dark">{error}</div>}
       <button className="btn btn-gold w-fit" disabled={busy || !text.trim()} onClick={submit}>
         {busy ? 'Отправляем…' : 'Добавить комментарий'}
       </button>
@@ -113,8 +113,8 @@ function MeasurementsTab({ items, selectedId, setSelectedId, onNoteAdded, onMark
 
   return (
     <>
-      <section className="bg-white rounded-lg p-6 shadow-float">
-        <h2 className="text-[18px] mb-2">Замеры <span className="text-ink-soft text-base">· {items.length}</span></h2>
+      <section className="panel">
+        <h2 className="text-[14px] font-medium text-ink mb-1">Замеры <span className="text-ink-soft font-normal">· {items.length}</span></h2>
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
@@ -129,15 +129,15 @@ function MeasurementsTab({ items, selectedId, setSelectedId, onNoteAdded, onMark
                 <tr><td colSpan={3} className="text-center text-sm text-ink-soft py-8">Замеров пока нет</td></tr>
               )}
               {items.map((m) => (
-                <tr key={m.id} className={m.id === selectedId ? 'bg-teal-bg/40' : ''}>
+                <tr key={m.id} className={m.id === selectedId ? 'bg-[#f4f8f6]' : ''}>
                   <td>
                     <div className="flex items-center gap-3">
                       <span className={`row-avatar row-avatar--${m.analysis?.risk_level ?? 'green'}`}>
                         {m.recorded_at.slice(8, 10)}
                       </span>
                       <div className="min-w-0">
-                        <div className="font-extrabold">{shortDate(m.recorded_at)}</div>
-                        <div className="text-xs text-ink-soft truncate max-w-[420px]"><Summary m={m} /></div>
+                        <div className="font-medium tabular-nums">{shortDate(m.recorded_at)}</div>
+                        <div className="text-[12px] text-ink-soft truncate max-w-[420px]"><Summary m={m} /></div>
                       </div>
                     </div>
                   </td>
@@ -150,7 +150,7 @@ function MeasurementsTab({ items, selectedId, setSelectedId, onNoteAdded, onMark
                   </td>
                   <td className="!text-right">
                     <button
-                      className="font-extrabold text-teal hover:text-teal-light whitespace-nowrap"
+                      className="text-[12.5px] text-teal-dark hover:underline underline-offset-2 whitespace-nowrap"
                       onClick={() => setSelectedId(m.id === selectedId ? null : m.id)}
                     >
                       {m.id === selectedId ? 'Свернуть' : 'Разобрать'}
@@ -167,7 +167,7 @@ function MeasurementsTab({ items, selectedId, setSelectedId, onNoteAdded, onMark
         <section className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <h2 className="text-[18px]">Разбор замера</h2>
+              <h2 className="text-[14px] font-medium text-ink">Разбор замера</h2>
               <RiskBadge level={a.risk_level} />
               {a.risk_level === 'red' && !a.doctor_seen_at && (
                 <button className="btn btn-ghost btn-sm"
@@ -177,34 +177,33 @@ function MeasurementsTab({ items, selectedId, setSelectedId, onNoteAdded, onMark
               )}
             </div>
 
-            <span className="text-sm text-ink-soft font-bold">анализ от {a.created_at.slice(0, 16)}</span>
+            <span className="text-[11.5px] text-ink-soft tabular-nums">анализ от {a.created_at.slice(0, 16)}</span>
           </div>
 
           <div className="grid md:grid-cols-2 gap-3">
             {a.findings.map((f) => <IndicatorCard key={f.key} finding={f} />)}
           </div>
 
-          <div className="bg-white rounded-xl p-5 glow-soft">
-            <div className="section-title mb-3">
-              <span className="emoji-box"><Icon name="stethoscope" size={20} /></span>
-              Комментарии врача {a.notes && a.notes.length > 0 && <span className="text-ink-soft">· {a.notes.length}</span>}
-            </div>
+          <div className="panel">
+            <h3 className="text-[14px] font-medium text-ink">
+              Комментарии врача {a.notes && a.notes.length > 0 && <span className="text-ink-soft font-normal">· {a.notes.length}</span>}
+            </h3>
 
             {a.notes && a.notes.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {a.notes.map((n) => (
                   <div key={n.id} className="flip-card flip-card--gold">
-                    <div className="text-xs font-extrabold text-ink-soft">
+                    <div className="text-[11.5px] text-ink-soft tabular-nums">
                       {n.doctor_name} · {n.created_at.slice(0, 16)}
                     </div>
-                    <p className="text-sm text-ink-soft mt-1">{n.text}</p>
+                    <p className="text-[13px] leading-relaxed text-ink mt-1.5">{n.text}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-4">
-                <EmptyArt className="mx-auto mb-2" />
-                <p className="text-sm text-ink-soft font-bold">
+              <div className="text-center py-5">
+                <EmptyArt className="mx-auto mb-3 opacity-70" />
+                <p className="text-[12.5px] text-ink-soft">
                   Комментариев пока нет — ваш комментарий увидит пациент
                 </p>
               </div>
@@ -269,13 +268,10 @@ function MedcardTab({ patientId, items, card, onCardSaved }: {
 
   if (editing) {
     return (
-      <form onSubmit={save} className="bg-white rounded-xl p-6 glow-soft flex flex-col gap-4">
-        <div className="section-title">
-          <span className="emoji-box"><Icon name="care" size={20} /></span>
-          Правка анкеты пациента
-        </div>
+      <form onSubmit={save} className="panel flex flex-col gap-4">
+        <h2 className="text-[14px] font-medium text-ink">Правка анкеты пациента</h2>
         <CardFormFields form={form} setField={setField} />
-        {error && <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>}
+        {error && <div className="text-[12.5px] text-coral-dark">{error}</div>}
         <div className="flex gap-2">
           <button className="btn btn-gold" disabled={busy}>{busy ? 'Сохраняем…' : 'Сохранить'}</button>
           <button type="button" className="btn btn-ghost" onClick={() => setEditing(false)}>Отмена</button>
@@ -290,39 +286,34 @@ function MedcardTab({ patientId, items, card, onCardSaved }: {
       <RiskSystems items={items} survey={card.survey} alarmKeys={card.alarm_keys} />
 
       {/* ИИ-сводка */}
-      <div className="bg-white rounded-xl p-5 glow-teal">
-        <div className="section-title mb-2">
-          <span className="emoji-box"><Icon name="sparkle" size={20} /></span>
-          ИИ-сводка к приёму
+      <div className="panel">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-[14px] font-medium text-ink">Сводка к приёму</h2>
+          <span className="text-[11.5px] text-ink-soft">формируется языковой моделью, данные обезличены</span>
         </div>
-        {summaryBusy && <p className="text-sm font-bold text-ink-soft animate-pulse">Готовим сводку по данным пациента…</p>}
+        {summaryBusy && <p className="text-[13px] text-ink-soft mt-3">Готовим сводку по данным пациента…</p>}
         {!summaryBusy && summary && (
-          <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">{summary}</p>
+          <p className="text-[13px] leading-relaxed text-ink whitespace-pre-wrap mt-3">{summary}</p>
         )}
         {!summaryBusy && !summary && summaryError && (
-          <div className="badge badge-gold normal-case tracking-normal w-fit mb-2">{summaryError}</div>
+          <div className="text-[12.5px] text-coral-dark mt-2">{summaryError}</div>
         )}
         {!summaryBusy && !summary && !summaryError && (
-          <p className="text-sm text-ink-soft font-bold">
+          <p className="text-[13px] text-ink-soft leading-relaxed mt-3">
             Краткая выжимка: анамнез, жалобы, динамика показателей и на что обратить внимание.
           </p>
         )}
-        <div className="flex flex-wrap gap-2 mt-3 no-print">
+        <div className="flex flex-wrap items-center gap-2 mt-4 no-print">
           <button className="btn btn-gold btn-sm" disabled={summaryBusy} onClick={askSummary}>
-            <Icon name="sparkle" size={14} className="inline-block align-[-2px] mr-1" />
             {summary ? 'Обновить сводку' : 'Сгенерировать сводку'}
           </button>
           <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Печать карточки</button>
-          <p className="text-xs text-ink-soft w-full">Сводка формируется нейросетью, данные обезличены</p>
         </div>
       </div>
 
       {/* Анкета */}
-      <div className="bg-white rounded-xl p-6 glow-soft">
-        <div className="section-title mb-3">
-          <span className="emoji-box"><Icon name="profile" size={20} /></span>
-          Анкета-анамнез
-        </div>
+      <div className="panel">
+        <h2 className="text-[14px] font-medium text-ink mb-3">Анкета-анамнез</h2>
         <CardView card={card} alarmKeys={card.alarm_keys} />
         <div className="mt-4 no-print">
           <button
@@ -360,8 +351,8 @@ function CloseVisitForm({ visit, onDone }: { visit: Visit; onDone: (visit: Visit
   }
 
   return (
-    <form onSubmit={submit} className="mt-3 flex flex-col gap-2 bg-teal-bg/40 rounded-xl p-4 border border-[#e5e7eb]">
-      <div className="text-sm font-extrabold text-teal-dark">Принять пациента</div>
+    <form onSubmit={submit} className="mt-3 flex flex-col gap-3 bg-[#f7f9f8] rounded-md p-4 border border-line">
+      <div className="text-[13px] font-medium text-ink">Принять пациента</div>
       <div>
         <label className="flip-label" htmlFor="cl-conclusion">Заключение</label>
         <textarea id="cl-conclusion" className="flip-input min-h-[64px]" maxLength={2000} required
@@ -374,7 +365,7 @@ function CloseVisitForm({ visit, onDone }: { visit: Visit; onDone: (visit: Visit
                   placeholder="что делать дальше (необязательно)"
                   value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
       </div>
-      {error && <div className="badge badge-red normal-case tracking-normal w-fit">{error}</div>}
+      {error && <div className="text-[12.5px] text-coral-dark">{error}</div>}
       <button className="btn btn-gold w-fit btn-sm" disabled={busy || !conclusion.trim()}>
         {busy ? 'Сохраняем…' : 'Завершить приём'}
       </button>
@@ -382,8 +373,7 @@ function CloseVisitForm({ visit, onDone }: { visit: Visit; onDone: (visit: Visit
   )
 }
 
-function VisitsTab({ patientId, visits, onVisits }: {
-  patientId: string
+function VisitsTab({ visits, onVisits }: {
   visits: Visit[]
   onVisits: (visits: Visit[]) => void
 }) {
@@ -400,27 +390,26 @@ function VisitsTab({ patientId, visits, onVisits }: {
   return (
     <div className="flex flex-col gap-4">
       <section>
-        <div className="section-title mb-3">
-          <span className="emoji-box"><Icon name="bell" size={20} /></span>
-          Ждут приёма <span className="text-ink-soft">· {planned.length}</span>
-        </div>
+        <h2 className="text-[14px] font-medium text-ink mb-3">
+          Ждут приёма <span className="text-ink-soft font-normal">· {planned.length}</span>
+        </h2>
         {planned.length === 0 ? (
-          <div className="bg-white rounded-xl p-6 text-center text-sm font-bold text-ink-soft glow-soft">
+          <div className="panel p-6 text-center text-[13px] text-ink-soft">
             Плановых приёмов нет.
           </div>
         ) : (
           <div className="flex flex-col gap-3">
             {planned.map((v) => (
-              <div key={v.id} className="bg-white rounded-xl p-5 glow-teal">
+              <div key={v.id} className="flip-card">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`badge ${STATUS_INFO[v.status].cls} normal-case tracking-normal`}>
+                  <span className={`badge ${STATUS_INFO[v.status].cls}`}>
                     {v.visit_date ? `приём ${fmtDate(v.visit_date)}` : 'дата не указана'}
                   </span>
-                  {v.reason && <span className="text-sm font-extrabold text-teal-dark">{v.reason}</span>}
+                  {v.reason && <span className="text-[13px] font-medium text-ink">{v.reason}</span>}
                 </div>
-                <div className="mt-2">
-                  <div className="text-[11px] font-semibold text-ink-soft">Жалобы пациента</div>
-                  <p className="text-base text-teal-dark whitespace-pre-wrap mt-0.5">{v.complaints}</p>
+                <div className="mt-2.5">
+                  <div className="text-[11px] text-ink-soft">Жалобы пациента</div>
+                  <p className="text-[13.5px] leading-relaxed text-ink whitespace-pre-wrap mt-1">{v.complaints}</p>
                 </div>
                 {openId === v.id ? (
                   <CloseVisitForm visit={v} onDone={onDone} />
@@ -436,31 +425,30 @@ function VisitsTab({ patientId, visits, onVisits }: {
       </section>
 
       <section>
-        <div className="section-title mb-3">
-          <span className="emoji-box"><Icon name="check" size={20} /></span>
-          История приёмов <span className="text-ink-soft">· {history.length}</span>
-        </div>
+        <h2 className="text-[14px] font-medium text-ink mb-3">
+          История приёмов <span className="text-ink-soft font-normal">· {history.length}</span>
+        </h2>
         {history.length === 0 ? (
-          <div className="text-sm font-bold text-ink-soft">Завершённых и отменённых приёмов пока нет.</div>
+          <div className="text-[13px] text-ink-soft">Завершённых и отменённых приёмов пока нет.</div>
         ) : (
           <div className="flex flex-col gap-2">
             {history.map((v) => (
               <div key={v.id} className={`flip-card ${v.status === 'cancelled' ? 'opacity-60' : ''}`}>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`badge ${STATUS_INFO[v.status].cls} normal-case tracking-normal`}>{STATUS_INFO[v.status].label}</span>
-                  <span className="text-xs font-extrabold text-ink-soft">
+                  <span className={`badge ${STATUS_INFO[v.status].cls}`}>{STATUS_INFO[v.status].label}</span>
+                  <span className="text-[11.5px] text-ink-soft tabular-nums">
                     {v.visit_date ? `${fmtDate(v.visit_date)} · ` : ''}запись от {fmtDate(v.created_at)}
                   </span>
                 </div>
-                {v.reason && <div className="text-sm font-extrabold text-teal-dark mt-1.5">{v.reason}</div>}
-                <p className="text-sm text-ink-soft mt-1 whitespace-pre-wrap">{v.complaints}</p>
+                {v.reason && <div className="text-[13px] font-medium text-ink mt-1.5">{v.reason}</div>}
+                <p className="text-[13px] leading-relaxed text-ink-soft mt-1 whitespace-pre-wrap">{v.complaints}</p>
                 {v.conclusion && (
-                  <div className="mt-2 border-t border-[#e5e7eb] pt-2">
-                    <div className="text-[11px] font-semibold text-ink-soft">Заключение</div>
-                    <p className="text-sm text-ink-soft whitespace-pre-wrap mt-0.5">{v.conclusion}</p>
+                  <div className="mt-3 pt-3 border-t border-line">
+                    <div className="text-[11px] text-ink-soft">Заключение</div>
+                    <p className="text-[13px] leading-relaxed text-ink whitespace-pre-wrap mt-1">{v.conclusion}</p>
                     {v.recommendations && (
-                      <p className="text-sm text-ink-soft whitespace-pre-wrap mt-1">
-                        <span className="font-extrabold">Рекомендации: </span>{v.recommendations}
+                      <p className="text-[13px] leading-relaxed text-ink-soft whitespace-pre-wrap mt-1.5">
+                        <span className="text-ink font-medium">Рекомендации: </span>{v.recommendations}
                       </p>
                     )}
                   </div>
@@ -514,16 +502,16 @@ export default function DoctorPatient() {
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl p-8 text-center glow-coral">
-        <p className="font-bold text-coral-dark mb-4">{error}</p>
-        <Link to="/patients" className="btn btn-gold">К списку пациентов</Link>
+      <div className="panel p-8 text-center">
+        <p className="text-[13.5px] text-coral-dark mb-4">{error}</p>
+        <Link to="/patients" className="btn btn-ghost">К списку пациентов</Link>
       </div>
     )
   }
   if (!patient) {
     return (
       <div className="flex flex-col gap-6" aria-busy>
-        <Skeleton w="45%" h={30} r={10} />
+        <Skeleton w="45%" h={26} r={4} />
         <SkeletonCard lines={2} />
         <SkeletonRows rows={4} />
       </div>
@@ -562,28 +550,44 @@ export default function DoctorPatient() {
       </div>
 
       {/* Профиль: аватар + мета-строка */}
-      <section className="panel flex flex-wrap items-center gap-x-8 gap-y-3">
-        <AvatarPatient size={48} />
-        <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-          <span><span className="text-ink-soft font-semibold">Email:</span> <span className="font-bold text-[#1b2622]">{patient.email}</span></span>
-          <span><span className="text-ink-soft font-semibold">Возраст:</span> <span className="font-bold text-[#1b2622]">{patient.age ?? '—'}</span></span>
-          <span><span className="text-ink-soft font-semibold">Пол:</span> <span className="font-bold text-[#1b2622]">{sexLabel(patient.sex)}</span></span>
-          <span><span className="text-ink-soft font-semibold">Рост:</span> <span className="font-bold text-[#1b2622]">{patient.height_cm ? `${patient.height_cm} см` : '—'}</span></span>
-        </div>
+      <section className="flex flex-wrap items-center gap-x-8 gap-y-4 pb-5 border-b border-line">
+        <span className="w-11 h-11 rounded-full grid place-items-center bg-[#edf2f0] text-teal-deep shrink-0">
+          <AvatarPatient size={26} />
+        </span>
+        <dl className="flex flex-wrap gap-x-8 gap-y-3 text-[13px]">
+          <div>
+            <dt className="text-[11px] text-ink-soft">Email</dt>
+            <dd className="text-ink mt-0.5">{patient.email}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] text-ink-soft">Возраст</dt>
+            <dd className="text-ink mt-0.5 tabular-nums">{patient.age ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] text-ink-soft">Пол</dt>
+            <dd className="text-ink mt-0.5">{sexLabel(patient.sex)}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] text-ink-soft">Рост</dt>
+            <dd className="text-ink mt-0.5 tabular-nums">{patient.height_cm ? `${patient.height_cm} см` : '—'}</dd>
+          </div>
+        </dl>
       </section>
 
-      {/* Вкладки — пилюли, как в медкарте пациента */}
       <div className="flex gap-2 flex-wrap no-print">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`btn btn-sm btn-pill ${tab === t.key ? 'btn-gold' : 'btn-ghost'}`}
+            className={`btn btn-sm ${tab === t.key ? 'btn-gold' : 'btn-ghost'}`}
+            aria-pressed={tab === t.key}
           >
             <Icon name={t.icon} size={14} />
             {t.label}
             {t.key === 'visits' && plannedCount > 0 && (
-              <span className={`font-bold ${tab === t.key ? 'text-white/75' : 'text-ink-soft'}`}>{plannedCount}</span>
+              <span className={tab === t.key ? 'text-white/70 tabular-nums' : 'text-ink-soft tabular-nums'}>
+                {plannedCount}
+              </span>
             )}
           </button>
         ))}
@@ -602,14 +606,14 @@ export default function DoctorPatient() {
         <>
           {cardLoading && (
             <div className="flex flex-col gap-6" aria-busy>
-              <Skeleton w="38%" h={24} r={10} />
+              <Skeleton w="38%" h={20} r={4} />
               <SkeletonCard lines={4} />
               <SkeletonCard lines={3} />
             </div>
           )}
           {!cardLoading && cardError && (
             <div className="flex flex-col items-start gap-3">
-              <div className="badge badge-red normal-case tracking-normal w-fit">{cardError}</div>
+              <div className="text-[12.5px] text-coral-dark">{cardError}</div>
               <button className="btn btn-ghost" onClick={loadCard}>Повторить</button>
             </div>
           )}
@@ -619,7 +623,7 @@ export default function DoctorPatient() {
         <MedcardTab patientId={id!} items={items} card={card} onCardSaved={setCard} />
       )}
       {tab === 'visits' && (
-        <VisitsTab patientId={id!} visits={visits} onVisits={setVisits} />
+        <VisitsTab visits={visits} onVisits={setVisits} />
       )}
     </div>
   )

@@ -1,4 +1,5 @@
 """SQLite-подключение (WAL) и схема таблиц."""
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -92,6 +93,18 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
+CREATE TABLE IF NOT EXISTS audit_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action     TEXT NOT NULL,
+    entity     TEXT,
+    entity_id  INTEGER,
+    details    TEXT NOT NULL DEFAULT '{}',
+    ip         TEXT,
+    user_agent TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Медкарта: анамнез, заполняется пациентом и врачом (1:1 к пользователю)
 CREATE TABLE IF NOT EXISTS patient_cards (
     user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -134,9 +147,12 @@ CREATE INDEX IF NOT EXISTS idx_measurements_user_time ON measurements (user_id, 
 CREATE INDEX IF NOT EXISTS idx_analyses_user          ON analyses (user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires       ON sessions (expires_at);
 CREATE INDEX IF NOT EXISTS idx_documents_user         ON documents (user_id, uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_documents_ocr_queue    ON documents (ocr_status, id);
 CREATE INDEX IF NOT EXISTS idx_chat_user              ON chat_messages (user_id, id);
 CREATE INDEX IF NOT EXISTS idx_visits_patient         ON visits (patient_id, status);
 CREATE INDEX IF NOT EXISTS idx_doctor_notes_analysis  ON doctor_notes (analysis_id);
+CREATE INDEX IF NOT EXISTS idx_audit_user_time        ON audit_log (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_entity           ON audit_log (entity, entity_id);
 """
 
 # Федеральная сеть «Спектр-диагностика»: города и телефоны с spdmed.ru
@@ -177,9 +193,75 @@ CREATE TABLE IF NOT EXISTS documents (
     mime        TEXT NOT NULL DEFAULT 'application/octet-stream',
     size        INTEGER NOT NULL DEFAULT 0,
     data        BLOB NOT NULL,
-    uploaded_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    uploaded_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    ocr_status  TEXT NOT NULL DEFAULT 'pending' CHECK (ocr_status IN ('disabled', 'pending', 'processing', 'ready', 'failed')),
+    ocr_text    TEXT,
+    ocr_error   TEXT,
+    ocr_engine  TEXT,
+    ocr_started_at TEXT,
+    ocr_finished_at TEXT,
+    ocr_attempts INTEGER NOT NULL DEFAULT 0
 );
 """
+
+
+_USERS_REBUILD_DDL = """
+CREATE TABLE users_new (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    name          TEXT NOT NULL DEFAULT '',
+    age           INTEGER,
+    sex           TEXT CHECK (sex IN ('male', 'female') OR sex IS NULL),
+    height_cm     REAL,
+    role          TEXT NOT NULL DEFAULT 'patient' CHECK (role IN ('patient', 'doctor')),
+    branch_id     INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+    disabled      INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+"""
+
+
+def _users_need_rebuild(db: sqlite3.Connection) -> bool:
+    """Колонки NOT NULL без значения по умолчанию ломают INSERT, который их
+    не перечисляет: register падал на 'NOT NULL constraint failed: users.disabled'
+    у баз, созданных alembic-миграцией (колонки добавлены без DEFAULT)."""
+    required = {"role": "'patient'", "disabled": "0", "created_at": "datetime"}
+    for row in db.execute("PRAGMA table_info(users)").fetchall():
+        if row["name"] in required and row["notnull"] and row["dflt_value"] is None:
+            return True
+    return False
+
+
+def _rebuild_users(db: sqlite3.Connection) -> None:
+    """Пересобирает users с канонической схемой, сохраняя данные.
+
+    Значение по умолчанию для created_at — выражение, а ALTER TABLE ADD COLUMN
+    его не принимает, поэтому правим таблицу целиком, а не по колонке.
+    Внешние ключи на время пересборки выключаются: иначе DROP TABLE родителя
+    конфликтует с дочерними строками. Ссылки детей хранятся по имени таблицы,
+    поэтому после RENAME остаются рабочими."""
+    db.execute("PRAGMA foreign_keys=OFF")
+    try:
+        db.execute("DROP TABLE IF EXISTS users_new")
+        db.execute(_USERS_REBUILD_DDL)
+        db.execute(
+            """INSERT INTO users_new
+                   (id, email, password_hash, name, age, sex, height_cm,
+                    role, branch_id, disabled, created_at)
+               SELECT id, email, password_hash, name, age, sex, height_cm,
+                      COALESCE(role, 'patient'), branch_id,
+                      COALESCE(disabled, 0),
+                      COALESCE(created_at, datetime('now'))
+               FROM users"""
+        )
+        db.execute("DROP TABLE users")
+        db.execute("ALTER TABLE users_new RENAME TO users")
+        broken = db.execute("PRAGMA foreign_key_check").fetchall()
+        if broken:
+            raise RuntimeError(f"пересборка users нарушила внешние ключи: {broken[:3]}")
+    finally:
+        db.execute("PRAGMA foreign_keys=ON")
 
 
 def _migrate(db: sqlite3.Connection) -> None:
@@ -191,6 +273,8 @@ def _migrate(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE users ADD COLUMN branch_id INTEGER REFERENCES branches(id)")
     if "disabled" not in columns:
         db.execute("ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0")
+    if _users_need_rebuild(db):
+        _rebuild_users(db)
     card_columns = {row["name"] for row in db.execute("PRAGMA table_info(patient_cards)").fetchall()}
     if card_columns and "survey" not in card_columns:
         db.execute("ALTER TABLE patient_cards ADD COLUMN survey TEXT")
@@ -200,6 +284,18 @@ def _migrate(db: sqlite3.Connection) -> None:
     anal_columns = {row["name"] for row in db.execute("PRAGMA table_info(analyses)").fetchall()}
     if "doctor_seen_at" not in anal_columns:
         db.execute("ALTER TABLE analyses ADD COLUMN doctor_seen_at TEXT")
+    doc_columns = {row["name"] for row in db.execute("PRAGMA table_info(documents)").fetchall()}
+    if doc_columns and "ocr_status" not in doc_columns:
+        for ddl in (
+            "ALTER TABLE documents ADD COLUMN ocr_status TEXT NOT NULL DEFAULT 'pending'",
+            "ALTER TABLE documents ADD COLUMN ocr_text TEXT",
+            "ALTER TABLE documents ADD COLUMN ocr_error TEXT",
+            "ALTER TABLE documents ADD COLUMN ocr_engine TEXT",
+            "ALTER TABLE documents ADD COLUMN ocr_started_at TEXT",
+            "ALTER TABLE documents ADD COLUMN ocr_finished_at TEXT",
+            "ALTER TABLE documents ADD COLUMN ocr_attempts INTEGER NOT NULL DEFAULT 0",
+        ):
+            db.execute(ddl)
     invite_columns = {row["name"] for row in db.execute("PRAGMA table_info(invite_codes)").fetchall()}
     if invite_columns and "expires_at" not in invite_columns:
         db.execute("ALTER TABLE invite_codes ADD COLUMN expires_at TEXT")
@@ -214,6 +310,9 @@ def connect() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=10000")
+    # Медицинские данные не должны появляться в clear-text дампах ОС.
+    conn.execute("PRAGMA secure_delete=ON")
     return conn
 
 
@@ -239,6 +338,10 @@ def get_db() -> Iterator[sqlite3.Connection]:
 
 def init_db() -> None:
     config.DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if config.ENV == "production" and os.name != "nt":
+        os.chmod(config.DATABASE_PATH.parent, 0o700)
+        if config.DATABASE_PATH.exists():
+            os.chmod(config.DATABASE_PATH, 0o600)
     with db_session() as db:
         db.executescript(SCHEMA)
         db.executescript(GOALS_TABLE)

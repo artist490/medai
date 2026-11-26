@@ -4,6 +4,8 @@ import * as api from '../api'
 import { useAuth } from '../auth'
 import { Icon } from '../components/Icon'
 import { brand } from '../brand'
+import AuthAside from '../components/AuthAside'
+import BrandLockup from '../components/BrandLockup'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -14,7 +16,11 @@ export default function Login() {
   const { user, loading, setUser } = useAuth()
 
   if (loading) {
-    return <div className="min-h-screen grid place-items-center text-teal-dark font-extrabold">Загрузка…</div>
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <div className="text-sm text-ink-soft" role="status">Загрузка…</div>
+      </div>
+    )
   }
   if (user) return <Navigate to="/" replace />
 
@@ -34,66 +40,80 @@ export default function Login() {
   }
 
   return (
-    <div className="auth-bg min-h-screen flex flex-col items-center justify-center px-4 py-10">
-      {/* Hero: логотип клиники */}
-      <div className="text-center mb-8 auth-logo anim-rise">
-        <img src={brand.logo} alt={brand.name} style={{ maxWidth: 340, width: '100%' }} />
+    <div className="auth-shell">
+      <div className="auth-panel">
+        <div className="auth-form">
+          <div className="auth-brand">
+            <BrandLockup />
+          </div>
+
+          <div>
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Вход в личный кабинет</h1>
+            <p className="text-[13px] text-ink-soft mt-1">
+              Дневник показателей, медкарта и разборы от врача клиники.
+            </p>
+          </div>
+
+          <form onSubmit={submit} className="flex flex-col gap-4 mt-2">
+            {error && (
+              <div
+                role="alert"
+                className="text-[12.5px] text-coral-dark bg-[#fbf1f0] border border-[#e8cfcc] rounded-md px-3 py-2"
+              >
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="flip-label" htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                required
+                autoComplete="email"
+                className="flip-input"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="flip-label" htmlFor="password">Пароль</label>
+              <input
+                id="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                className="flip-input"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            <button className="btn btn-gold w-full mt-1" disabled={busy}>
+              {busy ? 'Входим…' : 'Войти'}
+              {!busy && <Icon name="arrow" size={15} />}
+            </button>
+          </form>
+
+          <p className="text-[13px] text-ink-soft">
+            Нет аккаунта?{' '}
+            <Link to="/register" className="text-teal-dark font-medium hover:underline underline-offset-2">
+              Зарегистрироваться
+            </Link>
+          </p>
+
+          <p className="auth-foot">
+            {brand.name} · {brand.site}
+            <br />
+            Сервис не заменяет консультацию врача.
+          </p>
+        </div>
       </div>
 
-      <form
-        onSubmit={submit}
-        className="auth-card w-full max-w-sm flex flex-col gap-4 anim-rise"
-        style={{ animationDelay: '90ms' }}
-      >
-        <h1 className="page-title text-center">Вход <Icon name="login" size={22} className="inline-block align-[-3px]" /></h1>
-
-        {error && (
-          <div className="badge badge-red justify-center normal-case tracking-normal">
-            {error}
-          </div>
-        )}
-
-        <div>
-          <label className="flip-label" htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            required
-            className="flip-input"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="flip-label" htmlFor="password">Пароль</label>
-          <input
-            id="password"
-            type="password"
-            required
-            className="flip-input"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-
-        <button className="btn btn-gold w-full" disabled={busy}>
-          {busy ? 'Входим…' : (<span className="inline-flex items-center gap-2">Войти <Icon name="arrow" size={16} /></span>)}
-        </button>
-
-        <p className="text-center text-sm text-ink-soft">
-          Ещё нет аккаунта?{' '}
-          <Link to="/register" className="font-extrabold text-teal hover:text-teal-light">
-            Зарегистрироваться
-          </Link>
-        </p>
-      </form>
-
-      <p className="text-center text-xs text-ink-soft font-bold mt-4">
-        {brand.name} · {brand.site} · не заменяет консультацию врача
-      </p>
+      <AuthAside />
     </div>
   )
 }

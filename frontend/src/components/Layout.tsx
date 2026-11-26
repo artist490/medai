@@ -1,8 +1,6 @@
-// Каркас в стиле Flip7 SaaS: сайдбар слева, топбар с поиском, контент, футер.
-// На мобильных сайдбар скрывается — остаётся нижняя pill-навигация.
-// Навигация зависит от роли: пациент — личные вкладки, врач — кабинет пациентов.
-// Сайдбар как у Сбер Здоровья: профиль-блок, пункты с подписями и цветными
-// акцентами иконок (teal/коралл/небо/золото — статусная семантика сохранена).
+// Каркас приложения: постоянный сайдбар на десктопе, нижняя навигация
+// на телефоне, тонкий топбар с поиском. Никаких плавающих карточек и
+// цветных иконок — только структура, линии и один акцентный цвет.
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useFlowIndicatorStyle, useFlowRect } from './useFlowRect'
@@ -14,20 +12,20 @@ import type { IconName } from './Icon'
 import AvatarDoctor from './AvatarDoctor'
 import AvatarPatient from './AvatarPatient'
 
-type NavItem = { to: string; label: string; sub: string; icon: IconName; accent: 'teal' | 'coral' | 'sky' | 'gold' }
+type NavItem = { to: string; label: string; icon: IconName }
 
 const patientNav: NavItem[] = [
-  { to: '/', label: 'Дашборд', sub: 'Обзор здоровья', icon: 'home', accent: 'teal' },
-  { to: '/medcard', label: 'Медкарта', sub: 'Анкета, приёмы, замеры', icon: 'care', accent: 'coral' },
-  { to: '/chat', label: 'Ассистент', sub: 'ИИ-помощник клиники', icon: 'sparkle', accent: 'sky' },
-  { to: '/profile', label: 'Профиль', sub: 'Личные данные', icon: 'profile', accent: 'gold' },
+  { to: '/', label: 'Обзор', icon: 'home' },
+  { to: '/medcard', label: 'Медкарта', icon: 'care' },
+  { to: '/chat', label: 'Ассистент', icon: 'sparkle' },
+  { to: '/profile', label: 'Профиль', icon: 'profile' },
 ]
 
 const doctorNav: NavItem[] = [
-  { to: '/patients', label: 'Пациенты', sub: 'Кабинет врача', icon: 'stethoscope', accent: 'teal' },
-  { to: '/analytics', label: 'Аналитика', sub: 'Статистика филиала', icon: 'chart', accent: 'gold' },
-  { to: '/chat', label: 'Ассистент', sub: 'Помощник врача', icon: 'sparkle', accent: 'sky' },
-  { to: '/profile', label: 'Профиль', sub: 'Личные данные', icon: 'profile', accent: 'gold' },
+  { to: '/patients', label: 'Пациенты', icon: 'stethoscope' },
+  { to: '/analytics', label: 'Аналитика', icon: 'chart' },
+  { to: '/chat', label: 'Ассистент', icon: 'sparkle' },
+  { to: '/profile', label: 'Профиль', icon: 'profile' },
 ]
 
 // Русские склонения возраста: 31 год, 34 года, 40 лет
@@ -39,8 +37,18 @@ function ageWord(age: number): string {
   return 'лет'
 }
 
-// Кнопка нижней панели: иконка + подпись; активная тёмная плашка —
-// общий перетекающий индикатор, у самой кнопки только цвет текста
+function BrandMark() {
+  return (
+    <span className="brand-mark" aria-hidden>
+      <svg width="18" height="18" viewBox="0 0 18 18">
+        <circle cx="9" cy="9" r="3.4" />
+        <circle cx="9" cy="9" r="7" />
+      </svg>
+    </span>
+  )
+}
+
+// Пункт нижней панели: подложка — общий перетекающий индикатор
 function BarLink({ to, label, icon, end }: {
   to: string; label: string; icon: IconName; end?: boolean
 }) {
@@ -48,30 +56,15 @@ function BarLink({ to, label, icon, end }: {
     <NavLink
       to={to}
       end={end}
+      aria-label={label}
       className={({ isActive }) =>
-        `bar-link justify-self-center flex flex-col items-center justify-center rounded-[10px] w-full max-w-[60px] px-0.5 py-1.5 transition-quick text-[10.5px] font-bold whitespace-nowrap ${
-          isActive ? 'active text-white' : 'text-teal-dark hover:bg-teal-bg'
+        `bar-link flex flex-col items-center justify-center gap-1 h-full w-full transition-quick text-[10.5px] font-medium ${
+          isActive ? 'active text-teal-deep' : 'text-[#6a7772]'
         }`
       }
     >
-      <Icon name={icon} size={18} />
-      <span className="mt-0.5 hidden min-[360px]:block">{label}</span>
-    </NavLink>
-  )
-}
-
-// Ассистент: кружок в собственной средней ячейке бара, никого не перекрывает
-function AssistantSlot() {
-  return (
-    <NavLink
-      to="/chat"
-      className={({ isActive }) =>
-        `justify-self-center flex items-center ${isActive ? 'assistant-fab-active' : ''}`
-      }
-    >
-      <span className="assistant-fab-circle">
-        <Icon name="sparkle" size={22} />
-      </span>
+      <Icon name={icon} size={19} />
+      <span className="whitespace-nowrap">{label}</span>
     </NavLink>
   )
 }
@@ -80,6 +73,7 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const [signalCount, setSignalCount] = useState(0)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const userMenuButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (user?.role !== 'doctor') return
@@ -94,7 +88,18 @@ export default function Layout() {
   const [query, setQuery] = useState('')
   // Меню аватара закрывается при смене маршрута
   useEffect(() => { setUserMenuOpen(false) }, [location.pathname])
-  // Перетекающий индикатор: белая карточка в сайдбаре и плашка в мобильном баре
+  useEffect(() => {
+    if (!userMenuOpen) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setUserMenuOpen(false)
+      userMenuButtonRef.current?.focus()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [userMenuOpen])
+  // Перетекающий индикатор активного пункта: сайдбар и мобильный бар
   const navRef = useRef<HTMLElement>(null)
   const navRect = useFlowRect(navRef, '.sidebar-link.active', location.pathname)
   const navIndicator = useFlowIndicatorStyle(navRect)
@@ -103,7 +108,6 @@ export default function Layout() {
   const barIndicator = useFlowIndicatorStyle(barRect)
   const isDoctor = user?.role === 'doctor'
   const navItems = isDoctor ? doctorNav : patientNav
-  const onChat = location.pathname.startsWith('/chat')
 
   async function handleLogout() {
     if (!window.confirm('Выйти из аккаунта?')) return
@@ -118,87 +122,93 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen lg:grid" style={{ gridTemplateColumns: '250px 1fr' }}>
+    <div className="min-h-screen lg:grid" style={{ gridTemplateColumns: '248px 1fr' }}>
+      <a href="#main-content" className="skip-link">Перейти к основному содержимому</a>
+
       {/* ---- Сайдбар (desktop) ---- */}
-      <aside className="hidden lg:flex flex-col justify-between sticky top-0 h-screen sidebar-shell border-r border-[#e9efed] px-5 py-6">
+      <aside className="hidden lg:flex flex-col justify-between sticky top-0 h-screen sidebar-shell border-r border-line px-4 py-5">
         <div>
-          <NavLink to="/" className="block px-2 anim-rise">
-            <div className="flex items-center gap-2.5">
-              <span className="brand-mark" aria-hidden>
-                <svg width="30" height="30" viewBox="0 0 30 30">
-                  <circle cx="15" cy="15" r="8.5" fill="#E23A3A" />
-                  <circle cx="15" cy="15" r="11.5" fill="none" stroke="#E23A3A" strokeOpacity="0.25" strokeWidth="1.5" />
-                </svg>
-              </span>
-              <div>
-                <div className="wordmark" style={{ fontSize: 18 }}>Спектр-Диагностика</div>
-                <div className="wordmark-sub">{brand.subtitle}</div>
+          <NavLink to="/" className="flex items-start gap-2.5 px-2 py-1">
+            <BrandMark />
+            <div className="min-w-0">
+              <div className="text-[14.5px] font-semibold leading-[1.25] tracking-[-0.015em] text-ink">
+                {brand.name}
+              </div>
+              <div className="text-[9.5px] uppercase tracking-[0.06em] text-ink-soft mt-1 leading-[1.35]">
+                {brand.subtitle}
               </div>
             </div>
           </NavLink>
 
-          {/* Профиль-карточка: аватар, имя, роль — ведёт на страницу профиля */}
-          <NavLink to="/profile" className="profile-card mt-7 flex items-center gap-3 px-3 py-3 anim-rise" style={{ animationDelay: '60ms' }}>
+          {/* Текущий пользователь: строка, а не парящая карточка */}
+          <NavLink
+            to="/profile"
+            className="mt-5 flex items-center gap-2.5 border-y border-line px-2 py-3 hover:bg-[#f7f9f8] transition-quick"
+          >
             {isDoctor ? (
-              <AvatarDoctor size={44} />
+              <AvatarDoctor size={30} />
             ) : (
-              <span className="doctor-avatar text-white" style={{ width: 44, height: 44 }}>
-                <AvatarPatient size={36} />
+              <span className="doctor-avatar text-white" style={{ width: 30, height: 30 }}>
+                <AvatarPatient size={24} />
               </span>
             )}
             <div className="min-w-0">
-              <div className="text-sm font-bold text-[#1b2622] truncate">{user?.name || user?.email}</div>
-              <div className="text-xs text-ink-soft">
+              <div className="text-[13px] font-medium text-ink truncate">{user?.name || user?.email}</div>
+              <div className="text-[11.5px] text-ink-soft truncate">
                 {user?.age ? `${user.age} ${ageWord(user.age)}` : (isDoctor ? 'врач клиники' : 'пациент')}
               </div>
             </div>
           </NavLink>
 
-          <div className="mx-1 my-4 h-px bg-[#e9efed]" />
-
-          <nav ref={navRef} className="flex flex-col gap-1 flow-box">
+          <nav ref={navRef} className="mt-3 flex flex-col gap-0.5 flow-box">
             <span className="flow-indicator flow-indicator--card" style={navIndicator} aria-hidden />
-            {navItems.map((item, i) => (
+            {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to === '/' || item.to === '/patients'}
-                className={({ isActive }) => `sidebar-link anim-rise ${isActive ? 'active' : ''}`}
-                style={{ animationDelay: `${110 + i * 45}ms` }}
+                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className={`sidebar-icon sidebar-icon--${item.accent}`}><Icon name={item.icon} size={20} /></span>
-                <span className="flex flex-col leading-tight min-w-0">
-                  <span>{item.label}</span>
-                  <span className="text-[11px] font-semibold text-ink-soft truncate">{item.sub}</span>
-                </span>
+                <span className="sidebar-icon"><Icon name={item.icon} size={18} /></span>
+                <span className="truncate">{item.label}</span>
+                {item.to === '/patients' && signalCount > 0 && (
+                  <span className="ml-auto text-[11px] font-medium text-coral-dark tabular-nums">
+                    {signalCount}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
         </div>
 
-        {isDoctor ? (
-          <div className="text-xs font-bold text-ink-soft px-2 leading-relaxed">
-            Кабинет врача{user?.name ? ` · ${user.name}` : ''}
-          </div>
-        ) : (
-          <button className="btn btn-gold w-full anim-rise" style={{ animationDelay: '290ms' }} onClick={() => navigate('/new')}>
-            <Icon name="pressure" size={16} /> Новый замер
-          </button>
-        )}
+        <div className="flex flex-col gap-3">
+          {isDoctor ? (
+            <p className="text-[11.5px] text-ink-soft leading-relaxed px-2">
+              {brand.name}
+              <br />
+              {brand.phone}
+            </p>
+          ) : (
+            <button className="btn btn-gold w-full" onClick={() => navigate('/new')}>
+              <Icon name="pressure" size={16} /> Новый замер
+            </button>
+          )}
+        </div>
       </aside>
 
       {/* ---- Правая колонка ---- */}
       <div className="min-w-0 flex flex-col">
-        <header className="sticky top-0 z-40 bg-white/95 border-b border-[#e5e7eb]">
-          <div className="px-5 sm:px-8 h-16 flex items-center gap-3 sm:gap-5">
+        <header className="sticky top-0 z-40 bg-white border-b border-line">
+          <div className="px-5 sm:px-8 h-14 flex items-center gap-4">
             {/* Мобильный логотип */}
-            <NavLink to="/" className="lg:hidden">
-              <span className="wordmark !text-lg">Спектр-Диагностика</span>
+            <NavLink to="/" className="lg:hidden flex items-center gap-2">
+              <BrandMark />
+              <span className="wordmark">Спектр</span>
             </NavLink>
 
             {/* Поиск по замерам / пациентам */}
             <form className="search-pill" onSubmit={submitSearch}>
-              <Icon name="search" size={18} className="opacity-45" />
+              <Icon name="search" size={16} className="opacity-45" />
               <input
                 type="text"
                 placeholder={isDoctor ? 'Имя или email пациента…' : 'Поиск по замерам…'}
@@ -208,50 +218,67 @@ export default function Layout() {
               />
             </form>
 
-            <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
-              {user?.role === 'doctor' && signalCount > 0 && (
-                <span className="hidden lg:flex">
-                  <button className="topbar-icon" title="Новые сигналы: требуются разборы"
-                          aria-label="Сигналы" onClick={() => navigate('/patients')}>
-                    <Icon name="alarm" size={20} />
-                    <span className="absolute -top-0.5 -right-0.5 bg-coral text-white text-[10px] font-bold rounded-full px-1.5">{signalCount}</span>
-                  </button>
-                </span>
+            <div className="ml-auto flex items-center gap-1">
+              {isDoctor && signalCount > 0 && (
+                <button
+                  className="topbar-icon"
+                  title="Новые сигналы: требуются разборы"
+                  aria-label="Сигналы"
+                  onClick={() => navigate('/patients')}
+                >
+                  <Icon name="alarm" size={19} />
+                  <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-coral" aria-hidden />
+                </button>
               )}
               {/* Аватар: меню профиля (профиль / выход) вместо мгновенного logout */}
               <div className="relative">
                 {isDoctor ? (
                   <button
-                    className="cursor-pointer bg-transparent border-none p-0"
+                    className="cursor-pointer bg-transparent border-none p-0 flex"
+                    ref={userMenuButtonRef}
+                    id="profile-menu-button"
                     onClick={() => setUserMenuOpen((v) => !v)}
                     aria-label="Меню профиля"
+                    aria-haspopup="menu"
+                    aria-controls="profile-menu"
                     aria-expanded={userMenuOpen}
                   >
-                    <AvatarDoctor size={40} />
+                    <AvatarDoctor size={32} />
                   </button>
                 ) : (
                   <button
-                    className="doctor-avatar text-white cursor-pointer"
-                    style={{ width: 40, height: 40 }}
+                    className="doctor-avatar text-white cursor-pointer border-none p-0"
+                    style={{ width: 32, height: 32 }}
+                    ref={userMenuButtonRef}
+                    id="profile-menu-button"
                     onClick={() => setUserMenuOpen((v) => !v)}
                     aria-label="Меню профиля"
+                    aria-haspopup="menu"
+                    aria-controls="profile-menu"
                     aria-expanded={userMenuOpen}
                   >
-                    <AvatarPatient size={33} />
+                    <AvatarPatient size={26} />
                   </button>
                 )}
                 {userMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-40 cursor-default" onClick={() => setUserMenuOpen(false)} aria-hidden />
-                    <div className="absolute right-0 top-[46px] z-50 w-48 bg-white border border-[#e5e7eb] rounded-lg shadow-float p-1.5 flex flex-col">
+                    <div
+                      id="profile-menu"
+                      role="menu"
+                      aria-labelledby="profile-menu-button"
+                      className="absolute right-0 top-[40px] z-50 w-48 bg-white border border-line rounded-lg shadow-float p-1 flex flex-col"
+                    >
                       <button
-                        className="text-left text-sm font-semibold text-[#1b2622] px-3 py-2 rounded-lg hover:bg-[#f1f6f5] transition-quick"
+                        role="menuitem"
+                        className="text-left text-[13px] text-ink px-3 py-2 rounded hover:bg-[#f4f6f5] transition-quick"
                         onClick={() => { setUserMenuOpen(false); navigate('/profile') }}
                       >
                         Профиль
                       </button>
                       <button
-                        className="text-left text-sm font-semibold text-[#1b2622] px-3 py-2 rounded-lg hover:bg-[#f1f6f5] transition-quick"
+                        role="menuitem"
+                        className="text-left text-[13px] text-ink px-3 py-2 rounded hover:bg-[#f4f6f5] transition-quick"
                         onClick={handleLogout}
                       >
                         Выйти
@@ -264,75 +291,68 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 px-5 sm:px-8 pt-7 pb-28 lg:pb-7 max-w-[1200px] w-full mx-auto">
-          {/* Вход маршрута: контент страницы мягко проявляется при смене пути */}
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 px-5 sm:px-8 pt-6 pb-24 lg:pb-10 max-w-[1120px] w-full mx-auto"
+        >
           <div key={location.pathname} className="page-enter">
             <Outlet />
           </div>
         </main>
 
-        <footer className="hidden lg:flex px-5 sm:px-8 py-7 flex-wrap items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold text-ink-soft">
+        <footer className="hidden lg:flex px-5 sm:px-8 py-6 mt-4 border-t border-line flex-wrap items-center justify-between gap-2">
+          <span className="text-[11.5px] text-ink-soft">
             © 2026 {brand.name} · не заменяет консультацию врача
           </span>
-          <span className="text-[11px] font-semibold text-ink-soft">
+          <span className="text-[11.5px] text-ink-soft">
             {brand.site} · {brand.phone}
           </span>
         </footer>
       </div>
 
-      {/* ---- Мобильная нижняя навигация: 5 равных колонок, Ассистент —
-           в собственной средней ячейке, никого не перекрывает ---- */}
-      <nav className="lg:hidden fixed bottom-4 left-0 right-0 z-40 px-4">
-        <div ref={barRef} className="relative max-w-md mx-auto bg-white rounded-2xl glow-soft border border-[#e8eeed] grid grid-cols-5 items-center h-[70px] px-1 anim-rise" style={{ animationDelay: '120ms' }}>
+      {/* ---- Мобильная нижняя навигация ---- */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-line">
+        <div ref={barRef} className="relative grid grid-cols-5 h-[58px] flow-box">
           <span className="flow-indicator flow-indicator--bar" style={barIndicator} aria-hidden />
           {isDoctor ? (
             <>
               <BarLink to="/patients" label="Пациенты" icon="stethoscope" end />
               <BarLink to="/analytics" label="Аналитика" icon="chart" />
-              <AssistantSlot />
+              <BarLink to="/chat" label="Ассистент" icon="sparkle" />
               <BarLink to="/profile" label="Профиль" icon="profile" />
               <button
-                className="justify-self-center flex flex-col items-center justify-center rounded-[10px] w-full max-w-[60px] px-0.5 py-1.5 transition-quick text-[10.5px] font-bold text-teal-dark hover:bg-teal-bg"
+                className="bar-link flex flex-col items-center justify-center gap-1 h-full w-full transition-quick text-[10.5px] font-medium text-[#6a7772]"
                 onClick={() => navigate('/patients')}
                 aria-label="Сигналы пациентов"
               >
                 <span className="relative">
                   <Icon name="alarm" size={19} />
                   {signalCount > 0 && (
-                    <span className="absolute -top-1.5 -right-2 bg-coral text-white text-[9px] font-bold rounded-full px-[6px]">
-                      {signalCount}
-                    </span>
+                    <span className="absolute -top-1 -right-1.5 w-1.5 h-1.5 rounded-full bg-coral" aria-hidden />
                   )}
                 </span>
-                <span className="mt-0.5 hidden min-[360px]:block">Сигналы</span>
+                <span className="whitespace-nowrap">Сигналы</span>
               </button>
             </>
           ) : (
             <>
-              <BarLink to="/" label="Дашборд" icon="home" end />
+              <BarLink to="/" label="Обзор" icon="home" end />
               <BarLink to="/medcard" label="Медкарта" icon="care" />
-              <AssistantSlot />
+              <BarLink to="/chat" label="Ассистент" icon="sparkle" />
               <BarLink to="/profile" label="Профиль" icon="profile" />
               <button
-                className="justify-self-center flex flex-col items-center justify-center rounded-[10px] w-full max-w-[60px] px-0.5 py-1.5 transition-quick text-[10.5px] font-bold text-teal-dark hover:bg-teal-bg"
+                className="bar-link flex flex-col items-center justify-center gap-1 h-full w-full transition-quick text-[10.5px] font-medium text-[#6a7772]"
                 onClick={() => navigate('/new')}
                 aria-label="Новый замер"
               >
                 <Icon name="pressure" size={19} />
-                <span className="mt-0.5 hidden min-[360px]:block">Замер</span>
+                <span className="whitespace-nowrap">Замер</span>
               </button>
             </>
           )}
         </div>
       </nav>
-
-      {/* ---- Плавающая кнопка ИИ-помощника (desktop, как у Сбер Здоровья) ---- */}
-      {!onChat && (
-        <button className="ai-fab" onClick={() => navigate('/chat')} aria-label="Открыть чат с ИИ-помощником" title="ИИ-помощник">
-          <Icon name="sparkle" size={22} />
-        </button>
-      )}
     </div>
   )
 }

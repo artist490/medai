@@ -5,6 +5,8 @@ import { useAuth } from '../auth'
 import { Icon } from '../components/Icon'
 import { Skeleton } from '../components/Skeleton'
 import { brand } from '../brand'
+import AuthAside from '../components/AuthAside'
+import BrandLockup from '../components/BrandLockup'
 import type { Branch } from '../types'
 
 export default function Register() {
@@ -21,8 +23,7 @@ export default function Register() {
   const navigate = useNavigate()
   const { user, loading, setUser } = useAuth()
 
-  // Хуки — строго до условных выходов (Rules of Hooks): иначе у нового
-  // посетителя (loading: true → false) порядок хуков меняется и React падает.
+  // Хуки — строго до условных выходов (Rules of Hooks)
   function loadBranches() {
     setBranchesLoading(true)
     setBranchesError('')
@@ -34,11 +35,14 @@ export default function Register() {
 
   useEffect(() => {
     loadBranches()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loading) {
-    return <div className="min-h-screen grid place-items-center text-teal-dark font-extrabold">Загрузка…</div>
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <div className="text-sm text-ink-soft" role="status">Загрузка…</div>
+      </div>
+    )
   }
   if (user) return <Navigate to="/" replace />
 
@@ -62,119 +66,137 @@ export default function Register() {
   }
 
   return (
-    <div className="auth-bg min-h-screen flex flex-col items-center justify-center px-4 py-10">
-      <div className="text-center mb-8 auth-logo anim-rise">
-        <img src={brand.logo} alt={brand.name} style={{ maxWidth: 340, width: '100%' }} />
+    <div className="auth-shell">
+      <div className="auth-panel">
+        <div className="auth-form">
+          <div className="auth-brand">
+            <BrandLockup />
+          </div>
+
+          <div>
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Создать аккаунт</h1>
+            <p className="text-[13px] text-ink-soft mt-1">
+              Привяжем вас к филиалу — нормы и врачи будут из вашего города.
+            </p>
+          </div>
+
+          <form onSubmit={submit} className="flex flex-col gap-4 mt-2">
+            {error && (
+              <div
+                role="alert"
+                className="text-[12.5px] text-coral-dark bg-[#fbf1f0] border border-[#e8cfcc] rounded-md px-3 py-2"
+              >
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="flip-label" htmlFor="name">Имя</label>
+              <input
+                id="name"
+                className="flip-input"
+                autoComplete="name"
+                placeholder="Как вас зовут"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="flip-label" htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                required
+                autoComplete="email"
+                className="flip-input"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="flip-label" htmlFor="password">Пароль</label>
+              <input
+                id="password"
+                type="password"
+                required
+                minLength={12}
+                autoComplete="new-password"
+                className="flip-input"
+                placeholder="Не короче 12 символов"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <div className="flip-hint">Минимум 12 символов.</div>
+            </div>
+
+            <div>
+              <label className="flip-label" htmlFor="branch">Филиал клиники</label>
+              <select
+                id="branch"
+                required
+                className="flip-input"
+                value={branchId}
+                onChange={(e) => setBranchId(e.target.value)}
+              >
+                <option value="">Выберите город</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.city}</option>
+                ))}
+              </select>
+              {branchesLoading && (
+                <div className="flex items-center gap-2 mt-2" aria-busy>
+                  <Skeleton w={80} h={10} />
+                  <span className="text-[11.5px] text-ink-soft">Загружаем филиалы…</span>
+                </div>
+              )}
+              {branchesError && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="text-[12px] text-coral-dark">{branchesError}</span>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={loadBranches}>Повторить</button>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="flip-label" htmlFor="invite">
+                Код приглашения <span className="text-ink-soft font-normal">(для сотрудников)</span>
+              </label>
+              <input
+                id="invite"
+                type="text"
+                className="flip-input"
+                placeholder="Выдаёт администратор клиники"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+              />
+              <div className="flip-hint">С ним аккаунт станет кабинетом врача.</div>
+            </div>
+
+            <button className="btn btn-gold w-full mt-1" disabled={busy}>
+              {busy ? 'Создаём…' : 'Создать аккаунт'}
+              {!busy && <Icon name="arrow" size={15} />}
+            </button>
+          </form>
+
+          <p className="text-[13px] text-ink-soft">
+            Уже есть аккаунт?{' '}
+            <Link to="/login" className="text-teal-dark font-medium hover:underline underline-offset-2">
+              Войти
+            </Link>
+          </p>
+
+          <p className="auth-foot">
+            {brand.name} · {brand.site}
+            <br />
+            Сервис не заменяет консультацию врача.
+          </p>
+        </div>
       </div>
 
-      <form
-        onSubmit={submit}
-        className="auth-card w-full max-w-sm flex flex-col gap-4 anim-rise"
-        style={{ animationDelay: '90ms' }}
-      >
-        <h1 className="page-title text-center">Регистрация</h1>
-
-        {error && (
-          <div className="badge badge-red justify-center normal-case tracking-normal">
-            {error}
-          </div>
-        )}
-
-        <div>
-          <label className="flip-label" htmlFor="name">Имя</label>
-          <input
-            id="name"
-            className="flip-input"
-            placeholder="Как вас зовут?"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="flip-label" htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            required
-            className="flip-input"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="flip-label" htmlFor="password">Пароль (от 6 символов)</label>
-          <input
-            id="password"
-            type="password"
-            required
-            minLength={6}
-            className="flip-input"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="flip-label" htmlFor="branch">Филиал клиники</label>
-          <select
-            id="branch"
-            required
-            className="flip-input"
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-          >
-            <option value="">Выберите город…</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>{b.city}</option>
-            ))}
-          </select>
-          {branchesLoading && (
-            <div className="flex items-center gap-2 mt-2" aria-busy>
-              <Skeleton w={90} h={12} />
-              <span className="text-xs text-[#5b6b68]">Загружаем филиалы…</span>
-            </div>
-          )}
-          {branchesError && (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <div className="badge badge-red normal-case tracking-normal">{branchesError}</div>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={loadBranches}>Повторить</button>
-            </div>
-          )}
-          <div className="flip-hint">Город ближайшего центра «Спектр-Диагностика».</div>
-        </div>
-
-        <div>
-          <label className="flip-label" htmlFor="invite">Код приглашения (для сотрудников)</label>
-          <input
-            id="invite"
-            type="text"
-            className="flip-input"
-            placeholder="Выдаёт администратор клиники"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value)}
-          />
-          <div className="flip-hint">Есть у врачей клиники. Превращает аккаунт в кабинет врача.</div>
-        </div>
-
-        <button className="btn btn-gold w-full" disabled={busy}>
-          {busy ? 'Создаём…' : (<span className="inline-flex items-center gap-2">Создать аккаунт <Icon name="user-plus" size={16} /></span>)}
-        </button>
-
-        <p className="text-center text-sm text-ink-soft">
-          Уже есть аккаунт?{' '}
-          <Link to="/login" className="font-extrabold text-teal hover:text-teal-light">
-            Войти
-          </Link>
-        </p>
-      </form>
-
-      <p className="text-center text-xs text-ink-soft font-bold mt-4">
-        {brand.name} · {brand.site} · не заменяет консультацию врача
-      </p>
+      <AuthAside />
     </div>
   )
 }

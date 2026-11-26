@@ -30,9 +30,9 @@ const SYSTEMS: SystemDef[] = [
 ]
 
 const STATUS_META: Record<Status, { label: string; color: string; badge: string }> = {
-  ok: { label: 'Норма', color: '#00b8a9', badge: 'badge-green' },
-  warn: { label: 'Внимание', color: '#c99700', badge: 'badge-gold' },
-  alarm: { label: 'Тревога', color: '#dc2626', badge: 'badge-red' },
+  ok: { label: 'Норма', color: '#0b5c58', badge: 'badge-green' },
+  warn: { label: 'Внимание', color: '#a8760a', badge: 'badge-gold' },
+  alarm: { label: 'Тревога', color: '#a4231d', badge: 'badge-red' },
 }
 
 const SEVERITY: Record<Status, number> = { alarm: 3, warn: 2, ok: 1 }
@@ -106,40 +106,36 @@ export default function RiskSystems({ items, survey, alarmKeys, onBook }: {
   const hasData = risks.some((r) => r.status !== null)
 
   return (
-    <div className="bg-white rounded-xl p-6 glow-soft">
-      <div className="section-title mb-1">
-        <span className="emoji-box"><Icon name="pulse" size={20} /></span>
-        Риск по системам организма
-      </div>
-      <div className="text-xs font-bold text-ink-soft mb-4">
-        {hasData ? 'по последним замерам и анкете' : 'появится после замеров или опросника'}
+    <section className="panel">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-[14px] font-medium text-ink">Риск по системам организма</h2>
+        <span className="text-[11.5px] text-ink-soft">
+          {hasData ? 'по последним замерам и анкете' : 'появится после замеров или опросника'}
+        </span>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-3">
+      <div className="mt-4 grid sm:grid-cols-2 gap-x-6 gap-y-0">
         {risks.map((r) => {
           const meta = r.status ? STATUS_META[r.status] : null
           return (
-            <div key={r.def.key} className={`border border-[#e9efed] rounded-xl p-3.5 ${meta ? '' : 'opacity-55'}`}>
+            <div key={r.def.key} className="py-3 border-b border-line last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-extrabold text-teal-dark">{r.def.label}</span>
+                <span className="text-[13px] text-ink">{r.def.label}</span>
                 {meta ? (
-                  // точку рисует сам .badge (::before) — дублировать не нужно
-                  <span className={`badge ${meta.badge} normal-case tracking-normal`}>
-                    {meta.label}
-                  </span>
+                  <span className={`badge ${meta.badge}`}>{meta.label}</span>
                 ) : (
-                  <span className="badge normal-case tracking-normal">нет данных</span>
+                  <span className="badge text-ink-soft">нет данных</span>
                 )}
               </div>
               {(r.findings.length > 0 || r.surveyFlags.length > 0) && (
-                <div className="mt-2.5 flex flex-col gap-1">
+                <div className="mt-1.5 flex flex-col gap-0.5">
                   {r.findings.map((f) => (
-                    <div key={f.key} className="text-xs text-[#465a56]" title={f.message}>
-                      {f.label}: <span className="font-semibold text-[#1b2622]">{f.value} {f.unit}</span>
+                    <div key={f.key} className="text-[11.5px] text-ink-soft" title={f.message}>
+                      {f.label}: <span className="text-ink tabular-nums">{f.value} {f.unit}</span>
                     </div>
                   ))}
                   {r.surveyFlags.map((flag) => (
-                    <div key={flag} className="text-xs text-ink-soft" title="Из опросника Минздрава">
+                    <div key={flag} className="text-[11.5px] text-ink-soft" title="Из опросника Минздрава">
                       из анкеты: {flag}
                     </div>
                   ))}
@@ -151,15 +147,15 @@ export default function RiskSystems({ items, survey, alarmKeys, onBook }: {
       </div>
 
       {onBook && worst && (
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <span className="text-sm font-bold text-teal-deep">
+        <div className="mt-4 pt-3 border-t border-line flex flex-wrap items-center gap-3">
+          <span className="text-[12.5px] text-ink">
             По системе «{worst.def.label}» стоит показаться врачу.
           </span>
-          <button className="btn btn-gold btn-sm" onClick={() => onBook(`Консультация: ${worst.def.label.toLowerCase()}`)}>
+          <button className="btn btn-ghost btn-sm ml-auto" onClick={() => onBook(`Консультация: ${worst.def.label.toLowerCase()}`)}>
             Записаться к врачу
           </button>
         </div>
       )}
-    </div>
+    </section>
   )
 }

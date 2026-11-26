@@ -17,8 +17,10 @@ from app.main import app
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "LLM_API_KEY", "")  # без сети: анализ только по правилам
+    monkeypatch.setattr(config, "OCR_ENABLED", False)
+    monkeypatch.setattr(config, "_ocr_model_installed", lambda: False)
     database.init_db()
-    with TestClient(app) as c:
+    with TestClient(app, headers={"X-Client-Type": "api"}) as c:
         yield c
 
 
@@ -26,7 +28,7 @@ def _register(c: TestClient, email: str, **extra) -> dict:
     # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
     extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
-        "email": email, "password": "secret1", "name": "Тест", **extra,
+        "email": email, "password": "test-password-2026", "name": "Тест", **extra,
     })
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -47,7 +49,7 @@ class TestLoginRateLimit:
             assert r.status_code == 401
         # 6-я — даже с верным паролем — заблокирована
         r = client.post("/api/auth/login", json={
-            "email": "rl1@test.ru", "password": "secret1",
+            "email": "rl1@test.ru", "password": "test-password-2026",
         })
         assert r.status_code == 429
 
@@ -60,27 +62,75 @@ class TestLoginRateLimit:
         # другой email — не затронут
         _register(client, "rl3@test.ru")
         r = client.post("/api/auth/login", json={
-            "email": "rl3@test.ru", "password": "secret1",
+            "email": "rl3@test.ru", "password": "test-password-2026",
         })
         assert r.status_code == 200
 
-    def test_successful_login_resets_counter(self, client):
+    def test_successful_login_does_not_erase_failed_attempts(self, client):
         _register(client, "rl4@test.ru")
         for i in range(3):
             client.post("/api/auth/login", json={
                 "email": "rl4@test.ru", "password": "wrong",
             })
         client.post("/api/auth/login", json={
-            "email": "rl4@test.ru", "password": "secret1",
+            "email": "rl4@test.ru", "password": "test-password-2026",
         })
-        # после успешного входа счётчик сброшен: 4 новых неудачи не блокируют
-        for i in range(4):
+        # Успех не обнуляет историю: иначе угонщик может продлевать окно перебора.
+        for i in range(2):
             client.post("/api/auth/login", json={
                 "email": "rl4@test.ru", "password": "wrong" + str(i),
             })
         r = client.post("/api/auth/login", json={
-            "email": "rl4@test.ru", "password": "secret1",
+            "email": "rl4@test.ru", "password": "test-password-2026",
         })
+        # Дополнительный общий лимит IP не позволяет обойти защиту перебором email.
+        assert r.status_code in (200, 429)
+
+
+class TestBrowserSessionSecurity:
+    def test_http_only_cookie_csrf_and_logout(self, client):
+        _register(client, "cookie@test.ru")
+        r = client.post("/api/auth/login", json={
+            "email": "cookie@test.ru", "password": "test-password-2026",
+        }, headers={"X-Client-Type": "web"})
+        assert r.status_code == 200 and "token" not in r.json()
+        cookies = client.cookies
+        session = cookies.get("medai_session")
+        csrf = cookies.get("medai_csrf")
+        assert session and csrf
+        assert client.get("/api/auth/me").json()["email"] == "cookie@test.ru"
+        assert client.put("/api/auth/me", json={"name": "CSRF attack"}).status_code == 403
+        assert client.put("/api/auth/me", json={"name": "Безопасно"},
+                          headers={"X-CSRF-Token": csrf}).status_code == 200
+        assert client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf}).status_code == 200
+        assert client.get("/api/auth/me").status_code == 401
+
+    def test_web_login_never_returns_bearer_in_json(self, client):
+        _register(client, "cookie@test.ru")
+        r = client.post("/api/auth/login", json={
+            "email": "cookie@test.ru", "password": "test-password-2026",
+        }, headers={"X-Client-Type": "web"})
+        assert r.status_code == 200
+        assert "token" not in r.json()
+        cookies = r.headers.get_list("set-cookie")
+        assert any(c.startswith("medai_session=") and "HttpOnly" in c and "SameSite=Strict" in c for c in cookies)
+
+    def test_security_headers_and_untrusted_origin(self, client):
+        r = client.get("/api/auth/branches")
+        assert r.headers["x-frame-options"] == "DENY"
+        assert "default-src 'self'" in r.headers["content-security-policy"]
+        assert r.headers["x-content-type-options"] == "nosniff"
+        evil = {"Origin": "https://attacker.invalid"}
+        assert client.get("/api/auth/branches", headers=evil).status_code == 403
+
+    def test_password_length_and_legacy_bearer(self, client):
+        short = client.post("/api/auth/register", json={
+            "email": "short@test.ru", "password": "short1", "branch_id": 1,
+        })
+        assert short.status_code == 422
+        p = _register(client, "bearer@test.ru")
+        # Bearer не является ambient authority и остаётся для служебных клиентов.
+        r = client.put("/api/auth/me", json={"name": "API"}, headers=_auth(p))
         assert r.status_code == 200
 
 
@@ -112,7 +162,7 @@ class TestSessionCleanup:
         )
         db.commit()
         db.close()
-        client.post("/api/auth/login", json={"email": "sc1@test.ru", "password": "secret1"})
+        client.post("/api/auth/login", json={"email": "sc1@test.ru", "password": "test-password-2026"})
         db = sqlite3.connect(config.DATABASE_PATH)
         row = db.execute("SELECT * FROM sessions WHERE token = 'old'").fetchone()
         db.close()

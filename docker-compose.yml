@@ -1,0 +1,129 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medai-backend
+    expose:
+      - "8000"  # доступ только из внутренней docker-сети, не из интернета
+    volumes:
+      - medai-data:/data
+      # Веса OCR-модели лежат в репозитории: backend/models/ocria-nano
+      - ./backend/models:/models:ro
+    environment:
+      - DATABASE_PATH=/data/medai.db
+      - APP_ENV=${APP_ENV-production}
+      - ENFORCE_HTTPS=${ENFORCE_HTTPS-true}
+      - SECURE_COOKIES=${SECURE_COOKIES-true}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - SESSION_TTL_DAYS=7
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://plusvibeapi.ru/v1}
+      - LLM_MODEL=${LLM_MODEL:-deepseek-v4.1-flash-1017}
+      - CHAT_MODEL=${CHAT_MODEL:-deepseek-v4.1-flash-1017}
+      - OCR_ENABLED=${OCR_ENABLED:-true}
+      - OCR_MODEL=ocria-nano
+      - OCR_MAX_PAGES=${OCR_MAX_PAGES:-10}
+      - OCR_TIMEOUT=${OCR_TIMEOUT:-180}
+      - LITEPARSE_MODEL_DIR=/models
+    networks:
+      medai-net:
+        ipv4_address: 172.30.0.11
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  ocr-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: python -m app.services.ocr
+    volumes:
+      - medai-data:/data
+      - ./backend/models:/models:ro
+    environment:
+      - DATABASE_PATH=/data/medai.db
+      - APP_ENV=production
+      - ENFORCE_HTTPS=false  # внутренний worker не обслуживает HTTP
+      - OCR_ENABLED=${OCR_ENABLED:-true}
+      - OCR_MODEL=ocria-nano
+      - OCR_MAX_PAGES=${OCR_MAX_PAGES:-10}
+      - OCR_TIMEOUT=${OCR_TIMEOUT:-180}
+      - LITEPARSE_MODEL_DIR=/models
+    networks:
+      medai-net:
+        ipv4_address: 172.30.0.12
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: medai-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Сертификат выдаётся доверенным CA на реальный домен, не self-signed.
+      - ./certs/fullchain.pem:/etc/nginx/tls/fullchain.pem:ro
+      - ./certs/privkey.pem:/etc/nginx/tls/privkey.pem:ro
+    networks:
+      medai-net:
+        ipv4_address: 172.30.0.10
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - NET_BIND_SERVICE
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional: PostgreSQL for production-like testing
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: medai-postgres
+  #   environment:
+  #     - POSTGRES_DB=medai
+  #     - POSTGRES_USER=medai
+  #     - POSTGRES_PASSWORD=medai
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U medai -d medai"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+networks:
+  medai-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  medai-data:
+  # postgres-data:

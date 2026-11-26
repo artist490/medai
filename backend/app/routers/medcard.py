@@ -13,6 +13,7 @@ from .. import auth
 from ..database import get_db
 from ..schemas import MedCardIn
 from ..services.signals import ALARM_SURVEY_KEYS
+from ..services.audit import record
 
 router = APIRouter(prefix="/api/medcard", tags=["medcard"])
 
@@ -109,6 +110,8 @@ def patient_card(
     if patient is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Пациент не найден")
     row = db.execute("SELECT * FROM patient_cards WHERE user_id = ?", (patient_id,)).fetchone()
+    record(db, "patient.medcard.read", user_id=user["id"], entity="patient", entity_id=patient_id)
+    db.commit()
     return _card_payload(row)
 
 
@@ -126,4 +129,7 @@ def save_patient_card(
     ).fetchone()
     if patient is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Пациент не найден")
-    return _save_card(db, patient_id, data, updated_by="doctor")
+    result = _save_card(db, patient_id, data, updated_by="doctor")
+    record(db, "patient.medcard.update", user_id=user["id"], entity="patient", entity_id=patient_id)
+    db.commit()
+    return result

@@ -7,12 +7,13 @@ import type { IconName } from '../components/Icon'
 import PageHeader from '../components/PageHeader'
 import FlowTabs from '../components/FlowTabs'
 
-// Поле ввода одного показателя с нормой-подсказкой (cream-инпут Flip7)
+// Поле ввода одного показателя с подсказкой нормы
 function Field(props: {
   id: string
   icon?: IconName
   label: string
   hint: string
+  unit?: string
   step?: string
   min?: number
   max?: number
@@ -21,8 +22,8 @@ function Field(props: {
 }) {
   return (
     <div>
-      <label className="flip-label flex items-center gap-2" htmlFor={props.id}>
-        {props.icon && <Icon name={props.icon} size={16} />}
+      <label className="flip-label flex items-center gap-1.5" htmlFor={props.id}>
+        {props.icon && <Icon name={props.icon} size={14} className="opacity-55" />}
         {props.label}
       </label>
       <input
@@ -35,9 +36,13 @@ function Field(props: {
         className="flip-input"
         placeholder="—"
         value={props.value}
+        aria-describedby={`${props.id}-hint`}
         onChange={(e) => props.onChange(e.target.value)}
       />
-      <div className="flip-hint">норма: {props.hint}</div>
+      <div id={`${props.id}-hint`} className="flip-hint">
+        норма {props.hint}
+        {props.unit ? ` · ${props.unit}` : ''}
+      </div>
     </div>
   )
 }
@@ -48,9 +53,18 @@ const emptyForm = {
 }
 type FormShape = typeof emptyForm
 
-// Разблокировка «Отправить», когда заполнен хотя бы один показатель
+// «Отправить» активна, когда заполнен хотя бы один показатель
 function hasAnyValue(form: FormShape): boolean {
   return Object.values(form).some((v) => v.trim() !== '')
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="measurement-section">
+      <h2 className="text-[13px] font-medium text-ink mb-4">{title}</h2>
+      {children}
+    </section>
+  )
 }
 
 export default function NewMeasurement() {
@@ -58,6 +72,7 @@ export default function NewMeasurement() {
   const [period, setPeriod] = useState<'morning' | 'evening'>(new Date().getHours() < 12 ? 'morning' : 'evening')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(() => window.matchMedia('(min-width: 640px)').matches)
   const navigate = useNavigate()
 
   function set(key: keyof FormShape) {
@@ -90,15 +105,15 @@ export default function NewMeasurement() {
   }
 
   return (
-    <div className="flex flex-col gap-5 stagger">
+    <div className="flex flex-col gap-6 stagger">
       <PageHeader
-        title={<>Новый замер <Icon name="stethoscope" size={26} className="inline-block align-[-4px]" /></>}
-        sub="Заполните только то, что измерили. Остальное можно пропустить."
+        title="Новый замер"
+        sub="Заполните только то, что измерили. Остальное можно пропустить — данные не обязательны."
       />
 
       <form onSubmit={submit} className="flex flex-col gap-5">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-sm font-semibold text-[#465a56]">Период дня:</span>
+          <span className="text-[12.5px] text-ink-soft">Период дня</span>
           <FlowTabs
             ariaLabel="Период дня"
             items={[{ id: 'morning' as const, label: 'Утро' }, { id: 'evening' as const, label: 'Вечер' }]}
@@ -106,55 +121,68 @@ export default function NewMeasurement() {
             onChange={setPeriod}
           />
         </div>
-        <section className="bg-white rounded-xl p-5 glow-soft">
-          <div className="section-title mb-4">
-            <span className="emoji-box"><Icon name="pressure" size={20} /></span> Давление и пульс
-          </div>
+
+        <Section title="Давление и пульс">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Field id="systolic" label="Систолическое" hint="до 120" min={50} max={280} value={form.systolic} onChange={set('systolic')} />
-            <Field id="diastolic" label="Диастолическое" hint="до 80" min={30} max={200} value={form.diastolic} onChange={set('diastolic')} />
-            <Field id="pulse" icon="pulse" label="Пульс" hint="60–100" min={30} max={250} value={form.pulse} onChange={set('pulse')} />
+            <Field id="systolic" label="Систолическое" unit="мм рт. ст." hint="до 120" min={50} max={280} value={form.systolic} onChange={set('systolic')} />
+            <Field id="diastolic" label="Диастолическое" unit="мм рт. ст." hint="до 80" min={30} max={200} value={form.diastolic} onChange={set('diastolic')} />
+            <Field id="pulse" icon="pulse" label="Пульс" unit="уд/мин" hint="60–100" min={30} max={250} value={form.pulse} onChange={set('pulse')} />
           </div>
-        </section>
+        </Section>
 
-        <section className="bg-white rounded-xl p-5 glow-soft">
-          <div className="section-title mb-4">
-            <span className="emoji-box"><Icon name="temperature" size={20} /></span> Температура и сатурация
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Field id="temperature" label="Температура" hint="36.1–37.0" step="0.1" min={33} max={43} value={form.temperature} onChange={set('temperature')} />
-            <Field id="spo2" icon="lungs" label="SpO₂" hint="95–100" min={50} max={100} value={form.spo2} onChange={set('spo2')} />
-          </div>
-        </section>
+        <details className="measurement-more" open={moreOpen} onToggle={(e) => setMoreOpen(e.currentTarget.open)}>
+          <summary>
+            <span className="flex items-center gap-2 text-[13px]">
+              <Icon name="steps" size={16} /> Дополнительные показатели
+            </span>
+            <span className="measurement-more-hint">
+              Температура, вес, сон, активность <Icon name="chevron" size={13} />
+            </span>
+          </summary>
 
-        <section className="bg-white rounded-xl p-5 glow-soft">
-          <div className="section-title mb-4">
-            <span className="emoji-box"><Icon name="scale" size={20} /></span> Вес
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Field id="weight" label="Вес" hint="ИМТ 18.5–24.9" step="0.1" min={20} max={400} value={form.weight_kg} onChange={set('weight_kg')} />
-          </div>
-          <div className="flip-hint">ИМТ считается автоматически, если в профиле указан рост.</div>
-        </section>
+          <div className="measurement-more-content">
+            <Section title="Температура и сатурация">
+              <div className="grid grid-cols-2 gap-4">
+                <Field id="temperature" label="Температура" unit="°C" hint="36.1–37.0" step="0.1" min={33} max={43} value={form.temperature} onChange={set('temperature')} />
+                <Field id="spo2" icon="lungs" label="SpO₂" unit="%" hint="95–100" min={50} max={100} value={form.spo2} onChange={set('spo2')} />
+              </div>
+            </Section>
 
-        <section className="bg-white rounded-xl p-5 glow-soft">
-          <div className="section-title mb-4">
-            <span className="emoji-box"><Icon name="sleep" size={20} /></span> Образ жизни за сегодня
+            <Section title="Вес">
+              <div className="grid grid-cols-2 gap-4">
+                <Field id="weight" label="Вес" unit="кг" hint="ИМТ 18.5–24.9" step="0.1" min={20} max={400} value={form.weight_kg} onChange={set('weight_kg')} />
+              </div>
+              <div className="flip-hint mt-3">ИМТ считается автоматически, если в профиле указан рост.</div>
+            </Section>
+
+            <Section title="Образ жизни за сегодня">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <Field id="sleep" icon="sleep" label="Сон" unit="ч" hint="7–9" step="0.5" min={0} max={24} value={form.sleep_hours} onChange={set('sleep_hours')} />
+                <Field id="steps" icon="steps" label="Шаги" unit="шагов" hint="8000–10000" min={0} max={200000} value={form.steps} onChange={set('steps')} />
+                <Field id="water" icon="water" label="Вода" unit="мл" hint="≈2000" min={0} max={10000} value={form.water_ml} onChange={set('water_ml')} />
+              </div>
+            </Section>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Field id="sleep" label="Сон" hint="7–9 ч" step="0.5" min={0} max={24} value={form.sleep_hours} onChange={set('sleep_hours')} />
-            <Field id="steps" icon="steps" label="Шаги" hint="8000–10000" min={0} max={200000} value={form.steps} onChange={set('steps')} />
-            <Field id="water" icon="water" label="Вода" hint="≈2000 мл" min={0} max={10000} value={form.water_ml} onChange={set('water_ml')} />
-          </div>
-        </section>
+        </details>
 
         {error && (
-          <div className="badge badge-red justify-center normal-case tracking-normal">{error}</div>
+          <div
+            role="alert"
+            className="text-[12.5px] text-coral-dark bg-[#fbf1f0] border border-[#e8cfcc] rounded-md px-3 py-2"
+          >
+            {error}
+          </div>
         )}
 
-        <button className="btn btn-gold w-full" disabled={busy || !hasAnyValue(form)}>
-          {busy ? 'ИИ анализирует…' : (<span className="inline-flex items-center gap-2">Проанализировать <Icon name="sparkle" size={16} /></span>)}
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button className="btn btn-gold" disabled={busy || !hasAnyValue(form)}>
+            {busy ? 'Разбираем показатели…' : 'Сохранить и разобрать'}
+            {!busy && <Icon name="arrow" size={15} />}
+          </button>
+          <span className="text-[11.5px] text-ink-soft">
+            Разбор появится сразу после сохранения.
+          </span>
+        </div>
       </form>
     </div>
   )

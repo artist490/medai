@@ -49,12 +49,12 @@ function Chart({ title, subtitle, icon, data, series }: {
     <section className="panel">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
-          <h2 className="text-[18px] flex items-center gap-2.5">
-            <span className="emoji-box"><Icon name={icon} size={20} /></span> {title}
+          <h2 className="text-[14px] font-medium text-ink flex items-center gap-2">
+            <Icon name={icon} size={15} className="opacity-50" /> {title}
           </h2>
-          {subtitle && <p className="text-sm text-teal-deep mt-0.5">{subtitle}</p>}
+          {subtitle && <p className="text-[11.5px] text-ink-soft mt-1">{subtitle}</p>}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-4">
           {series.map((s) => (
             <span key={s.key} className="legend-pill">
               <span className="legend-dot" style={{ background: s.color }} />{s.name}
@@ -62,16 +62,38 @@ function Chart({ title, subtitle, icon, data, series }: {
           ))}
         </div>
       </div>
-      <div className="chart-box" style={{ height: 240 }}>
+      <div style={{ height: 220 }}>
         <ResponsiveContainer>
-          <LineChart data={data} margin={{ top: 10, right: 16, bottom: 0, left: -12 }}>
-            <CartesianGrid strokeDasharray="4 4" stroke="#e3efed" vertical={false} />
-            <XAxis dataKey="t" tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: '#1b2622', fontWeight: 600 }} domain={['auto', 'auto']} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={{ borderRadius: 12, border: '2px solid #00b8a9', fontSize: 12 }} />
+          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eceeec" vertical={false} />
+            <XAxis
+              dataKey="t"
+              tick={{ fontSize: 10.5, fill: '#7b8681' }}
+              tickLine={false}
+              axisLine={{ stroke: '#e3e6e3' }}
+            />
+            <YAxis
+              tick={{ fontSize: 10.5, fill: '#7b8681' }}
+              domain={['auto', 'auto']}
+              tickLine={false}
+              axisLine={false}
+            />
+            <Tooltip
+              contentStyle={{
+                borderRadius: 6,
+                border: '1px solid #e3e6e3',
+                fontSize: 12,
+                boxShadow: '0 8px 24px -16px rgba(19,26,24,.3)',
+              }}
+            />
             {series.map((s) => (
-              <Line key={s.key} type="monotone" dataKey={s.key} name={s.name}
-                    stroke={s.color} strokeWidth={3.5} dot={{ r: 4, strokeWidth: 0, fill: s.color }} connectNulls />
+              <Line
+                key={s.key} type="monotone" dataKey={s.key} name={s.name}
+                stroke={s.color} strokeWidth={1.6}
+                dot={{ r: 2.5, strokeWidth: 0, fill: s.color }}
+                activeDot={{ r: 4 }}
+                connectNulls
+              />
             ))}
           </LineChart>
         </ResponsiveContainer>
@@ -105,7 +127,7 @@ export default function MeasurementsHistory() {
 
   useEffect(() => {
     load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   // Поиск: по дате и любому значению показателей
@@ -154,36 +176,39 @@ export default function MeasurementsHistory() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          {query && <p className="text-xs text-ink-soft mt-0.5">Поиск: «{query}»</p>}
+          {query && <p className="text-[12px] text-ink-soft">Поиск: «{query}»</p>}
         </div>
-        <Link to="/new" className="btn btn-gold btn-sm">Новый замер</Link>
+        <Link to="/new" className="btn btn-ghost btn-sm">Новый замер</Link>
       </div>
 
-      <Chart title="Давление, мм рт. ст." icon="pressure"
+      <Chart title="Давление" subtitle="мм рт. ст." icon="pressure"
              data={chartData}
-             series={[{ key: 'systolic', name: 'Систолическое', color: '#EF6C4A' },
-                      { key: 'diastolic', name: 'Диастолическое', color: '#2BA8A2' }]} />
-      <Chart title="Пульс, уд/мин" icon="pulse"
+             series={[{ key: 'systolic', name: 'Систолическое', color: '#a4231d' },
+                      { key: 'diastolic', name: 'Диастолическое', color: '#0b5c58' }]} />
+      <Chart title="Пульс" subtitle="уд/мин" icon="pulse"
              data={chartData}
-             series={[{ key: 'pulse', name: 'Пульс', color: '#E74C3C' }]} />
-      <Chart title="Вес" icon="scale"
+             series={[{ key: 'pulse', name: 'Пульс', color: '#0b5c58' }]} />
+      <Chart title="Вес" subtitle="кг" icon="scale"
              data={chartData}
-             series={[{ key: 'weight_kg', name: 'Вес, кг', color: '#5DADE2' }]} />
-      <Chart title="ИМТ" subtitle="Индекс массы тела, норма 18.5–24.9" icon="scale"
+             series={[{ key: 'weight_kg', name: 'Вес', color: '#3d7ea6' }]} />
+      <Chart title="ИМТ" subtitle="норма 18.5–24.9" icon="scale"
              data={bmiData}
-             series={[{ key: 'bmi', name: 'ИМТ', color: '#FFD23F' }]} />
-      <Chart title="Сон, часы" icon="sleep"
+             series={[{ key: 'bmi', name: 'ИМТ', color: '#a8760a' }]} />
+      <Chart title="Сон" subtitle="часы" icon="sleep"
              data={chartData}
-             series={[{ key: 'sleep_hours', name: 'Сон', color: '#2BA8A2' }]} />
+             series={[{ key: 'sleep_hours', name: 'Сон', color: '#0b5c58' }]} />
       <Chart title="Активность и вода" icon="steps"
              data={chartData}
-             series={[{ key: 'steps', name: 'Шаги', color: '#27AE60' },
-                      { key: 'water_ml', name: 'Вода, мл', color: '#5DADE2' }]} />
+             series={[{ key: 'steps', name: 'Шаги', color: '#146c43' },
+                      { key: 'water_ml', name: 'Вода, мл', color: '#3d7ea6' }]} />
 
       {/* Все замеры */}
-      <section className="bg-white rounded-lg p-6 shadow-float">
+      <section className="panel">
         <div className="flex items-center justify-between gap-3 mb-2">
-          <h2 className="text-[18px]">Все замеры {filtered.length > 0 && <span className="text-ink-soft text-base">· {filtered.length}</span>}</h2>
+          <h2 className="text-[14px] font-medium text-ink">
+            Все замеры
+            {filtered.length > 0 && <span className="text-ink-soft font-normal"> · {filtered.length}</span>}
+          </h2>
         </div>
         <div className="overflow-x-auto" data-full-bleed>
           <table className="data-table">
@@ -210,7 +235,7 @@ export default function MeasurementsHistory() {
                         {m.recorded_at.slice(8, 10)}
                       </span>
                       <div className="min-w-0">
-                        <div className="font-extrabold">{humanDate(m.recorded_at)}</div>
+                        <div className="font-medium">{humanDate(m.recorded_at)}</div>
                         <div className="text-xs text-ink-soft truncate max-w-[420px]"><Summary m={m} /></div>
                       </div>
                     </div>
@@ -223,8 +248,8 @@ export default function MeasurementsHistory() {
                     ) : '—'}
                   </td>
                   <td className="!text-right whitespace-nowrap">
-                    <span className="text-sm text-ink-soft mr-4">{humanTime(m.recorded_at)}</span>
-                    <Link to={`/result/${m.id}`} className="font-extrabold text-teal hover:text-teal-light mr-3">
+                    <span className="text-[12px] text-ink-soft mr-4 tabular-nums">{humanTime(m.recorded_at)}</span>
+                    <Link to={`/result/${m.id}`} className="text-[12.5px] text-teal-dark hover:underline underline-offset-2 mr-3">
                       Открыть
                     </Link>
                     <button

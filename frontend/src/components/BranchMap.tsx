@@ -1,6 +1,11 @@
 // Векторная карта филиала, отрисованная с нуля в палитре «Клинического света».
 // MapLibre GL читает наши PMTiles-экстракты (/maps/{slug}.pmtiles, вырезаются
 // из билда Protomaps) — во внешние сервисы страница не ходит, offline-деплой.
+//
+// Проекция — globe: при отдалении карта становится земным шаром, а не плоским
+// полотном. Городские экстракты покрывают только свой bbox, поэтому для низких
+// зумов рядом лежит мировая суша (world-atlas 110m, /world/*.geojson):
+// она проявляется при отдалении и гаснет к городскому зуму.
 import { useEffect, useRef, useState } from 'react'
 import { Map as MapLibreMap, Marker, NavigationControl, ScaleControl, addProtocol, setWorkerUrl, type StyleSpecification, type RequestParameters } from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
@@ -15,15 +20,52 @@ addProtocol('pmtiles', (params: RequestParameters, abortController: AbortControl
   protocol.tile(params, abortController) as unknown as Promise<{ data: ArrayBuffer }>,
 )
 
+// Зумы, между которыми происходит переход «глобус ↔ город».
+// До WORLD_FADE_END видна мировая суша, с CITY_MIN_ZOOM — городские тайлы.
+const WORLD_FADE_END = 8.5
+const CITY_MIN_ZOOM = 8
+// Диаметр шара в пикселях на зуме 0: worldSize / (π·cos φ), где worldSize = 512.
+// Формула из исходников MapLibre (getGlobeRadiusPixels), а не подбор «на глаз»:
+// иначе шар не вписывается в контейнер и висит мелким пятном по центру.
+const WORLD_TILE_PX = 512
+
+/** Зум, при котором земной шар занимает долю высоты контейнера. */
+function fitGlobeZoom(height: number, lat: number): number {
+  const target = Math.max(160, height * 0.92)
+  const cos = Math.cos((Math.min(Math.abs(lat), 85) * Math.PI) / 180)
+  return Math.log2((target * Math.PI * cos) / WORLD_TILE_PX)
+}
+
 const PIN_HTML =
   '<style>@keyframes bmpulse{0%{transform:scale(.5);opacity:.85}100%{transform:scale(2);opacity:0}}</style>' +
   '<div style="position:relative;width:26px;height:34px">' +
   '<div style="position:absolute;left:-8px;top:-8px;width:26px;height:26px;border-radius:50%;' +
-  'background:rgba(0,184,169,.45);animation:bmpulse 1.8s ease-out infinite"></div>' +
-  '<div style="position:absolute;left:0;top:0;width:26px;height:26px;background:#00b8a9;' +
+  'background:rgba(11,92,88,.35);animation:bmpulse 1.8s ease-out infinite"></div>' +
+  '<div style="position:absolute;left:0;top:0;width:26px;height:26px;background:#0b5c58;' +
   'border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);' +
   'box-shadow:0 6px 14px rgba(11,60,56,.35)"></div>' +
   '<div style="position:absolute;left:9px;top:8px;width:8px;height:8px;background:#fff;border-radius:50%"></div></div>'
+
+// Меридианы и параллели: на глобусе дают масштаб и «картографичность».
+// Рисуются под сушей, поэтому видны только над океаном — как на морской карте.
+function graticule(step = 30): GeoJSON.FeatureCollection {  const features: GeoJSON.Feature[] = []
+  const line = (coords: number[][]) => ({
+    type: 'Feature' as const,
+    properties: {},
+    geometry: { type: 'LineString' as const, coordinates: coords },
+  })
+  for (let lon = -180; lon <= 180; lon += step) {
+    const coords: number[][] = []
+    for (let lat = -85; lat <= 85; lat += 5) coords.push([lon, lat])
+    features.push(line(coords))
+  }
+  for (let lat = -60; lat <= 60; lat += step) {
+    const coords: number[][] = []
+    for (let lon = -180; lon <= 180; lon += 5) coords.push([lon, lat])
+    features.push(line(coords))
+  }
+  return { type: 'FeatureCollection', features }
+}
 
 // Иконки POI рисуются канвасом (без спрайт-листов): белый круг + цветной крест
 function makeIconImage(color: string): ImageData {
@@ -43,25 +85,87 @@ function makeIconImage(color: string): ImageData {
 // Иконки живут в стиле; после setStyle их нужно вернуть
 function addMapImages(map: MapLibreMap) {
   if (map.hasImage('med-cross')) return
-  map.addImage('med-cross', makeIconImage('#00b8a9'), { pixelRatio: 2 })
-  map.addImage('pharmacy', makeIconImage('#2E9E5B'), { pixelRatio: 2 })
+  map.addImage('med-cross', makeIconImage('#0b5c58'), { pixelRatio: 2 })
+  map.addImage('pharmacy', makeIconImage('#2E7D4F'), { pixelRatio: 2 })
 }
 
-// Стиль «Клинический свет» — вся геометрия красится в палитру сайта
+// Стиль «Клинический свет» — вся геометрия красится в палитру сайта.
+// Порядок слоёв снизу вверх: океан → сетка → суша → границы → город.
 function buildStyle(slug: string, threeD: boolean): StyleSpecification {
   const kind = ['coalesce', ['get', 'kind'], ['get', 'pmap:kind']]
   return {
     version: 8,
     glyphs: '/glyphs/{fontstack}/{range}.pbf',
+    // Глобус вместо плоского полотна: при отдалении земля становится шаром
+    projection: { type: 'globe' },
     sources: {
       protomaps: {
         type: 'vector',
         url: `pmtiles:///maps/${slug}.pmtiles`,
+        // Ниже CITY_MIN_ZOOM городские тайлы не запрашиваются: на глобусе
+        // они дали бы крошечное пятно детализации поверх мировой суши
+        minzoom: CITY_MIN_ZOOM,
+        maxzoom: 15,
         attribution: '© OpenStreetMap contributors · Protomaps',
+      },
+      // Мировая суша и границы: нужны только на низких зумах, где городских
+      // тайлов нет. 110m-генерализация — 84 и 188 КБ, грузятся один раз.
+      worldLand: {
+        type: 'geojson',
+        data: '/world/land-110m.geojson',
+        attribution: 'Natural Earth',
+      },
+      worldBorders: {
+        type: 'geojson',
+        data: '/world/countries-110m.geojson',
+      },
+      graticule: {
+        type: 'geojson',
+        data: graticule(),
       },
     },
     layers: [
-      { id: 'bg', type: 'background', paint: { 'background-color': '#F7FAF8' } },
+      {
+        id: 'bg', type: 'background',
+        // Океан на глобусе заметно глубже бумаги сайта — иначе шар читается
+        // как бледное пятно; к городскому зуму фон светлеет до бумаги.
+        paint: {
+          'background-color': ['interpolate', ['linear'], ['zoom'],
+            0, '#B7D5CE',
+            3, '#C6DED8',
+            6, '#E2EEEB',
+            8.5, '#F7FAF8'],
+        },
+      },
+
+      // Сетка видна только над водой: суша рисуется поверх
+      {
+        id: 'graticule', type: 'line', source: 'graticule',
+        paint: {
+          'line-color': '#9FBEB6',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.6, 4, 1],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 3, 0.7, 5.5, 0],
+        },
+      },
+
+      // Суша: проявляется при отдалении и гаснет до городского зума
+      {
+        id: 'world-land', type: 'fill', source: 'worldLand',
+        paint: {
+          'fill-color': '#F4F8F6',
+          'fill-opacity': ['interpolate', ['linear'], ['zoom'],
+            0, 1, 5, 1, WORLD_FADE_END, 0],
+        },
+      },
+      {
+        id: 'world-borders', type: 'line', source: 'worldBorders',
+        paint: {
+          'line-color': '#BCD4CD',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.5, 5, 0.9],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'],
+            0, 0.95, 5, 0.95, WORLD_FADE_END, 0],
+        },
+      },
 
       // Зелень и парки
       {
@@ -215,7 +319,7 @@ function buildStyle(slug: string, threeD: boolean): StyleSpecification {
   } as StyleSpecification
 }
 
-export default function BranchMap({ slug, lat, lon, city }: {
+export default function BranchMap({ slug, lat, lon }: {
   slug: string
   lat: number
   lon: number
@@ -240,11 +344,35 @@ export default function BranchMap({ slug, lat, lon, city }: {
       style: buildStyle(slug, threeD),
       center: [lon, lat],
       zoom: 14, // на 14 появляются подписи улиц
+      minZoom: -1, // дальше шар переворачивается через полюс
       maxZoom: 15,
       scrollZoom: false, // не перехватывать скролл страницы
     })
     map.addControl(new NavigationControl({ showCompass: true }), 'top-left')
     map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left')
+
+    // Кнопка «Глобус»: камера уезжает к земному шару и обратно
+    const globeBtn = document.createElement('div')
+    globeBtn.className = 'maplibregl-ctrl maplibregl-ctrl-group'
+    globeBtn.innerHTML =
+      '<button type="button" title="Показать земной шар" aria-label="Показать земной шар" ' +
+      'style="width:29px;height:29px;display:grid;place-items:center;border:0;background:none;cursor:pointer;color:var(--color-teal-deep)">' +
+      '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+      'stroke-linecap="round"><circle cx="12" cy="12" r="8.5"></circle>' +
+      '<path d="M3.5 12h17M12 3.5c2.6 2.4 4 5.3 4 8.5s-1.4 6.1-4 8.5c-2.6-2.4-4-5.3-4-8.5s1.4-6.1 4-8.5z"></path></svg></button>'
+    globeBtn.querySelector('button')!.addEventListener('click', () => {
+      const [la, lo] = clinicRef.current
+      const toGlobe = map.getZoom() > 6
+      map.easeTo({
+        center: [lo, la],
+        zoom: toGlobe ? fitGlobeZoom(map.getContainer().clientHeight, la) : 14,
+        pitch: 0,
+        bearing: 0,
+        duration: 1400,
+        easing: (t) => 1 - Math.pow(1 - t, 3),
+      })
+    })
+    map.addControl({ onAdd: () => globeBtn, onRemove: () => { globeBtn.remove() } }, 'top-left')
 
     // Кнопка «Клиника»: вернуть камеру к пину филиала
     const clinicBtn = document.createElement('div')
@@ -277,10 +405,15 @@ export default function BranchMap({ slug, lat, lon, city }: {
       .addTo(map)
     mapRef.current = map
     try {
+      // Атмосфера глобуса: светлая, чтобы шар жил в бумажной палитре сайта,
+      // а не выглядел скриншотом Google Earth
       map.setSky({
-        'sky-color': '#DCEFEA',
-        'horizon-color': '#EDF4F1',
-        'fog-color': '#F7FAF8',
+        'sky-color': '#F4F9F7',
+        'horizon-color': '#D8E9E4',
+        'fog-color': '#EDF4F1',
+        'sky-horizon-blend': 0.7,
+        'horizon-fog-blend': 0.6,
+        'fog-ground-blend': 0.4,
       })
     } catch { /* Sky API недоступна */ }
     map.on('load', () => {
@@ -331,10 +464,16 @@ export default function BranchMap({ slug, lat, lon, city }: {
   // Эргономичный формат ~16:10 (вместо растянутой полосы), одинаковый
   // в 2D и 3D — при переключении камера наклоняется внутри той же рамки
   return (
-    <div
-      ref={boxRef}
-      className="w-full h-[260px] lg:h-[340px]"
-      style={{ background: '#F7FAF8' }}
-    />
+    <div>
+      <div
+        ref={boxRef}
+        className="w-full h-[260px] lg:h-[340px]"
+        style={{ background: '#F7FAF8' }}
+      />
+      {/* Подпись под картой: иконка глобуса без неё не читается */}
+      <p className="mt-2 text-[10.5px] text-ink-soft">
+        Отдалите карту или нажмите глобус — увидите, где филиал на планете.
+      </p>
+    </div>
   )
 }

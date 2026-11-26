@@ -17,7 +17,7 @@ from app.main import app
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
     database.init_db()
-    with TestClient(app) as c:
+    with TestClient(app, headers={"X-Client-Type": "api"}) as c:
         yield c
 
 
@@ -25,7 +25,7 @@ def _register(c: TestClient, email: str, **extra) -> dict:
     # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
     extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
-        "email": email, "password": "secret1", "name": "Тест", **extra,
+        "email": email, "password": "test-password-2026", "name": "Тест", **extra,
     })
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -98,12 +98,18 @@ class TestDocuments:
         assert client.post("/api/documents", files=big, headers=_auth(p)).status_code == 422
         exe = {"file": ("virus.exe", io.BytesIO(b"MZ"), "application/x-msdownload")}
         assert client.post("/api/documents", files=exe, headers=_auth(p)).status_code == 422
+        fake = {"file": ("fake.png", io.BytesIO(b"<html>not a picture</html>"), "image/png")}
+        assert client.post("/api/documents", files=fake, headers=_auth(p)).status_code == 422
+        evil_name = {"file": ("bad\r\nname.png", io.BytesIO(b"\x89PNG\r\n\x1a\nDATA"), "image/png")}
+        uploaded = client.post("/api/documents", files=evil_name, headers=_auth(p))
+        assert uploaded.status_code == 201
+        assert "\r" not in uploaded.json()["filename"] and "\n" not in uploaded.json()["filename"]
 
     def test_private_documents(self, client):
         p = _register(client, "d3@test.ru")
         h = _auth(p)
         doc = client.post("/api/documents",
-                          files={"file": ("a.png", io.BytesIO(b"PNGDATA"), "image/png")},
+                          files={"file": ("a.png", io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"PNGDATA"), "image/png")},
                           headers=h).json()
         other = _register(client, "d4@test.ru")
         r = client.get(f"/api/documents/{doc['id']}/download", headers=_auth(other))

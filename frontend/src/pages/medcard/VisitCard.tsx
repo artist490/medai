@@ -25,35 +25,33 @@ export default function VisitCard({ visit, onChanged }: { visit: Visit; onChange
 
   return (
     <div className={`flip-card ${visit.status === 'cancelled' ? 'opacity-60' : ''}`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`badge ${info.cls} normal-case tracking-normal`}>{info.label}</span>
-        <span className="text-xs font-extrabold text-ink-soft">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className={`badge ${info.cls}`}>{info.label}</span>
+        <span className="text-[11.5px] text-ink-soft tabular-nums">
           {visit.visit_date ? `на ${fmtDate(visit.visit_date)} · ` : ''}запись от {fmtDate(visit.created_at)}
         </span>
       </div>
-      {error && <div className="badge badge-red normal-case tracking-normal mt-1.5">{error}</div>}
-      {visit.reason && <div className="text-sm font-extrabold text-[#1b2622] mt-1.5">{visit.reason}</div>}
-      <p className="text-sm text-ink-soft mt-1 whitespace-pre-wrap">{visit.complaints}</p>
+      {error && <div className="text-[12px] text-coral-dark mt-1.5">{error}</div>}
+      {visit.reason && <div className="text-[13.5px] font-medium text-ink mt-2">{visit.reason}</div>}
+      <p className="text-[13px] leading-relaxed text-ink-soft mt-1 whitespace-pre-wrap">{visit.complaints}</p>
 
       {visit.status === 'completed' && visit.conclusion && (
-        <div className="mt-2 border-t border-[#e5e7eb] pt-2 flex flex-col gap-1">
-          <div className="text-xs font-semibold text-ink-soft flex items-center gap-1.5">
-            {visit.doctor_name ? (
-              <AvatarDoctor size={20} />
-            ) : null}
+        <div className="mt-3 pt-3 border-t border-line flex flex-col gap-1.5">
+          <div className="text-[11.5px] text-ink-soft flex items-center gap-1.5">
+            {visit.doctor_name ? <AvatarDoctor size={18} /> : null}
             Заключение врача{visit.doctor_name ? ` · ${visit.doctor_name}` : ''}
           </div>
-          <p className="text-sm text-ink-soft whitespace-pre-wrap">{visit.conclusion}</p>
+          <p className="text-[13px] leading-relaxed text-ink whitespace-pre-wrap">{visit.conclusion}</p>
           {visit.recommendations && (
-            <p className="text-sm text-ink-soft whitespace-pre-wrap">
-              <span className="font-extrabold">Рекомендации: </span>{visit.recommendations}
+            <p className="text-[13px] leading-relaxed text-ink-soft whitespace-pre-wrap">
+              <span className="text-ink font-medium">Рекомендации: </span>{visit.recommendations}
             </p>
           )}
         </div>
       )}
 
       {visit.status === 'planned' && (
-        <div className="mt-2">
+        <div className="mt-3">
           <button className="btn btn-ghost btn-sm" disabled={busy} onClick={cancel}>
             Отменить запись
           </button>

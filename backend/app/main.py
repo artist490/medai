@@ -3,7 +3,6 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -19,6 +18,7 @@ from .routers import measurements as measurements_router
 from .routers import medcard as medcard_router
 from .routers import stats as stats_router
 from .routers import visits as visits_router
+from .security import SecurityMiddleware
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,18 +26,19 @@ logging.basicConfig(level=logging.INFO)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    from .services import ocr
+    ocr.start_local_worker()
     yield
+    ocr.stop_local_worker()
 
 
-app = FastAPI(title="MedAI", version="1.0.0", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+app = FastAPI(
+    title="MedAI", version="1.0.0", lifespan=lifespan,
+    docs_url=None if config.ENV == "production" else "/docs",
+    redoc_url=None if config.ENV == "production" else "/redoc",
+    openapi_url=None if config.ENV == "production" else "/openapi.json",
 )
+app.add_middleware(SecurityMiddleware)
 
 app.include_router(auth_router.router)
 app.include_router(analytics_router.router)

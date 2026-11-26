@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 class RegisterIn(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(min_length=12, max_length=128)
     name: str = Field(default="", max_length=64)
     invite_code: Optional[str] = Field(default=None, max_length=64)  # код приглашения для врачей
     # Филиал обязателен на сервере для любой роли (С.3): без него 422 — иначе
@@ -24,7 +24,12 @@ class ProfileIn(BaseModel):
     age: Optional[int] = Field(default=None, ge=1, le=120)
     sex: Optional[Literal["male", "female"]] = None
     height_cm: Optional[float] = Field(default=None, ge=50, le=250)
-    branch_id: Optional[int] = None
+    branch_id: Optional[int] = Field(default=None, exclude=True)  # только через защищённый endpoint
+
+
+class BranchChangeIn(BaseModel):
+    branch_id: int
+    current_password: str = Field(min_length=1, max_length=128)
 
 
 class MeasurementIn(BaseModel):

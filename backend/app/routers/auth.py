@@ -1,41 +1,39 @@
 """Роутер авторизации и профиля."""
+import secrets
 import sqlite3
-import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from .. import auth
 from ..database import db_session, get_db
-from ..schemas import LoginIn, ProfileIn, RegisterIn
+from ..schemas import BranchChangeIn, LoginIn, ProfileIn, RegisterIn
+from ..security import (SESSION_COOKIE, SlidingRateLimiter, clear_auth_cookies,
+                        csrf_cookie, session_cookie)
+from ..services.audit import record
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-# Защита от брутфорса: не более LOGIN_MAX_FAILS неудачных входов
-# на пару «email + IP» за окно LOGIN_WINDOW секунд (in-memory, для локального
-# деплоя достаточно; при масштабировании — Redis).
-LOGIN_MAX_FAILS = 5
-LOGIN_WINDOW = 15 * 60
-_LOGIN_FAILS: dict[str, list[float]] = {}
+# In-memory для одной реплики; при горизонтальном масштабировании — Redis.
+_login_limiter = SlidingRateLimiter(5, 15 * 60)
+_login_ip_limiter = SlidingRateLimiter(60, 15 * 60)
+_register_limiter = SlidingRateLimiter(5, 60 * 60)
+_branch_change_limiter = SlidingRateLimiter(5, 15 * 60)
+_DUMMY_PASSWORD_HASH = auth.hash_password(secrets.token_urlsafe(32))
+
+
+def _ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
 
 
 def _login_key(email: str, request: Request) -> str:
-    ip = request.client.host if request.client else "unknown"
-    return f"{email.lower()}|{ip}"
+    return f"{email.lower()}|{_ip(request)}"
 
 
 def _login_blocked(key: str) -> bool:
-    # Cap словаря: не даём ему расти бесконечно по подбрасываемым email
-    if len(_LOGIN_FAILS) > 10_000:
-        cutoff = time.time() - LOGIN_WINDOW
-        stale = [k for k, v in _LOGIN_FAILS.items() if not v or v[-1] <= cutoff]
-        for k in stale:
-            del _LOGIN_FAILS[k]
-    now = time.time()
-    fresh = [t for t in _LOGIN_FAILS.get(key, []) if now - t < LOGIN_WINDOW]
-    _LOGIN_FAILS[key] = fresh
-    return len(fresh) >= LOGIN_MAX_FAILS
+    # Исторический тестовый интерфейс: проверка без регистрации новой попытки.
+    return not _login_limiter.allow(key)
 
 
 def _branch_of(db: sqlite3.Connection, branch_id: Optional[int]) -> Optional[sqlite3.Row]:
@@ -71,8 +69,21 @@ def list_branches():
     return {"items": [dict(r) for r in rows]}
 
 
+def _auth_response(user: sqlite3.Row, branch: Optional[sqlite3.Row], token: str,
+                   request: Request, response: Response) -> dict:
+    """Bearer для машинных клиентов; cookie для браузера."""
+    if request.headers.get("x-client-type") == "api":
+        return {"token": token, "user": user_payload(user, branch)}
+    csrf = secrets.token_urlsafe(32)
+    response.headers.append("set-cookie", session_cookie(token))
+    response.headers.append("set-cookie", csrf_cookie(csrf))
+    return {"user": user_payload(user, branch)}
+
+
 @router.post("/register", status_code=201)
-def register(data: RegisterIn, db: sqlite3.Connection = Depends(get_db)):
+def register(data: RegisterIn, request: Request, response: Response, db: sqlite3.Connection = Depends(get_db)):
+    if not _register_limiter.allow(_ip(request)):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Слишком много регистраций — повторите позже")
     exists = db.execute("SELECT id FROM users WHERE email = ?", (data.email.lower(),)).fetchone()
     if exists:
         raise HTTPException(status.HTTP_409_CONFLICT, "Пользователь с таким email уже есть")
@@ -87,8 +98,8 @@ def register(data: RegisterIn, db: sqlite3.Connection = Depends(get_db)):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Код приглашения не найден")
         if invite["used_by"] is not None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Код приглашения уже использован")
-        # С.3: срок действия кода (tools/make_invite.py --days). Коды, созданные до
-        # миграции (expires_at IS NULL), остаются бессрочными — срок им не назначаем задним числом.
+        # У всех новых кодов обязателен срок действия. NULL допускается только
+        # для записей, созданных до миграции expires_at (см. test_access_contour).
         if invite["expires_at"] and invite["expires_at"] <= datetime.now(timezone.utc).isoformat():
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Срок действия кода приглашения истёк")
         role = "doctor"
@@ -116,36 +127,47 @@ def register(data: RegisterIn, db: sqlite3.Connection = Depends(get_db)):
     # после ответа, и клиент успевает сделать следующий запрос без этих данных
     db.commit()
     user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    return {"token": token, "user": user_payload(user, branch)}
+    record(db, "auth.register", user_id=user_id, entity="user", entity_id=user_id,
+           ip=_ip(request), user_agent=request.headers.get("user-agent"))
+    db.commit()
+    return _auth_response(user, branch, token, request, response)
 
 
 @router.post("/login")
-def login(data: LoginIn, request: Request, db: sqlite3.Connection = Depends(get_db)):
+def login(data: LoginIn, request: Request, response: Response, db: sqlite3.Connection = Depends(get_db)):
+    if not _login_ip_limiter.allow(_ip(request)):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Слишком много попыток входа с этого адреса")
     key = _login_key(data.email, request)
     if _login_blocked(key):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,
                             "Слишком много попыток входа — подождите 15 минут")
     user = db.execute("SELECT * FROM users WHERE email = ?", (data.email.lower(),)).fetchone()
-    if user is None or not auth.verify_password(data.password, user["password_hash"]):
-        _LOGIN_FAILS.setdefault(key, []).append(time.time())
+    password_hash = user["password_hash"] if user else _DUMMY_PASSWORD_HASH
+    password_ok = auth.verify_password(data.password, password_hash)
+    if user is None or not password_ok:
+        # Общий ответ и одинаковый PBKDF2 для несуществующего email.
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный email или пароль")
     # С.3: отключённому пользователю (tools/disable_user.py) новых сессий не выдаём —
     # проверка после пароля, чтобы статус аккаунта не раскрывался до аутентификации
     if user["disabled"]:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Аккаунт отключён — обратитесь к администратору клиники")
-    _LOGIN_FAILS.pop(key, None)
     # попутно убираем истёкшие сессии пользователя
     db.execute("DELETE FROM sessions WHERE user_id = ? AND expires_at <= ?",
                (user["id"], datetime.now(timezone.utc).isoformat()))
     token = auth.create_session(db, user["id"])
-    db.commit()  # см. комментарий в register
-    return {"token": token, "user": user_payload(user, _branch_of(db, user["branch_id"]))}
+    record(db, "auth.login", user_id=user["id"], entity="user", entity_id=user["id"],
+           ip=_ip(request), user_agent=request.headers.get("user-agent"))
+    db.commit()
+    return _auth_response(user, _branch_of(db, user["branch_id"]), token, request, response)
 
 
 @router.post("/logout")
-def logout(credentials=Depends(auth.bearer_scheme)):
-    if credentials:
-        auth.delete_session(credentials.credentials)
+def logout(request: Request, response: Response, credentials=Depends(auth.bearer_scheme)):
+    token = credentials.credentials if credentials else request.cookies.get(SESSION_COOKIE)
+    if token:
+        auth.delete_session(token)
+    for cookie in clear_auth_cookies():
+        response.headers.append("set-cookie", cookie)
     return {"ok": True}
 
 
@@ -160,8 +182,6 @@ def update_me(
     user: sqlite3.Row = Depends(auth.get_current_user),
     db: sqlite3.Connection = Depends(get_db),
 ):
-    if data.branch_id is not None and _branch_of(db, data.branch_id) is None:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Филиал не найден")
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
         return user_payload(user, _branch_of(db, user["branch_id"]))
@@ -170,3 +190,36 @@ def update_me(
     db.commit()  # см. комментарий в register
     fresh = db.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
     return user_payload(fresh, _branch_of(db, fresh["branch_id"]))
+
+
+@router.post("/me/branch")
+def change_branch(
+    data: BranchChangeIn,
+    request: Request,
+    user: sqlite3.Row = Depends(auth.get_current_user),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Осознанный перенос пациента; филиал врача меняет только администратор БД."""
+    if user["role"] != "patient":
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "Смена филиала врача выполняется администратором клиники")
+    if not _branch_change_limiter.allow(f"branch|{user['id']}"):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Слишком много попыток — повторите позже")
+    if not auth.verify_password(data.current_password, user["password_hash"]):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Неверный пароль")
+    branch = _branch_of(db, data.branch_id)
+    if branch is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Филиал не найден")
+    if user["branch_id"] == data.branch_id:
+        return user_payload(user, branch)
+    # Переносим незавершённые записи вместе с пациентом: иначе после смены филиала
+    # пациент видит запись, которую не сможет открыть ни один врач нового филиала.
+    db.execute("UPDATE visits SET branch_id = ? WHERE patient_id = ? AND status = 'planned'",
+               (data.branch_id, user["id"]))
+    db.execute("UPDATE users SET branch_id = ? WHERE id = ?", (data.branch_id, user["id"]))
+    record(db, "patient.branch_change", user_id=user["id"], entity="user", entity_id=user["id"],
+           details={"from_branch_id": user["branch_id"], "to_branch_id": data.branch_id},
+           ip=_ip(request), user_agent=request.headers.get("user-agent"))
+    db.commit()
+    fresh = db.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+    return user_payload(fresh, branch)

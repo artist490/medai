@@ -5,13 +5,12 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .database import db_session
 
-PBKDF2_ITERATIONS = 200_000
-SESSION_TTL_DAYS = 30
+PBKDF2_ITERATIONS = 600_000
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -27,7 +26,9 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, stored: str) -> bool:
     try:
         algo, iterations, salt, digest = stored.split("$")
-        if algo != "pbkdf2_sha256":
+        iterations = int(iterations)
+        # Не позволяем повреждённой записи БД вызвать необоснованно дорогой PBKDF2.
+        if algo != "pbkdf2_sha256" or not 100_000 <= iterations <= 2_000_000:
             return False
         candidate = hashlib.pbkdf2_hmac(
             "sha256", password.encode("utf-8"), salt.encode("utf-8"), int(iterations)
@@ -38,8 +39,9 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def create_session(db: sqlite3.Connection, user_id: int) -> str:
+    from . import config
     token = secrets.token_urlsafe(32)
-    expires = datetime.now(timezone.utc) + timedelta(days=SESSION_TTL_DAYS)
+    expires = datetime.now(timezone.utc) + timedelta(days=config.SESSION_TTL_DAYS)
     db.execute(
         "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)",
         (token, user_id, expires.isoformat()),
@@ -53,12 +55,14 @@ def delete_session(token: str) -> None:
 
 
 def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
 ) -> sqlite3.Row:
-    """Зависимость FastAPI: возвращает пользователя по Bearer-токену."""
-    if credentials is None:
+    """Bearer для машинных клиентов; HttpOnly-cookie для браузера."""
+    from .security import SESSION_COOKIE
+    token = credentials.credentials if credentials else request.cookies.get(SESSION_COOKIE)
+    if not token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Требуется авторизация")
-    token = credentials.credentials
     with db_session() as db:
         row = db.execute(
             """

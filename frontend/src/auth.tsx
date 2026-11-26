@@ -23,10 +23,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!api.getToken()) {
-      setLoading(false)
-      return
-    }
+    // Удаляем токен старой версии: теперь сессия живёт только в HttpOnly-cookie.
+    api.setToken(null)
     api.fetchMe()
       .then(setUser)
       .catch(() => api.setToken(null))

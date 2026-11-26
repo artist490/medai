@@ -6,6 +6,7 @@
 """
 import json
 import logging
+import secrets
 import sqlite3
 from typing import Callable, Optional
 
@@ -13,6 +14,8 @@ from .. import config
 from . import llm as llm_service
 
 logger = logging.getLogger("medai.chat")
+# Секрет живёт в памяти процесса и не сохраняется в БД/ответах API.
+_chat_hmac_key = secrets.token_bytes(32)
 
 MAX_TOOL_ROUNDS = 6
 HISTORY_LIMIT = 12  # сколько последних сообщений подаём модели
@@ -183,7 +186,7 @@ def _get_profile(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
     profile = {
         "пациент": llm_service.patient_alias(user["id"], user["age"]),
         "height_cm": row["height_cm"],
-        "branch_city": row["branch_city"],
+        # Город/филиал не нужен для интерпретации замеров — не передаём его.
     }
     return json.dumps(profile, ensure_ascii=False)
 
@@ -350,7 +353,7 @@ def _exec_patients_overview(db: sqlite3.Connection, doctor: sqlite3.Row, _: dict
     items = []
     for r in rows:
         items.append({
-            "id": r["id"],
+            "id": _anonymous_patient_id(r["id"]),
             "пациент": llm_service.patient_alias(r["id"], r["age"]),
             "last_measurement_at": r["last_measurement_at"],
             "last_risk": r["last_risk"],
@@ -358,22 +361,41 @@ def _exec_patients_overview(db: sqlite3.Connection, doctor: sqlite3.Row, _: dict
     return json.dumps(items, ensure_ascii=False, default=str)
 
 
+def _anonymous_patient_id(patient_id: int) -> int:
+    """Положительный HMAC-псевдоним только для одного чата; не ID БД."""
+    import hashlib
+    import hmac
+    return int.from_bytes(hmac.new(
+        _chat_hmac_key, str(patient_id).encode(), hashlib.sha256
+    ).digest()[:4], "big")
+
+
+def _resolve_patient_id(db: sqlite3.Connection, doctor: sqlite3.Row, value: object) -> int:
+    try:
+        anonymous_id = int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+    rows = db.execute("SELECT id FROM users WHERE role = 'patient' AND branch_id IS ?",
+                      (doctor["branch_id"],)).fetchall()
+    return next((row["id"] for row in rows if _anonymous_patient_id(row["id"]) == anonymous_id), 0)
+
+
 def _exec_patient_measurements(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
-    patient = _doctor_guard(db, doctor, int(args.get("patient_id") or 0))
+    patient = _doctor_guard(db, doctor, _resolve_patient_id(db, doctor, args.get("patient_id")))
     if patient is None:
         return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
     return _recent_measurements(db, patient["id"], args)
 
 
 def _exec_patient_last_analysis(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
-    patient = _doctor_guard(db, doctor, int(args.get("patient_id") or 0))
+    patient = _doctor_guard(db, doctor, _resolve_patient_id(db, doctor, args.get("patient_id")))
     if patient is None:
         return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
     return _last_analysis(db, patient["id"], args)
 
 
 def _exec_patient_medcard(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
-    patient = _doctor_guard(db, doctor, int(args.get("patient_id") or 0))
+    patient = _doctor_guard(db, doctor, _resolve_patient_id(db, doctor, args.get("patient_id")))
     if patient is None:
         return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
     row = db.execute(
@@ -385,7 +407,7 @@ def _exec_patient_medcard(db: sqlite3.Connection, doctor: sqlite3.Row, args: dic
 
 
 def _exec_patient_visits(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
-    patient = _doctor_guard(db, doctor, int(args.get("patient_id") or 0))
+    patient = _doctor_guard(db, doctor, _resolve_patient_id(db, doctor, args.get("patient_id")))
     if patient is None:
         return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
     rows = db.execute(
@@ -399,7 +421,7 @@ def _exec_patient_visits(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict
 
 
 def _exec_patient_documents(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
-    patient = _doctor_guard(db, doctor, int(args.get("patient_id") or 0))
+    patient = _doctor_guard(db, doctor, _resolve_patient_id(db, doctor, args.get("patient_id")))
     if patient is None:
         return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
     rows = db.execute(
@@ -434,8 +456,8 @@ def _exec_patients_needing_attention(db: sqlite3.Connection, doctor: sqlite3.Row
         findings = json.loads(r["findings"] or "[]")
         top = next((f for f in findings if f.get("status") == "alarm"), None)
         items.append({
-            "patient_id": r["patient_id"],
-            # F034: вместо реального имени — «Пациент N, X лет»
+            # F034: ни реального имени, ни ID внутренней БД во внешний LLM.
+            "id": _anonymous_patient_id(r["patient_id"]),
             "пациент": llm_service.patient_alias(r["patient_id"], r["age"]),
             "recorded_at": r["recorded_at"],
             "risk_level": r["risk_level"],

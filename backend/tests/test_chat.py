@@ -18,7 +18,7 @@ from app.services import chat_agent
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
     database.init_db()
-    with TestClient(app) as c:
+    with TestClient(app, headers={"X-Client-Type": "api"}) as c:
         yield c
 
 
@@ -26,7 +26,7 @@ def _register(c: TestClient, email: str, **extra) -> dict:
     # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
     extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
-        "email": email, "password": "secret1", "name": "Тест", **extra,
+        "email": email, "password": "test-password-2026", "name": "Тест", **extra,
     })
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -186,10 +186,10 @@ class TestChatAgent:
         tool_msg = [m for m in mock.calls[1]["messages"] if m["role"] == "tool"][0]
         patients = json.loads(tool_msg["content"])
         assert len(patients) == 1
-        assert patients[0]["id"] == p_vrn["user"]["id"]
+        assert patients[0]["id"] == chat_agent._anonymous_patient_id(p_vrn["user"]["id"])
         # сравниваем по полю id, а не подстрокой: цифра id может совпасть
         # с цифрой в таймстампе замера (флейкий тест до правки)
-        assert p_bg["user"]["id"] not in [pt["id"] for pt in patients]
+        assert chat_agent._anonymous_patient_id(p_bg["user"]["id"]) not in [pt["id"] for pt in patients]
 
     def test_unknown_tool_rejected(self, client, monkeypatch):
         p = _register(client, "p6@test.ru")
@@ -381,7 +381,7 @@ class TestDoctorToolsExtended:
         db = connect()
         doc_row = db.execute("SELECT * FROM users WHERE email = ?", ("dv@test.ru",)).fetchone()
         rows = json.loads(chat_agent._exec_patient_visits(
-            db, doc_row, {"patient_id": pat["user"]["id"]}))
+            db, doc_row, {"patient_id": chat_agent._anonymous_patient_id(pat["user"]["id"])}))
         db.close()
         assert len(rows) == 1
         assert rows[0]["reason"] == "Осмотр"
@@ -396,7 +396,7 @@ class TestDoctorToolsExtended:
         db = connect()
         doc_row = db.execute("SELECT * FROM users WHERE email = ?", ("dv2@test.ru",)).fetchone()
         result = json.loads(chat_agent._exec_patient_visits(
-            db, doc_row, {"patient_id": foreign["user"]["id"]}))
+            db, doc_row, {"patient_id": chat_agent._anonymous_patient_id(foreign["user"]["id"])}))
         db.close()
         assert "error" in result
 
@@ -414,9 +414,10 @@ class TestDoctorToolsExtended:
         doc_row = db.execute("SELECT * FROM users WHERE email = ?", ("dv3@test.ru",)).fetchone()
         rows = json.loads(chat_agent._exec_patients_needing_attention(db, doc_row, {"days": 30}))
         db.close()
-        ids = [r["patient_id"] for r in rows]
-        assert bad["user"]["id"] in ids
-        assert good["user"]["id"] not in ids
+        assert all("patient_id" not in r for r in rows)
+        assert len(rows) == 1
+        assert rows[0]["id"] == chat_agent._anonymous_patient_id(bad["user"]["id"])
+        assert all(r["id"] != chat_agent._anonymous_patient_id(good["user"]["id"]) for r in rows)
 
 
 class TestChatDeidentified:
@@ -459,7 +460,7 @@ class TestChatDeidentified:
         assert "Демо" not in joined
         assert "женский" not in joined  # пол — тоже ПДн
         assert "Ирина Ивановна" not in joined  # имя врача модели не нужно
-        assert f"Пациент {p['user']['id']}, 46 лет" in joined
+        assert "Пациент, 46 лет" in joined
 
     def test_doctor_tool_results_deidentified(self, client, monkeypatch):
         branches = client.get("/api/auth/branches").json()["items"]
@@ -488,7 +489,7 @@ class TestChatDeidentified:
         assert "Демо" not in joined
         assert "Мария" not in joined
         assert "Сидорова" not in joined
-        # обезличенные подписи с id на месте — модель может вызвать get_patient_*
-        assert f"Пациент {bad['user']['id']}, 46 лет" in joined
-        assert f"Пациент {good['user']['id']}" in joined
+        # ID записей БД не нужен модели и не передаётся внешнему обработчику.
+        assert "Пациент, 46 лет" in joined
+        assert "Пациент" in joined
 

@@ -36,7 +36,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "LLM_API_KEY", "")  # без сети: анализ только по правилам
     database.init_db()
-    with TestClient(app) as c:
+    with TestClient(app, headers={"X-Client-Type": "api"}) as c:
         yield c
 
 
@@ -44,7 +44,7 @@ def _register(c: TestClient, email: str, **extra) -> dict:
     # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
     extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
-        "email": email, "password": "secret1", "name": "Тест", **extra,
+        "email": email, "password": "test-password-2026", "name": "Тест", **extra,
     })
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -86,7 +86,7 @@ class TestBranchRequired:
 
     def test_patient_without_branch_422(self, client):
         resp = client.post("/api/auth/register", json={
-            "email": "nb1@test.ru", "password": "secret1", "name": "Без филиала",
+            "email": "nb1@test.ru", "password": "test-password-2026", "name": "Без филиала",
         })
         assert resp.status_code == 422
         db = _db()
@@ -98,7 +98,7 @@ class TestBranchRequired:
         """Отказ не расходует одноразовый код: регистрация с филиалом возможна."""
         _make_invite("inv-nb")
         resp = client.post("/api/auth/register", json={
-            "email": "nb2@test.ru", "password": "secret1", "invite_code": "inv-nb",
+            "email": "nb2@test.ru", "password": "test-password-2026", "invite_code": "inv-nb",
         })
         assert resp.status_code == 422
         db = _db()
@@ -126,7 +126,7 @@ class TestInviteExpiry:
         past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
         _make_invite("inv-expired", past)
         resp = client.post("/api/auth/register", json={
-            "email": "exp1@test.ru", "password": "secret1", "invite_code": "inv-expired",
+            "email": "exp1@test.ru", "password": "test-password-2026", "invite_code": "inv-expired",
             "branch_id": 1,
         })
         assert resp.status_code == 422
@@ -202,7 +202,7 @@ class TestDisabledUser:
         db.commit()
         db.close()
         before = _sessions_count(p["user"]["id"])
-        r = client.post("/api/auth/login", json={"email": "dis2@test.ru", "password": "secret1"})
+        r = client.post("/api/auth/login", json={"email": "dis2@test.ru", "password": "test-password-2026"})
         assert r.status_code == 403
         assert _sessions_count(p["user"]["id"]) == before  # новых сессий отключённому не выдаётся
 
@@ -227,11 +227,11 @@ class TestDisabledUser:
         tool = _load_tool("disable_user")
         assert tool.main(["doc2@test.ru"]) == 0
         assert client.post("/api/auth/login",
-                           json={"email": "doc2@test.ru", "password": "secret1"}).status_code == 403
+                           json={"email": "doc2@test.ru", "password": "test-password-2026"}).status_code == 403
 
         assert tool.main(["doc2@test.ru", "--enable"]) == 0
         assert _user_column("doc2@test.ru", "disabled") == 0
-        r = client.post("/api/auth/login", json={"email": "doc2@test.ru", "password": "secret1"})
+        r = client.post("/api/auth/login", json={"email": "doc2@test.ru", "password": "test-password-2026"})
         assert r.status_code == 200
         me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {r.json()['token']}"})
         assert me.status_code == 200  # свежий токен снова работает

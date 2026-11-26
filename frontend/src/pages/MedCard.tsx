@@ -62,22 +62,22 @@ export default function MedCard() {
     api.fetchMyVisits().then((d) => setVisits(d.items)).catch(() => {})
     api.listMeasurements(30).then((d) => setItems(d.items)).catch(() => {})
     loadGoals()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   if (error && !card) {
     return (
-      <div className="bg-white rounded-lg p-8 text-center glow-coral">
-        <p className="font-bold text-coral-dark">{error}</p>
+      <div className="panel p-8 text-center">
+        <p className="text-[13.5px] text-coral-dark">{error}</p>
       </div>
     )
   }
   if (!card) {
     return (
       <div className="flex flex-col gap-6" aria-busy>
-        <Skeleton w="42%" h={30} r={10} />
+        <Skeleton w="42%" h={26} r={4} />
         <div className="flex gap-2">
-          {TABS.map((tb) => <Skeleton key={tb.id} w={112} h={32} r={999} />)}
+          {TABS.map((tb) => <Skeleton key={tb.id} w={104} h={30} r={6} />)}
         </div>
         <SkeletonCard lines={4} />
         <SkeletonCard lines={3} />
@@ -134,10 +134,12 @@ export default function MedCard() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title={<>Медкарта <Icon name="care" size={26} className="inline-block align-[-4px]" /></>}
+        eyebrow="История и документы"
+        title="Медкарта"
+        sub="Риск по системам организма, приёмы у врача, анкета и замеры."
         actions={<button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Печать карты</button>}
       />
-      {/* Вкладки с перетекающей активной пилюлей */}
+      {/* Вкладки с перетекающим индикатором */}
       <FlowTabs
         ariaLabel="Разделы медкарты"
         items={TABS.map((tb) => ({ id: tb.id, label: tb.label, icon: <Icon name={tb.icon} size={14} /> }))}
@@ -146,16 +148,19 @@ export default function MedCard() {
       />
 
       {/* Содержимое вкладки: пересоздаётся при смене — секции входят каскадом */}
-      <div key={tab} className="tab-enter stagger flex flex-col gap-6">
+      <div key={tab} className="tab-enter flex flex-col gap-6">
         {tab === 'overview' && (
           <>
             <RiskSystems items={items} survey={card.survey} alarmKeys={card.alarm_keys} onBook={bookFromRisk} />
 
             <section id="visits-section">
-              <div className="section-title mb-3 flex items-center gap-2">
-                <span className="emoji-box"><Icon name="calendar" size={20} /></span>
-                <span>Приёмы</span>
-                {plannedCount > 0 && <span className="text-xs font-semibold text-ink-soft">· {plannedCount} запланировано</span>}
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <h2 className="text-[14px] font-medium text-ink">
+                  Приёмы
+                  {plannedCount > 0 && (
+                    <span className="text-ink-soft font-normal"> · {plannedCount} запланировано</span>
+                  )}
+                </h2>
               </div>
 
               <div className="flex flex-col gap-3">
@@ -184,10 +189,10 @@ export default function MedCard() {
                 )}
 
                 {visits.length === 0 && !showVisitForm && (
-                  <div className="bg-white rounded-lg p-6 text-center glow-soft">
-                    <EmptyArt className="mx-auto mb-2" />
-                    <p className="text-base font-bold text-[#1b2622]">Приёмов пока нет</p>
-                    <p className="text-sm text-ink-soft mt-1">
+                  <div className="panel py-10 text-center">
+                    <EmptyArt className="mx-auto mb-3 opacity-70" />
+                    <p className="text-[13.5px] font-medium text-ink">Приёмов пока нет</p>
+                    <p className="text-[12.5px] text-ink-soft mt-1.5 max-w-[44ch] mx-auto leading-relaxed">
                       Запишитесь и опишите жалобы — врач подготовится заранее.
                     </p>
                   </div>
@@ -198,7 +203,7 @@ export default function MedCard() {
                     <VisitCard visit={visit} onChanged={(v) => setVisits((prev) => prev.map((x) => (x.id === v.id ? v : x)))} />
                     {visit.status === 'planned' && !showVisitForm && (
                       <button
-                        className="text-xs font-extrabold text-teal-dark hover:text-teal-deep mt-1 ml-1 min-h-[32px] inline-flex items-center"
+                        className="text-[12px] text-teal-dark hover:underline underline-offset-2 mt-1.5 min-h-[32px] inline-flex items-center"
                         onClick={() => startEdit(visit)}
                       >
                         Изменить жалобу или дату
@@ -213,10 +218,7 @@ export default function MedCard() {
 
         {tab === 'anamnesis' && (
           <section>
-            <div className="section-title mb-3">
-              <span className="emoji-box"><Icon name="check" size={20} /></span>
-              Анкета-анамнез
-            </div>
+            <h2 className="text-[14px] font-medium text-ink mb-3">Анкета-анамнез</h2>
             {showSurvey ? (
               <AnamnesisSurvey
                 initial={card.survey}
@@ -226,18 +228,20 @@ export default function MedCard() {
               />
             ) : (
               <div className="flex flex-col gap-3">
-                <button className="flip-card flip-card--sky flex items-center gap-3 text-left hover:opacity-90 transition-quick"
-                        onClick={() => setShowSurvey(true)}>
-                  <span className="emoji-box"><Icon name="check" size={20} /></span>
+                <button
+                  className="panel flex items-center gap-3 text-left hover:border-[#c4ccc8] transition-quick"
+                  onClick={() => setShowSurvey(true)}
+                >
+                  <Icon name="check" size={18} className="text-teal-dark shrink-0" />
                   <span className="min-w-0">
-                    <span className="block text-sm font-extrabold text-teal-dark">
-                      {card.survey ? 'Пройти опросник Минздрава заново' : 'Пройти опросник Минздрава (5 минут)'}
+                    <span className="block text-[13.5px] font-medium text-ink">
+                      {card.survey ? 'Пройти опросник Минздрава заново' : 'Пройти опросник Минздрава'}
                     </span>
-                    <span className="block text-xs font-bold text-ink-soft">
-                      28 вопросов как на диспансеризации: диагнозы, симптомы, привычки — заполняет форму автоматически
+                    <span className="block text-[12px] text-ink-soft mt-0.5 leading-relaxed">
+                      28 вопросов как на диспансеризации — диагнозы, симптомы, привычки. Занимает около 5 минут.
                     </span>
                   </span>
-                  <Icon name="chevron" size={14} className="ml-auto text-teal-deep" />
+                  <Icon name="chevron" size={14} className="ml-auto text-ink-soft shrink-0" />
                 </button>
                 <AnamnesisForm card={card} />
               </div>
@@ -250,8 +254,8 @@ export default function MedCard() {
             {/* Дневник давления: утро/вечер за неделю */}
             <section className="panel">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <h2 className="text-lg">Дневник давления</h2>
-                <div className="flex gap-2">
+                <h2 className="text-[14px] font-medium text-ink">Дневник давления</h2>
+                <div className="flex flex-wrap gap-2">
                   {(['morning', 'evening'] as const).map((pt) => (
                     <button key={pt} className="btn btn-ghost btn-sm" disabled={diaryBusy !== ''}
                             onClick={async () => {
@@ -267,13 +271,13 @@ export default function MedCard() {
                                 setDiaryBusy('')
                               }
                             }}>
-                      {diaryBusy === pt ? 'Добавляем…' : (pt === 'morning' ? 'Повторить как утренний' : 'Повторить как вечерний')}
+                      {diaryBusy === pt ? 'Добавляем…' : (pt === 'morning' ? 'Повторить утренний' : 'Повторить вечерний')}
                     </button>
                   ))}
                 </div>
               </div>
               {diaryMsg && (
-                <div className={`badge ${diaryMsg.kind === 'ok' ? 'badge-green' : 'badge-red'} normal-case tracking-normal w-fit mb-3`}>
+                <div className={`text-[12.5px] mb-3 ${diaryMsg.kind === 'ok' ? 'text-[#146c43]' : 'text-coral-dark'}`}>
                   {diaryMsg.text}
                 </div>
               )}
@@ -285,7 +289,7 @@ export default function MedCard() {
               <GoalsEditor goals={goals} onSaved={setGoals} loaded={goalsLoaded} />
               {goalsError && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <div className="badge badge-red normal-case tracking-normal">{goalsError}</div>
+                  <div className="text-[12.5px] text-coral-dark">{goalsError}</div>
                   <button className="btn btn-ghost btn-sm" onClick={loadGoals}>Повторить</button>
                 </div>
               )}

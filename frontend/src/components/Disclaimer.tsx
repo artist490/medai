@@ -1,19 +1,19 @@
 // Обязательный дисклеймер на каждом результате анализа.
 import { brand } from '../brand'
-import { Icon } from './Icon'
 
 export default function Disclaimer({ urgent = false, phone }: { urgent?: boolean; phone?: string }) {
   return (
     <div
-      className={`rounded-xl p-3 text-xs leading-relaxed border-2 border-dashed ${
+      className={`border rounded-md px-4 py-3 text-[11.5px] leading-relaxed ${
         urgent
-          ? 'border-coral/40 bg-coral/5 text-coral-dark'
-          : 'border-teal/25 bg-teal-bg/60 text-ink-soft'
+          ? 'border-[#e3c9c6] bg-[#fbf6f5] text-coral-dark'
+          : 'border-line bg-[#fafbfa] text-ink-soft'
       }`}
     >
-      <Icon name="cross" size={12} className="inline-block align-[-1px] mr-1" />{brand.name} не ставит диагнозы и не заменяет консультацию врача. Рекомендации носят
-      информационный характер по здоровому образу жизни. При тревожных показателях обратитесь
-      к специалисту{urgent ? ` или позвоните в клинику: ${phone || brand.phone}` : ''}, при критических — 103.
+      <span className="font-medium">{brand.name} не ставит диагнозы</span> и не заменяет
+      консультацию врача. Рекомендации носят информационный характер и касаются образа
+      жизни. При тревожных показателях обратитесь к специалисту
+      {urgent ? ` или позвоните в клинику: ${phone || brand.phone}` : ''}, при критических — 103.
     </div>
   )
 }

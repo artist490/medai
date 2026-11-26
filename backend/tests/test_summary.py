@@ -17,7 +17,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATABASE_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "LLM_API_KEY", "sk-pv-test-key")
     database.init_db()
-    with TestClient(app) as c:
+    with TestClient(app, headers={"X-Client-Type": "api"}) as c:
         yield c
 
 
@@ -25,7 +25,7 @@ def _register(c: TestClient, email: str, **extra) -> dict:
     # С.3: филиал обязателен на сервере — тестовые пользователи по умолчанию в филиале 1
     extra.setdefault("branch_id", 1)
     resp = c.post("/api/auth/register", json={
-        "email": email, "password": "secret1", "name": "Тест", **extra,
+        "email": email, "password": "test-password-2026", "name": "Тест", **extra,
     })
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -92,7 +92,8 @@ class TestSummary:
         assert "ТРЕВОГА" in seen["payload"]
         # F034: реальное имя пациента в LLM не уходит
         assert "Анна Петровна" not in seen["payload"]
-        assert f"Пациент {p['user']['id']}" in seen["payload"]
+        assert "Пациент" in seen["payload"]
+        assert f"Пациент {p['user']['id']}" not in seen["payload"]
 
     def test_summary_payload_deidentified(self, client, monkeypatch):
         """F034: имя/пол/возраст подменяются на «Пациент N, X лет», клиника остаётся."""
@@ -117,7 +118,8 @@ class TestSummary:
         assert "Анна" not in payload
         assert "Демо" not in payload
         assert "женский" not in payload  # пол — тоже ПДн
-        assert f"Пациент {p['user']['id']}, 46 лет" in payload
+        assert "Пациент, 46 лет" in payload
+        assert f"Пациент {p['user']['id']}" not in payload
         # клинические поля не пострадали
         assert "Давление подскочило" in payload
         assert "Анамнез" in payload
@@ -134,7 +136,9 @@ class TestSummary:
         resp = client.post(f"/api/doctor/patients/{p['user']['id']}/summary", headers=_auth(d))
         assert resp.status_code == 503
 
-    def test_summary_other_branch_404(self, client):
+    def test_summary_other_branch_404(self, client, monkeypatch):
+        import app.services.llm as llm_mod
+        monkeypatch.setattr(llm_mod.httpx, "post", lambda *a, **kw: (_ for _ in ()).throw(AssertionError("network forbidden")))
         d1 = _doctor(client, "invite-s-2", "d2@test.ru", branch_id=1)
         _doctor(client, "invite-s-3", "d3@test.ru", branch_id=2)
         p = _register(client, "p2@test.ru", branch_id=2)

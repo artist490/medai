@@ -3,11 +3,11 @@
 // JSON-заголовка) документы реально доходят до сервера.
 import { useEffect, useRef, useState } from 'react'
 import * as api from '../../api'
-import { getToken, uploadDocument } from '../../api'
+import { uploadDocument } from '../../api'
 import { Icon } from '../../components/Icon'
 import EmptyArt from '../../components/EmptyArt'
 import { Skeleton } from '../../components/Skeleton'
-import type { DocumentItem } from '../../types'
+import type { DocumentItem, OcrResult } from '../../types'
 
 export default function DocumentsTab() {
   const [docs, setDocs] = useState<DocumentItem[] | null>(null)
@@ -16,6 +16,36 @@ export default function DocumentsTab() {
   const [error, setError] = useState('')
   const [listError, setListError] = useState('')
   const fileRef = useRef<HTMLInputElement | null>(null)
+  const [ocrDocId, setOcrDocId] = useState<number | null>(null)
+  const [ocr, setOcr] = useState<OcrResult | null>(null)
+  const [ocrBusy, setOcrBusy] = useState(false)
+
+  useEffect(() => {
+    if (ocrDocId === null || !ocr || !['pending', 'processing'].includes(ocr.status)) return
+    const timer = window.setTimeout(() => {
+      api.fetchDocumentOcr(ocrDocId).then((result) => {
+        setOcr(result)
+        setDocs((prev) => prev?.map((d) => d.id === ocrDocId ? { ...d, ocr: result } : d) ?? prev)
+      }).catch((e) => setError(e instanceof Error ? e.message : 'Не удалось проверить OCR'))
+    }, 2000)
+    return () => window.clearTimeout(timer)
+  }, [ocrDocId, ocr])
+
+  async function recognize(doc: DocumentItem) {
+    setOcrDocId(doc.id)
+    setOcrBusy(true)
+    setError('')
+    try {
+      let result = doc.ocr
+      if (result.status === 'ready') result = await api.fetchDocumentOcr(doc.id)
+      else result = await api.startDocumentOcr(doc.id)
+      setOcr(result)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Серверный OCR недоступен')
+    } finally {
+      setOcrBusy(false)
+    }
+  }
 
   function loadDocs() {
     setListError('')
@@ -27,7 +57,7 @@ export default function DocumentsTab() {
 
   useEffect(() => {
     loadDocs()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   async function upload() {
@@ -48,7 +78,7 @@ export default function DocumentsTab() {
 
   async function download(doc: DocumentItem) {
     const resp = await fetch('/api/documents/' + doc.id + '/download', {
-      headers: { Authorization: 'Bearer ' + getToken() },
+      credentials: 'same-origin',
     })
     if (!resp.ok) return
     const blob = await resp.blob()
@@ -93,8 +123,38 @@ export default function DocumentsTab() {
         <button className="btn btn-gold w-fit" disabled={busy}>
           {busy ? 'Загружаем…' : 'Загрузить документ'}
         </button>
-        <div className="flip-hint">PDF или фото до 8 МБ. Документы видны только вам.</div>
+        <div className="flip-hint">PDF или фото до 8 МБ. Документы видны только вам.
+          OCR выполняется локально на сервере клиники, без внешнего API.</div>
       </form>
+
+      {ocrDocId !== null && ocr && (ocr.status !== 'disabled' || !ocr.enabled) && (
+        <section className="bg-white rounded-xl p-5 border border-[#e4ebe9]" aria-live="polite">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-bold">Серверное распознавание</h3>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setOcrDocId(null); setOcr(null) }}>Закрыть</button>
+          </div>
+          {!ocr.enabled ? (
+            <p className="text-sm text-ink-soft mt-3">OCR не настроен на сервере. Обратитесь к администратору клиники.</p>
+          ) : ['pending', 'processing'].includes(ocr.status) ? (
+            <p className="text-sm text-ink-soft mt-3">
+              {ocr.status === 'pending' ? 'Документ в очереди на распознавание…' : 'Обрабатываем документ на сервере…'}
+            </p>
+          ) : ocr.status === 'failed' ? (
+            <>
+              <div className="badge badge-red normal-case tracking-normal mt-3">{ocr.error ?? 'Ошибка распознавания'}</div>
+              <button className="btn btn-ghost btn-sm mt-3" disabled={ocrBusy}
+                      onClick={() => { const doc = docs?.find((d) => d.id === ocrDocId); if (doc) recognize(doc) }}>
+                Повторить распознавание
+              </button>
+            </>
+          ) : ocr.status === 'ready' ? (
+            <>
+              <p className="flip-hint mt-2">Проверьте текст: OCR может ошибаться. Ничего не добавлено в медкарту автоматически.</p>
+              <pre className="mt-3 max-h-[420px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#f6faf8] p-4 text-sm">{ocr.text}</pre>
+            </>
+          ) : <p className="text-sm text-ink-soft mt-3">Нажмите «Распознать» у нужного документа.</p>}
+        </section>
+      )}
 
       {listError ? (
         <div className="flex flex-col items-start gap-3">
@@ -134,7 +194,13 @@ export default function DocumentsTab() {
                   {fmtSize(d.size)} · {d.uploaded_at.slice(0, 16).replace('T', ' ')}
                 </div>
               </div>
-              <button className="btn btn-ghost btn-sm ml-auto" onClick={() => download(d)} aria-label={'Скачать ' + d.title}>
+              <button className="btn btn-ghost btn-sm ml-auto" onClick={() => recognize(d)}
+                      disabled={ocrBusy || (!d.ocr.enabled && d.ocr.status !== 'ready')}
+                      title={d.ocr.status === 'ready' ? 'Показать распознанный текст' : d.ocr.enabled ? 'Распознать на сервере клиники' : 'Серверный OCR не включён'}
+                      aria-label={'Распознать ' + d.title}>
+                <Icon name="sparkle" size={16} />
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => download(d)} aria-label={'Скачать ' + d.title}>
                 <Icon name="download" size={16} />
               </button>
               <button className="btn btn-ghost btn-sm text-coral" onClick={() => remove(d)} aria-label={'Удалить ' + d.title}>

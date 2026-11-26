@@ -91,6 +91,18 @@ export interface DocumentItem {
   mime: string
   size: number
   uploaded_at: string
+  ocr: OcrResult
+}
+
+export type OcrStatus = 'disabled' | 'pending' | 'processing' | 'ready' | 'failed'
+export interface OcrResult {
+  status: OcrStatus
+  error: string | null
+  engine: string | null
+  enabled: boolean
+  started_at: string | null
+  finished_at: string | null
+  text?: string | null
 }
 
 export interface DoctorSignal {

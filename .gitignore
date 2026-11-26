@@ -4,9 +4,13 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .env
 backend/.env
 backend/medai.db
+backend/*.db
+backend/*.db.bak-*
 *.db-wal
 *.db-shm
 
@@ -26,3 +30,28 @@ tools/input/
 
 # pmtiles CLI (скачивается с github.com/protomaps/go-pmtiles/releases, 58 МБ)
 tools/bin/
+certs/
+*.pem
+*.key
+!certs/.gitkeep
+
+# --- Посторонние проекты и бэкапы в рабочей папке (не часть medai) ---
+*.zip
+dsh-our-free-model/
+dsh-lean-context/
+dsh-usage-dashboard/
+blog-agent/
+telegram-api-proxy/
+moscow-3d-standalone/
+gui-test-screenshots/
+*-backup-*/
+tools/backup/
+tools/*.ps1
+ofm-*
+pollinations-test.jpg
+
+# --- Веса OCR-модели намеренно в репозитории: backend/models/ocria-nano ---
+# Не добавляйте сюда правила для *.onnx / backend/models: проект должен
+# работать сразу после клонирования. Лицензия модели — в
+# backend/models/ocria-nano/LICENSE (см. OCR_SETUP.md).
+workshop-README.md

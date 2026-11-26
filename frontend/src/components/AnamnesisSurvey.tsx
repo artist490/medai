@@ -3,7 +3,6 @@
 // контент — официальные вопросы, сокращённые для приложения.
 // Результат — JSON в patient_cards.survey + человекочитаемый chronic.
 import { useMemo, useState } from 'react'
-import { Icon } from './Icon'
 
 export type SurveyAnswers = Record<string, boolean | number | string>
 
