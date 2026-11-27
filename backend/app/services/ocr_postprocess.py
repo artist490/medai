@@ -4,6 +4,9 @@
 
 * markdown-мусор LiteParse (таблицы с ``|``, заголовки ``#``, ``**``) превращается
   в выровненный обычный текст;
+* HTML-таблицы бланков (LiteParse 2.21 отдаёт их как ``<table><tr><td>``) разбираются
+  в те же выровненные колонки; строка-заголовок на всю ширину (``colspan``) выходит
+  отдельной строкой, ``rowspan`` учитывается резервированием колонок;
 * типовые ошибки распознавания единиц измерения исправляются только в контексте
   «число + единица» (например ``145 r/n`` → ``145 г/л``);
 * разорванные строки склеиваются, лишние пустые строки убираются.
@@ -14,6 +17,7 @@
 ``text_raw`` — постобработка ничего не теряет.
 """
 import re
+from html import unescape
 
 # Неразрывный пробел, мягкий перенос и zero-width символы — от LiteParse.
 _INVISIBLE = dict.fromkeys(map(ord, "\u00a0\u00ad\u200b\u200c\u200d\ufeff"), " ")
@@ -45,6 +49,8 @@ _UNIT_RULES = (
                 re.IGNORECASE), "10^12/л"),
     # мм/ч, ММ/Ч, MM/ч → мм/ч (латинская M в OCR неотличима от кириллической М)
     (re.compile(r"(?<=\d)[ \t]*[мmМM]{2}[ \t]*[/|][ \t]*[чЧ](?![\w/])", re.IGNORECASE), " мм/ч"),
+    # 24.7 nr → 24.7 пг: пикограммы (пг) OCR стабильно читает латиницей n/r
+    (re.compile(r"(?<=\d)[ \t]*[nпП][ \t]*[rгГ](?![\w/])"), " пг"),
     # Общий случай: «число/n» → «число/л». Срабатывает последним, только на
     # латинской «n» после косой черты и только у чисел от двух цифр или с
     # дробной частью — поэтому дозировки вида «2/n» не переписываются.
@@ -80,6 +86,97 @@ def _join_hyphenation(text: str) -> str:
     return _HYPHEN_BREAK.sub(r"\1\2", text)
 
 
+# --- HTML-таблицы бланков (LiteParse 2.21): <table><tr><td>… → выровненные колонки ---
+
+_TABLE_BLOCK = re.compile(r"<table[^>]*>.*?</table>", re.IGNORECASE | re.DOTALL)
+_HTML_ROW = re.compile(r"<tr[^>]*>(.*?)</tr>", re.IGNORECASE | re.DOTALL)
+_HTML_CELL = re.compile(r"<t[dh]([^>]*)>(.*?)</t[dh]>", re.IGNORECASE | re.DOTALL)
+_HTML_COLSPAN = re.compile(r"\bcolspan=[\"']?(\d+)", re.IGNORECASE)
+_HTML_ROWSPAN = re.compile(r"\browspan=[\"']?(\d+)", re.IGNORECASE)
+_HTML_TAG = re.compile(r"<[^>]+>")
+_HTML_BREAK = re.compile(r"<br[^>]*/?>", re.IGNORECASE)
+_RUN_SPACES = re.compile(r"\s+")
+
+
+def _cell_text(body: str) -> str:
+    """Текст ячейки без разметки: теги и <br> — в пробел, мнемоники раскрываются."""
+    text = _HTML_BREAK.sub(" ", body)
+    text = _HTML_TAG.sub(" ", text)
+    return _RUN_SPACES.sub(" ", unescape(text)).strip()
+
+
+def _html_table_rows(block: str) -> list[tuple[list[str], int]]:
+    """Строки таблицы: (ячейки с учётом rowspan-резервов, своя ширина по colspan)."""
+    rows: list[tuple[list[str], int]] = []
+    reserved: dict[tuple[int, int], str] = {}
+    for row_idx, row_html in enumerate(_HTML_ROW.findall(block)):
+        cursor = 0
+        cells: list[str] = []
+        own_span = 0
+        for attrs, body in _HTML_CELL.findall(row_html):
+            while (row_idx, cursor) in reserved:
+                cells.append(reserved.pop((row_idx, cursor)))
+                cursor += 1
+            colspan = int(m.group(1)) if (m := _HTML_COLSPAN.search(attrs)) else 1
+            rowspan = int(m.group(1)) if (m := _HTML_ROWSPAN.search(attrs)) else 1
+            cells.append(_cell_text(body))
+            own_span += colspan
+            for r in range(1, rowspan):
+                for c in range(colspan):
+                    reserved.setdefault((row_idx + r, cursor + c), "")
+            cursor += colspan
+        while (row_idx, cursor) in reserved:
+            cells.append(reserved.pop((row_idx, cursor)))
+            cursor += 1
+        rows.append((cells, own_span))
+    return rows
+
+
+def _format_html_tables(text: str) -> str:
+    """<table>-блоки → обычный текст: колонки выровнены, строка-заголовок
+    на всю ширину (одна ячейка с colspan по всей ширине) идёт отдельной строкой.
+    Содержимое ячеек не изменяется — только разметка и выравнивание.
+    Пустые ячейки выводятся как «—», как на бумажном бланке: иначе при
+    выравнивании пустая колонка схлопывается и строка теряет позицию."""
+
+    def convert(match: re.Match[str]) -> str:
+        rows = _html_table_rows(match.group(0))
+        if not rows:
+            return ""
+        width = max(own_span for _, own_span in rows)
+        if width <= 0:
+            return ""
+        items: list[tuple[str, list[str]]] = []
+        for cells, own_span in rows:
+            # Заголовок раздела: единственная содержательная ячейка на всю ширину.
+            if len(cells) == 1 and own_span >= width and cells[0]:
+                items.append(("text", [cells[0]]))
+            elif any(cells):
+                items.append(("grid", list(cells) + [""] * (width - len(cells))))
+        columns = [0] * width
+        for _, row in items:
+            if len(row) == width:
+                for index, cell in enumerate(row):
+                    columns[index] = max(columns[index], len(cell or "—"))
+        parts: list[str] = []
+        grid_block: list[str] = []
+        for kind, row in items:
+            if kind == "text":
+                if grid_block:
+                    parts.append("\n".join(grid_block))
+                    grid_block = []
+                parts.append(row[0])
+            else:
+                grid_block.append("  ".join(
+                    (row[index] or "—").ljust(columns[index]) for index in range(width)
+                ).rstrip())
+        if grid_block:
+            parts.append("\n".join(grid_block))
+        return "\n\n".join(parts)
+
+    return _TABLE_BLOCK.sub(convert, text)
+
+
 def _format_tables(text: str) -> str:
     """Markdown-таблицы → выровненные колонки обычного текста."""
     out: list[str] = []
@@ -107,7 +204,7 @@ def _format_tables(text: str) -> str:
                 columns[index] = max(columns[index], len(cell))
         for row in rows:
             padded = [
-                (row[index] if index < len(row) else "").ljust(columns[index])
+                (row[index] if index < len(row) else "—").ljust(columns[index])
                 for index in range(width)
             ]
             out.append("  ".join(padded).rstrip())
@@ -159,6 +256,7 @@ def clean(text: str) -> str:
     result = text.replace("\r\n", "\n").replace("\r", "\n")
     result = _strip_invisible(result)
     result = _strip_markdown(result)
+    result = _format_html_tables(result)
     result = _join_hyphenation(result)
     result = _format_tables(result)
     result = _fix_units(result)
