@@ -1,10 +1,17 @@
 """Точка входа FastAPI: сборка приложения, CORS, раздача фронта."""
 import logging
+import mimetypes
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+# Windows: тип для .mjs берётся из реестра и часто оказывается text/plain —
+# с nosniff браузер отказывается исполнять такой модульный воркер MapLibre
+# (карта инициализируется, но тайлы не рисуются). Регистрируем явно.
+mimetypes.add_type("text/javascript", ".mjs")
+mimetypes.add_type("text/javascript", ".js")
 
 from . import config
 from .database import init_db
@@ -61,7 +68,21 @@ def health():
 if config.FRONTEND_DIST.is_dir():
     assets = config.FRONTEND_DIST / "assets"
     if assets.is_dir():
-        app.mount("/assets", StaticFiles(directory=assets), name="assets")
+        class _RevalidateStaticFiles(StaticFiles):
+            """Статика фронтенда с cache-control: no-cache.
+
+            Без явного заголовка браузер кэширует ответы эвристически: после
+            обновления сервера (например, исправленный content-type воркера
+            MapLibre) страница продолжает жить со старой копией из кэша.
+            no-cache дёшев: файл не менялся — сервер отвечает 304.
+            """
+
+            def file_response(self, *args, **kwargs):
+                response = super().file_response(*args, **kwargs)
+                response.headers["cache-control"] = "no-cache"
+                return response
+
+        app.mount("/assets", _RevalidateStaticFiles(directory=assets), name="assets")
 
     @app.get("/{full_path:path}")
     def spa(full_path: str):
@@ -72,5 +93,5 @@ if config.FRONTEND_DIST.is_dir():
         # файлы, реально лежащие внутри dist; всё остальное — index.html.
         candidate = (config.FRONTEND_DIST / full_path).resolve()
         if candidate.is_file() and candidate.is_relative_to(config.FRONTEND_DIST):
-            return FileResponse(candidate)
-        return FileResponse(config.FRONTEND_DIST / "index.html")
+            return FileResponse(candidate, headers={"cache-control": "no-cache"})
+        return FileResponse(config.FRONTEND_DIST / "index.html", headers={"cache-control": "no-cache"})

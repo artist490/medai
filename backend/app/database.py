@@ -19,7 +19,10 @@ CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     email         TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    name          TEXT NOT NULL DEFAULT '',
+    name          TEXT NOT NULL DEFAULT '',  -- отображаемое ФИО, пересобирается из частей при записи
+    first_name    TEXT NOT NULL DEFAULT '',  -- имя
+    last_name     TEXT NOT NULL DEFAULT '',  -- фамилия
+    middle_name   TEXT NOT NULL DEFAULT '',  -- отчество (может быть пустым)
     age           INTEGER,
     sex           TEXT CHECK (sex IN ('male', 'female') OR sex IS NULL),
     height_cm     REAL,
@@ -212,6 +215,9 @@ CREATE TABLE users_new (
     email         TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     name          TEXT NOT NULL DEFAULT '',
+    first_name    TEXT NOT NULL DEFAULT '',
+    last_name     TEXT NOT NULL DEFAULT '',
+    middle_name   TEXT NOT NULL DEFAULT '',
     age           INTEGER,
     sex           TEXT CHECK (sex IN ('male', 'female') OR sex IS NULL),
     height_cm     REAL,
@@ -248,9 +254,11 @@ def _rebuild_users(db: sqlite3.Connection) -> None:
         db.execute(_USERS_REBUILD_DDL)
         db.execute(
             """INSERT INTO users_new
-                   (id, email, password_hash, name, age, sex, height_cm,
-                    role, branch_id, disabled, created_at)
-               SELECT id, email, password_hash, name, age, sex, height_cm,
+                   (id, email, password_hash, name, first_name, last_name, middle_name,
+                    age, sex, height_cm, role, branch_id, disabled, created_at)
+               SELECT id, email, password_hash, name,
+                      COALESCE(first_name, ''), COALESCE(last_name, ''), COALESCE(middle_name, ''),
+                      age, sex, height_cm,
                       COALESCE(role, 'patient'), branch_id,
                       COALESCE(disabled, 0),
                       COALESCE(created_at, datetime('now'))
@@ -274,6 +282,13 @@ def _migrate(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE users ADD COLUMN branch_id INTEGER REFERENCES branches(id)")
     if "disabled" not in columns:
         db.execute("ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0")
+    # ФИО по частям: name остаётся отображаемым полем, пересобирается при записи
+    if "first_name" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN first_name TEXT NOT NULL DEFAULT ''")
+    if "last_name" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN last_name TEXT NOT NULL DEFAULT ''")
+    if "middle_name" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN middle_name TEXT NOT NULL DEFAULT ''")
     if _users_need_rebuild(db):
         _rebuild_users(db)
     card_columns = {row["name"] for row in db.execute("PRAGMA table_info(patient_cards)").fetchall()}
@@ -298,6 +313,7 @@ def _migrate(db: sqlite3.Connection) -> None:
             "ALTER TABLE documents ADD COLUMN ocr_attempts INTEGER NOT NULL DEFAULT 0",
         ):
             db.execute(ddl)
+        doc_columns = {row["name"] for row in db.execute("PRAGMA table_info(documents)").fetchall()}
     if doc_columns and "ocr_text_clean" not in doc_columns:
         db.execute("ALTER TABLE documents ADD COLUMN ocr_text_clean TEXT")
     invite_columns = {row["name"] for row in db.execute("PRAGMA table_info(invite_codes)").fetchall()}
@@ -350,8 +366,8 @@ def init_db() -> None:
         db.executescript(SCHEMA)
         db.executescript(GOALS_TABLE)
         db.executescript(DOCUMENTS_TABLE)
+        _migrate(db)  # миграции до индексов: индексы ссылаются на колонки, добавляемые миграциями
         db.executescript(INDEXES_SQL)
-        _migrate(db)
         db.executemany(
             "INSERT OR IGNORE INTO branches (city, phone) VALUES (?, ?)",
             BRANCHES_SEED,
