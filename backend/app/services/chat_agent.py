@@ -11,6 +11,7 @@ import sqlite3
 from typing import Callable, Optional
 
 from .. import config
+from ..services.audit import record
 from . import llm as llm_service
 
 logger = logging.getLogger("medai.chat")
@@ -37,11 +38,16 @@ PROMPT_RULES = """
 
 SYSTEM_PROMPT_PATIENT = """Ты — ассистент здоровья федеральной сети клиник «Спектр-Диагностика».
 Общаешься с пациентом и можешь смотреть его данные через инструменты (замеры,
-разборы, статистика). Помогаешь понять показатели и здоровый образ жизни.
+разборы, история разборов, документы и текст распознанных анализов).
+Помогаешь понять показатели и здоровый образ жизни.
+Когда вопрос про результаты анализов (кровь, биохимия, выписки) — посмотри
+list_my_documents и прочитай нужный документ через read_my_document, затем
+объясни показатели простыми словами и отметь те, что выходят за норму.
 """ + PROMPT_RULES
 
 SYSTEM_PROMPT_DOCTOR = """Ты — ассистент врача сети клиник «Спектр-Диагностика».
-Помогаешь врачу быстро смотреть данные пациентов его филиала через инструменты.
+Помогаешь врачу быстро смотреть данные пациентов его филиала через инструменты:
+замеры, разборы, история разборов, документы и текст распознанных анализов.
 """ + PROMPT_RULES
 
 # ---------- Определения инструментов (OpenAI function calling) ----------
@@ -63,6 +69,14 @@ PATIENT_TOOLS = [
         "name": "get_last_analysis",
         "description": "Последний разбор замера: риск (green/yellow/red), статусы показателей, рекомендации правил",
         "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "list_my_analyses",
+        "description": "История всех разборов: дата, риск, статусы показателей и рекомендации правил "
+                       "(в отличие от get_last_analysis, который берёт только последний)",
+        "parameters": {"type": "object", "properties": {
+            "limit": {"type": "integer", "description": "Сколько последних разборов, 1–50", "default": 10},
+        }, "required": []},
     }},
     {"type": "function", "function": {
         "name": "get_stats_summary",
@@ -102,9 +116,18 @@ PATIENT_TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "list_my_documents",
-        "description": "Загруженные документы: название, тип файла, размер, дата загрузки "
-                       "(без содержимого)",
+        "description": "Загруженные документы: название, тип файла, размер, дата загрузки, "
+                       "распознан ли текст. Содержимое — через read_my_document",
         "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "read_my_document",
+        "description": "Текст распознанного анализа (результаты лаборатории, выписки) по id "
+                       "из list_my_documents: показатели, значения, единицы, нормы. "
+                       "Персональные поля бланка скрыты автоматически",
+        "parameters": {"type": "object", "properties": {
+            "document_id": {"type": "integer", "description": "id документа из list_my_documents"},
+        }, "required": ["document_id"]},
     }},
     {"type": "function", "function": {
         "name": "search_measurements",
@@ -140,6 +163,14 @@ DOCTOR_TOOLS = [
         }, "required": ["patient_id"]},
     }},
     {"type": "function", "function": {
+        "name": "get_patient_analyses",
+        "description": "История разборов пациента: дата, риск, статусы показателей, рекомендации правил",
+        "parameters": {"type": "object", "properties": {
+            "patient_id": {"type": "integer", "description": "ID пациента из get_patients_overview"},
+            "limit": {"type": "integer", "description": "Сколько последних разборов, 1–50", "default": 10},
+        }, "required": ["patient_id"]},
+    }},
+    {"type": "function", "function": {
         "name": "get_patient_medcard",
         "description": "Медкарта пациента (анкета-анамнез): группа крови, аллергии, хронические заболевания, лекарства, операции, привычки",
         "parameters": {"type": "object", "properties": {
@@ -155,10 +186,21 @@ DOCTOR_TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "get_patient_documents",
-        "description": "Документы пациента: название, тип, размер, дата загрузки (без содержимого)",
+        "description": "Документы пациента: название, тип, размер, дата загрузки, "
+                       "распознан ли текст. Содержимое — через get_patient_document",
         "parameters": {"type": "object", "properties": {
             "patient_id": {"type": "integer", "description": "ID пациента из get_patients_overview"},
         }, "required": ["patient_id"]},
+    }},
+    {"type": "function", "function": {
+        "name": "get_patient_document",
+        "description": "Текст распознанного анализа пациента (лаборатория, выписка) по id "
+                       "из get_patient_documents: показатели, значения, единицы, нормы. "
+                       "Персональные поля бланка скрыты автоматически",
+        "parameters": {"type": "object", "properties": {
+            "patient_id": {"type": "integer", "description": "ID пациента из get_patients_overview"},
+            "document_id": {"type": "integer", "description": "id документа из get_patient_documents"},
+        }, "required": ["patient_id", "document_id"]},
     }},
     {"type": "function", "function": {
         "name": "get_patients_needing_attention",
@@ -216,6 +258,30 @@ def _last_analysis(db: sqlite3.Connection, user_id: int, _: dict) -> str:
     d["findings"] = json.loads(d["findings"])
     d["recommendations"] = json.loads(d["recommendations"])
     return json.dumps(d, ensure_ascii=False)
+
+
+def _analyses_history(db: sqlite3.Connection, user_id: int, args: dict) -> str:
+    limit = max(1, min(50, int(args.get("limit") or 10)))
+    rows = db.execute(
+        """SELECT m.recorded_at, a.risk_level, a.findings, a.recommendations, a.bmi
+           FROM analyses a JOIN measurements m ON m.id = a.measurement_id
+           WHERE a.user_id = ? ORDER BY m.recorded_at DESC, m.id DESC LIMIT ?""",
+        (user_id, limit),
+    ).fetchall()
+    if not rows:
+        return json.dumps({"error": "анализов пока нет"}, ensure_ascii=False)
+    # findings/recommendations лежат в БД как JSON-строки. Разворачиваем их в
+    # объекты: иначе модель получает экранированный JSON внутри строки и путается.
+    items = []
+    for r in rows:
+        item = dict(r)
+        for key in ("findings", "recommendations"):
+            try:
+                item[key] = json.loads(item[key] or "[]")
+            except (json.JSONDecodeError, TypeError):
+                item[key] = []
+        items.append(item)
+    return json.dumps(items, ensure_ascii=False)
 
 
 def _stats_summary(db: sqlite3.Connection, user_id: int, args: dict) -> str:
@@ -296,13 +362,64 @@ def _my_goals(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
 
 
 def _my_documents(db: sqlite3.Connection, user: sqlite3.Row, _: dict) -> str:
-    # Только метаданные: содержимое файла модели не передаём
+    # Метаданные и признак «есть распознанный текст». Сам текст — через
+    # read_my_document: он уходит внешнему LLM только по запросу модели
+    # и только после DLP-очистки.
     rows = db.execute(
-        """SELECT id, title, filename, mime, size, uploaded_at
+        """SELECT id, title, filename, mime, size, uploaded_at, ocr_status,
+                  (ocr_text_clean IS NOT NULL AND ocr_text_clean <> '') AS has_text
            FROM documents WHERE user_id = ? ORDER BY id DESC LIMIT 50""",
         (user["id"],),
     ).fetchall()
     return _rows_to_json(rows)
+
+
+def _document_text(db: sqlite3.Connection, owner_id: int, document_id,
+                   *, audit_user_id: int) -> str:
+    """Текст распознанного документа для модели — с DLP-очисткой и аудитом.
+
+    Это единственное место, где содержимое медицинского документа уходит
+    внешнему LLM, поэтому здесь сосредоточены все ограничения: владелец,
+    статус OCR, лимит размера, вырезание персональных полей и запись в аудит.
+    """
+    if not config.CHAT_DOCUMENT_TEXT_ENABLED:
+        return json.dumps({"error": "чтение текста документов отключено администратором клиники"},
+                          ensure_ascii=False)
+    try:
+        doc_id = int(document_id)
+    except (TypeError, ValueError):
+        return json.dumps({"error": "нужен document_id из списка документов"}, ensure_ascii=False)
+    row = db.execute(
+        """SELECT id, title, mime, uploaded_at, ocr_status, ocr_text, ocr_text_clean
+           FROM documents WHERE id = ? AND user_id = ?""",
+        (doc_id, owner_id),
+    ).fetchone()
+    if row is None:
+        return json.dumps({"error": "документ не найден"}, ensure_ascii=False)
+    if row["ocr_status"] != "ready":
+        return json.dumps({
+            "error": "документ ещё не распознан",
+            "ocr_status": row["ocr_status"],
+            "hint": "текст появится после распознавания в разделе «Документы»",
+        }, ensure_ascii=False)
+    text = (row["ocr_text_clean"] or row["ocr_text"] or "").strip()
+    if not text:
+        return json.dumps({"error": "в документе не распознан текст"}, ensure_ascii=False)
+    # DLP: модель получает показатели, но не ФИО/дату рождения/адрес с бланка.
+    # Сначала очистка целиком, потом обрезка — иначе замена ПДн на плейсхолдеры
+    # укоротила бы текст и «truncated» врал бы про обрезанный документ.
+    safe_full = llm_service.redact_document(text, max(len(text), 1))
+    safe = safe_full[:config.CHAT_DOCUMENT_TEXT_MAX]
+    truncated = len(safe_full) > len(safe)
+    record(db, "chat.document_text", user_id=audit_user_id, entity="document", entity_id=doc_id,
+           details={"chars_sent": len(safe), "chars_total": len(text), "truncated": truncated})
+    return json.dumps({
+        "id": row["id"],
+        "title": row["title"],
+        "uploaded_at": row["uploaded_at"],
+        "text": safe,
+        "truncated": truncated,
+    }, ensure_ascii=False)
 
 
 def _search_measurements(db: sqlite3.Connection, user: sqlite3.Row, args: dict) -> str:
@@ -323,6 +440,7 @@ PATIENT_EXECUTORS: dict[str, Callable] = {
     "get_profile": lambda db, user, args: _get_profile(db, user, args),
     "get_recent_measurements": lambda db, user, args: _recent_measurements(db, user["id"], args),
     "get_last_analysis": lambda db, user, args: _last_analysis(db, user["id"], args),
+    "list_my_analyses": lambda db, user, args: _analyses_history(db, user["id"], args),
     "get_stats_summary": lambda db, user, args: _stats_summary(db, user["id"], args),
     "get_risk_history": lambda db, user, args: _risk_history(db, user["id"], args),
     "get_my_medcard": _my_medcard,
@@ -330,6 +448,8 @@ PATIENT_EXECUTORS: dict[str, Callable] = {
     "get_doctor_notes": _doctor_notes,
     "get_my_goals": _my_goals,
     "list_my_documents": _my_documents,
+    "read_my_document": lambda db, user, args: _document_text(
+        db, user["id"], args.get("document_id"), audit_user_id=user["id"]),
     "search_measurements": _search_measurements,
 }
 
@@ -394,6 +514,13 @@ def _exec_patient_last_analysis(db: sqlite3.Connection, doctor: sqlite3.Row, arg
     return _last_analysis(db, patient["id"], args)
 
 
+def _exec_patient_analyses(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
+    patient = _doctor_guard(db, doctor, _resolve_patient_id(db, doctor, args.get("patient_id")))
+    if patient is None:
+        return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
+    return _analyses_history(db, patient["id"], args)
+
+
 def _exec_patient_medcard(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
     patient = _doctor_guard(db, doctor, _resolve_patient_id(db, doctor, args.get("patient_id")))
     if patient is None:
@@ -425,11 +552,21 @@ def _exec_patient_documents(db: sqlite3.Connection, doctor: sqlite3.Row, args: d
     if patient is None:
         return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
     rows = db.execute(
-        """SELECT id, title, filename, mime, size, uploaded_at
+        """SELECT id, title, filename, mime, size, uploaded_at, ocr_status,
+                  (ocr_text_clean IS NOT NULL AND ocr_text_clean <> '') AS has_text
            FROM documents WHERE user_id = ? ORDER BY id DESC LIMIT 50""",
         (patient["id"],),
     ).fetchall()
     return _rows_to_json(rows)
+
+
+def _exec_patient_document(db: sqlite3.Connection, doctor: sqlite3.Row, args: dict) -> str:
+    patient = _doctor_guard(db, doctor, _resolve_patient_id(db, doctor, args.get("patient_id")))
+    if patient is None:
+        return json.dumps({"error": "пациент не найден в вашем филиале"}, ensure_ascii=False)
+    # В аудит — кто именно смотрел текст документа пациента.
+    return _document_text(db, patient["id"], args.get("document_id"),
+                          audit_user_id=doctor["id"])
 
 
 def _exec_patients_needing_attention(db: sqlite3.Connection, doctor: sqlite3.Row,
@@ -471,9 +608,11 @@ DOCTOR_EXECUTORS: dict[str, Callable] = {
     "get_patients_overview": _exec_patients_overview,
     "get_patient_measurements": _exec_patient_measurements,
     "get_patient_last_analysis": _exec_patient_last_analysis,
+    "get_patient_analyses": _exec_patient_analyses,
     "get_patient_medcard": _exec_patient_medcard,
     "get_patient_visits": _exec_patient_visits,
     "get_patient_documents": _exec_patient_documents,
+    "get_patient_document": _exec_patient_document,
     "get_patients_needing_attention": _exec_patients_needing_attention,
 }
 

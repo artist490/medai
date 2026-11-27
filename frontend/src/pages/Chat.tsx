@@ -13,11 +13,13 @@ const PATIENT_CHIPS = [
   'Что показывает последний разбор?',
   'Как я сплю и сколько хожу в среднем за месяц?',
   'Был ли у меня красный риск?',
+  'Объясни мои последние анализы',
 ]
 const DOCTOR_CHIPS = [
   'Покажи пациентов, требующих внимания',
   'Сколько пациентов в моём филиале?',
   'Какие риски у моих пациентов?',
+  'Что в анализах пациента?',
 ]
 
 // Безопасный рендер markdown-ответа модели (только жирный и пункты;
@@ -159,7 +161,8 @@ export default function Chat() {
             <EmptyArt className="mx-auto mb-3 opacity-70" />
             <p className="text-[13.5px] font-medium text-ink">Переписки пока нет</p>
             <p className="text-[12.5px] text-ink-soft max-w-[44ch] mt-1.5 leading-relaxed">
-              Спросите о показателях — ассистент сам поднимет нужные замеры и разборы.
+              Спросите о показателях — ассистент сам поднимет нужные замеры, разборы
+              и текст распознанных анализов.
             </p>
           </div>
         )}
@@ -224,7 +227,7 @@ export default function Chat() {
             className="flip-input flex-1 resize-none"
             aria-label="Сообщение ассистенту"
             rows={1}
-            placeholder="Спросите о своих показателях…"
+            placeholder="Спросите о показателях или анализах…"
             value={input}
             maxLength={2000}
             onChange={(e) => setInput(e.target.value)}

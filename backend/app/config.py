@@ -54,6 +54,15 @@ OCR_WORKERS: int = min(2, max(1, int(os.getenv("OCR_WORKERS", "1"))))
 OCR_TIMEOUT: int = min(600, max(30, int(os.getenv("OCR_TIMEOUT", "180"))))
 OCR_MAX_TEXT: int = min(500_000, max(1_000, int(os.getenv("OCR_MAX_TEXT", "200000"))))
 
+# --- ИИ-чат и распознанные анализы ---
+# Текст распознанного документа — медицинские ПДн, которые уйдут внешнему LLM.
+# Клиника может запретить это одной переменной, не трогая код.
+CHAT_DOCUMENT_TEXT_ENABLED: bool = (
+    os.getenv("CHAT_DOCUMENT_TEXT", "true").lower() == "true"
+)
+# Сколько символов текста документа отдаём модели за один вызов (экономия токенов).
+CHAT_DOCUMENT_TEXT_MAX: int = min(20_000, max(500, int(os.getenv("CHAT_DOCUMENT_TEXT_MAX", "6000"))))
+
 # --- Приложение и production-безопасность ---
 ENV: str = os.getenv("APP_ENV", "development").strip().lower()
 ENFORCE_HTTPS: bool = os.getenv("ENFORCE_HTTPS", "true" if ENV == "production" else "false").lower() == "true"
