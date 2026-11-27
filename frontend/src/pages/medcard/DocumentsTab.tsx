@@ -6,6 +6,7 @@ import * as api from '../../api'
 import { uploadDocument } from '../../api'
 import { Icon } from '../../components/Icon'
 import EmptyArt from '../../components/EmptyArt'
+import OcrText from '../../components/OcrText'
 import { Skeleton } from '../../components/Skeleton'
 import type { DocumentItem, OcrResult } from '../../types'
 
@@ -150,7 +151,7 @@ export default function DocumentsTab() {
           ) : ocr.status === 'ready' ? (
             <>
               <p className="flip-hint mt-2">Проверьте текст: OCR может ошибаться. Ничего не добавлено в медкарту автоматически.</p>
-              <pre className="mt-3 max-h-[420px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#f6faf8] p-4 text-sm">{ocr.text}</pre>
+              <OcrText text={ocr.text ?? ''} raw={ocr.text_raw} />
             </>
           ) : <p className="text-sm text-ink-soft mt-3">Нажмите «Распознать» у нужного документа.</p>}
         </section>

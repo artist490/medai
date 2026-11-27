@@ -103,6 +103,8 @@ export interface OcrResult {
   started_at: string | null
   finished_at: string | null
   text?: string | null
+  // Исходный ответ OCR до постобработки — для сверки с бланком.
+  text_raw?: string | null
 }
 
 export interface DoctorSignal {

@@ -169,6 +169,7 @@ class Document(Base):
     uploaded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     analysis_id = Column(Integer, ForeignKey("analyses.id", ondelete="SET NULL"), nullable=True)
     ocr_text = Column(Text, nullable=True)
+    ocr_text_clean = Column(Text, nullable=True)  # результат постобработки
     ocr_status = Column(String, nullable=True)  # pending | done | failed
     ocr_error = Column(Text, nullable=True)
 

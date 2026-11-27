@@ -13,12 +13,21 @@ from pathlib import Path
 
 from .. import config
 from ..database import db_session
+from . import ocr_postprocess
 from .audit import record
 
 logger = logging.getLogger("medai.ocr")
 _worker_lock = threading.Lock()
 _worker_started = False
 _stopping = threading.Event()
+
+
+def _row_value(row, key: str, default=None):
+    """sqlite3.Row бросает IndexError на отсутствующую колонку (старая БД)."""
+    try:
+        return row[key]
+    except (IndexError, KeyError):
+        return default
 
 
 def ocr_payload(row, *, include_text: bool = False) -> dict:
@@ -31,7 +40,14 @@ def ocr_payload(row, *, include_text: bool = False) -> dict:
         "finished_at": row["ocr_finished_at"],
     }
     if include_text:
-        result["text"] = row["ocr_text"]
+        raw = _row_value(row, "ocr_text")
+        clean = _row_value(row, "ocr_text_clean")
+        if not clean and raw:
+            # Документы, распознанные до постобработки: чистим на чтении,
+            # сохранит их backfill_postprocessed().
+            clean = ocr_postprocess.clean(raw)
+        result["text"] = clean or raw
+        result["text_raw"] = raw
     return result
 
 
@@ -152,13 +168,24 @@ def process_one(document_id: int | None = None) -> bool:
                 raise RuntimeError("Текст на документе не найден")
             if len(text) > config.OCR_MAX_TEXT:
                 raise RuntimeError("Распознанный текст превышает допустимый размер")
+            # Постобработка считается один раз и сохраняется рядом с исходником.
+            clean_text = ocr_postprocess.clean(text)
+            if not clean_text:
+                raise RuntimeError("Текст на документе не найден")
+            if len(clean_text) > config.OCR_MAX_TEXT:
+                clean_text = clean_text[:config.OCR_MAX_TEXT]
         with db_session() as db:
             db.execute(
-                """UPDATE documents SET ocr_status='ready', ocr_text=?, ocr_error=NULL,
-                   ocr_finished_at=datetime('now', 'localtime') WHERE id=? AND ocr_status='processing'""",
-                (text, doc_id),
+                """UPDATE documents SET ocr_status='ready', ocr_text=?, ocr_text_clean=?,
+                   ocr_error=NULL, ocr_finished_at=datetime('now', 'localtime')
+                   WHERE id=? AND ocr_status='processing'""",
+                (text, clean_text, doc_id),
             )
             record(db, "document.ocr.ready", user_id=job["user_id"], entity="document", entity_id=doc_id)
+            # В аудит — только размеры, без содержимого документа.
+            record(db, "document.ocr.postprocess", user_id=job["user_id"],
+                   entity="document", entity_id=doc_id,
+                   details=ocr_postprocess.analyze(text))
     except Exception as exc:
         # В БД/логи не попадает текст документа, stderr или временные пути.
         logger.warning("OCR документа %s не выполнен: %s", doc_id, exc)
@@ -172,10 +199,30 @@ def process_one(document_id: int | None = None) -> bool:
     return True
 
 
+def backfill_postprocessed() -> int:
+    """Сохраняет очищенный текст документам, распознанным до постобработки.
+
+    Идемпотентно: трогает только строки, где ocr_text_clean ещё не заполнен.
+    """
+    with db_session() as db:
+        rows = db.execute(
+            """SELECT id, ocr_text FROM documents
+               WHERE ocr_text IS NOT NULL AND ocr_text <> ''
+                 AND (ocr_text_clean IS NULL OR ocr_text_clean = '')"""
+        ).fetchall()
+        for row in rows:
+            db.execute(
+                "UPDATE documents SET ocr_text_clean=? WHERE id=?",
+                (ocr_postprocess.clean(row["ocr_text"]), row["id"]),
+            )
+    return len(rows)
+
+
 def worker_loop() -> None:
     """Один процесс/worker на сервере; API не выполняет OCR в своём потоке."""
     _stopping.clear()
     recover_interrupted()
+    backfill_postprocessed()
     while not _stopping.is_set():
         if not config.ocr_enabled() or not process_one():
             _stopping.wait(2)

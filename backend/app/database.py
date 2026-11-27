@@ -196,6 +196,7 @@ CREATE TABLE IF NOT EXISTS documents (
     uploaded_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     ocr_status  TEXT NOT NULL DEFAULT 'pending' CHECK (ocr_status IN ('disabled', 'pending', 'processing', 'ready', 'failed')),
     ocr_text    TEXT,
+    ocr_text_clean TEXT,
     ocr_error   TEXT,
     ocr_engine  TEXT,
     ocr_started_at TEXT,
@@ -289,6 +290,7 @@ def _migrate(db: sqlite3.Connection) -> None:
         for ddl in (
             "ALTER TABLE documents ADD COLUMN ocr_status TEXT NOT NULL DEFAULT 'pending'",
             "ALTER TABLE documents ADD COLUMN ocr_text TEXT",
+            "ALTER TABLE documents ADD COLUMN ocr_text_clean TEXT",
             "ALTER TABLE documents ADD COLUMN ocr_error TEXT",
             "ALTER TABLE documents ADD COLUMN ocr_engine TEXT",
             "ALTER TABLE documents ADD COLUMN ocr_started_at TEXT",
@@ -296,6 +298,8 @@ def _migrate(db: sqlite3.Connection) -> None:
             "ALTER TABLE documents ADD COLUMN ocr_attempts INTEGER NOT NULL DEFAULT 0",
         ):
             db.execute(ddl)
+    if doc_columns and "ocr_text_clean" not in doc_columns:
+        db.execute("ALTER TABLE documents ADD COLUMN ocr_text_clean TEXT")
     invite_columns = {row["name"] for row in db.execute("PRAGMA table_info(invite_codes)").fetchall()}
     if invite_columns and "expires_at" not in invite_columns:
         db.execute("ALTER TABLE invite_codes ADD COLUMN expires_at TEXT")
