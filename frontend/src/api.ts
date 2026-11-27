@@ -64,7 +64,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 // ---------- auth ----------
 
 export async function register(
-  email: string, password: string, name: string,
+  email: string, password: string,
+  firstName: string, lastName: string, middleName: string,
   inviteCode?: string, branchId?: number,
 ) {
   const data = await request<{ user: User }>('/api/auth/register', {
@@ -73,7 +74,9 @@ export async function register(
     body: JSON.stringify({
       email,
       password,
-      name,
+      first_name: firstName,
+      last_name: lastName,
+      middle_name: middleName,
       ...(inviteCode ? { invite_code: inviteCode } : {}),
       ...(branchId ? { branch_id: branchId } : {}),
     }),

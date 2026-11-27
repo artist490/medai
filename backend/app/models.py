@@ -34,7 +34,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String, nullable=False, unique=True)
     password_hash = Column(String, nullable=False)
-    name = Column(String, nullable=False, default="")
+    name = Column(String, nullable=False, default="")  # отображаемое ФИО, пересобирается из частей
+    first_name = Column(String, nullable=False, default="")
+    last_name = Column(String, nullable=False, default="")
+    middle_name = Column(String, nullable=False, default="")
     age = Column(Integer, nullable=True)
     sex = Column(String, nullable=True)  # CHECK в миграции
     height_cm = Column(Float, nullable=True)

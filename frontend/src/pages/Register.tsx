@@ -10,7 +10,9 @@ import BrandLockup from '../components/BrandLockup'
 import type { Branch } from '../types'
 
 export default function Register() {
-  const [name, setName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [middleName, setMiddleName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
@@ -49,13 +51,21 @@ export default function Register() {
   async function submit(e: FormEvent) {
     e.preventDefault()
     setError('')
+    if (!lastName.trim() || !firstName.trim()) {
+      setError('Укажите фамилию и имя')
+      return
+    }
     if (!branchId) {
       setError('Выберите филиал клиники')
       return
     }
     setBusy(true)
     try {
-      const user = await api.register(email.trim(), password, name.trim(), inviteCode.trim() || undefined, Number(branchId))
+      const user = await api.register(
+        email.trim(), password,
+        firstName.trim(), lastName.trim(), middleName.trim(),
+        inviteCode.trim() || undefined, Number(branchId),
+      )
       setUser(user)
       navigate('/')
     } catch (err) {
@@ -90,15 +100,44 @@ export default function Register() {
               </div>
             )}
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="flip-label" htmlFor="last-name">Фамилия</label>
+                <input
+                  id="last-name"
+                  className="flip-input"
+                  required
+                  autoComplete="family-name"
+                  placeholder="Иванов"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="flip-label" htmlFor="first-name">Имя</label>
+                <input
+                  id="first-name"
+                  className="flip-input"
+                  required
+                  autoComplete="given-name"
+                  placeholder="Иван"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="flip-label" htmlFor="name">Имя</label>
+              <label className="flip-label" htmlFor="middle-name">
+                Отчество <span className="text-ink-soft font-normal">(если есть)</span>
+              </label>
               <input
-                id="name"
+                id="middle-name"
                 className="flip-input"
-                autoComplete="name"
-                placeholder="Как вас зовут"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                autoComplete="additional-name"
+                placeholder="Иванович"
+                value={middleName}
+                onChange={(e) => setMiddleName(e.target.value)}
               />
             </div>
 

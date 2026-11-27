@@ -260,6 +260,8 @@ class TestDisabledUser:
         db.close()
         assert "disabled" in cols
         assert row["disabled"] == 0
+        # разделение ФИО: у старой БД части имени доливаются миграцией
+        assert {"first_name", "last_name", "middle_name"} <= cols
 
 
 def _legacy_db(tmp_path, monkeypatch) -> Path:

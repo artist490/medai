@@ -14,7 +14,10 @@ export interface Branch {
 export interface User {
   id: number
   email: string
-  name: string
+  name: string            // собранное ФИО «Фамилия Имя Отчество» для отображения
+  first_name: string      // имя
+  last_name: string       // фамилия
+  middle_name: string     // отчество (может быть пустым)
   age: number | null
   sex: 'male' | 'female' | null
   height_cm: number | null

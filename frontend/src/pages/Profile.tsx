@@ -101,7 +101,9 @@ const CITY_SLUG: Record<string, string> = {
 export default function Profile() {
   const { user, setUser, logout } = useAuth()
   const navigate = useNavigate()
-  const [name, setName] = useState(user?.name ?? '')
+  const [lastName, setLastName] = useState(user?.last_name ?? '')
+  const [firstName, setFirstName] = useState(user?.first_name ?? '')
+  const [middleName, setMiddleName] = useState(user?.middle_name ?? '')
   const [sex, setSex] = useState<'male' | 'female' | ''>(user?.sex ?? '')
   const [age, setAge] = useState(user?.age ?? 0)
   const [height, setHeight] = useState(user?.height_cm ?? 0)
@@ -122,8 +124,13 @@ export default function Profile() {
   }, [])
 
   const branchCity = branches.find((b) => String(b.id) === branchId)?.city
-  const filled = [name.trim(), sex, age > 0, height > 0, branchId].filter(Boolean).length
+  // ФИО засчитано, когда заполнены и фамилия, и имя; отчество — необязательное
+  const hasName = lastName.trim() !== '' && firstName.trim() !== ''
+  const filled = [hasName, sex, age > 0, height > 0, branchId].filter(Boolean).length
   const pct = Math.round((filled / 5) * 100)
+  // Живое отображение ФИО; пока части не заполнены — прежнее name (легаси-аккаунты)
+  const displayName = [lastName, firstName, middleName].map((s) => s.trim()).filter(Boolean).join(' ')
+    || user?.name || ''
 
   const bmi = lastWeight && height >= 50 ? lastWeight / (height / 100) ** 2 : null
   const status = bmi !== null ? bmiStatus(bmi) : null
@@ -145,7 +152,9 @@ export default function Profile() {
         await api.changeBranch(Number(branchId), currentPassword)
       }
       const updated = await api.updateProfile({
-        name: name.trim(),
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        middle_name: middleName.trim(),
         age: age > 0 ? age : null,
         sex: sex || null,
         height_cm: height > 0 ? height : null,
@@ -178,10 +187,10 @@ export default function Profile() {
             style={{ background: '#edf2f0', color: 'var(--color-teal-deep)' }}
             aria-hidden
           >
-            {initials(name || user?.email || '')}
+            {initials(displayName || user?.email || '')}
           </span>
           <div className="min-w-0">
-            <div className="text-[13.5px] font-medium text-ink truncate">{name.trim() || user?.email}</div>
+            <div className="text-[13.5px] font-medium text-ink truncate">{displayName || user?.email}</div>
             <div className="text-[12px] text-ink-soft truncate">{user?.email}</div>
           </div>
         </div>
@@ -211,13 +220,39 @@ export default function Profile() {
           </div>
 
           <div className="flex flex-col gap-5">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="flip-label" htmlFor="p-last-name">Фамилия</label>
+                <input
+                  id="p-last-name"
+                  className="flip-input"
+                  autoComplete="family-name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="flip-label" htmlFor="p-first-name">Имя</label>
+                <input
+                  id="p-first-name"
+                  className="flip-input"
+                  autoComplete="given-name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="flip-label" htmlFor="p-name">Имя</label>
+              <label className="flip-label" htmlFor="p-middle-name">
+                Отчество <span className="text-ink-soft font-normal">(если есть)</span>
+              </label>
               <input
-                id="p-name"
+                id="p-middle-name"
                 className="flip-input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                autoComplete="additional-name"
+                value={middleName}
+                onChange={(e) => setMiddleName(e.target.value)}
               />
             </div>
 

@@ -7,7 +7,10 @@ from pydantic import BaseModel, EmailStr, Field
 class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=12, max_length=128)
-    name: str = Field(default="", max_length=64)
+    first_name: str = Field(default="", max_length=64)   # имя
+    last_name: str = Field(default="", max_length=64)    # фамилия
+    middle_name: str = Field(default="", max_length=64)  # отчество (опционально)
+    name: str = Field(default="", max_length=64)  # легаси: разовое имя из клиентов до разделения ФИО
     invite_code: Optional[str] = Field(default=None, max_length=64)  # код приглашения для врачей
     # Филиал обязателен на сервере для любой роли (С.3): без него 422 — иначе
     # возникают «невидимые» пациенты (branch_id IS NULL не попадает ни в один пул врача)
@@ -20,7 +23,9 @@ class LoginIn(BaseModel):
 
 
 class ProfileIn(BaseModel):
-    name: Optional[str] = Field(default=None, max_length=64)
+    first_name: Optional[str] = Field(default=None, max_length=64)
+    last_name: Optional[str] = Field(default=None, max_length=64)
+    middle_name: Optional[str] = Field(default=None, max_length=64)
     age: Optional[int] = Field(default=None, ge=1, le=120)
     sex: Optional[Literal["male", "female"]] = None
     height_cm: Optional[float] = Field(default=None, ge=50, le=250)

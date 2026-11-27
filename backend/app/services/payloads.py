@@ -28,6 +28,19 @@ ORDER BY CASE status WHEN 'planned' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END,
 
 # ---------- Пациент ----------
 
+def compose_full_name(first_name: str, last_name: str, middle_name: str) -> str:
+    """Отображаемое ФИО «Фамилия Имя Отчество»; пустые части пропускаются.
+
+    Единая точка сборки: users.name — кэш этого выражения, пересобирается при
+    каждой записи профиля, поэтому все читатели (сайдбар, пул врача, сигналы,
+    приёмы) показывают ФИО согласованно. Пустой результат — у аккаунтов,
+    созданных до разделения ФИО: показываем прежнее name как есть.
+    """
+    return " ".join(
+        part for part in (last_name.strip(), first_name.strip(), middle_name.strip()) if part
+    )
+
+
 def patient_payload(p: sqlite3.Row) -> dict:
     return {k: p[k] for k in ("id", "email", "name", "age", "sex", "height_cm", "created_at")}
 

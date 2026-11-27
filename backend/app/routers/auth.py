@@ -12,6 +12,7 @@ from ..schemas import BranchChangeIn, LoginIn, ProfileIn, RegisterIn
 from ..security import (SESSION_COOKIE, SlidingRateLimiter, clear_auth_cookies,
                         csrf_cookie, session_cookie)
 from ..services.audit import record
+from ..services.payloads import compose_full_name
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -53,6 +54,9 @@ def user_payload(user: sqlite3.Row, branch: Optional[sqlite3.Row] = None) -> dic
         "id": user["id"],
         "email": user["email"],
         "name": user["name"],
+        "first_name": user["first_name"],
+        "last_name": user["last_name"],
+        "middle_name": user["middle_name"],
         "age": user["age"],
         "sex": user["sex"],
         "height_cm": user["height_cm"],
@@ -111,8 +115,13 @@ def register(data: RegisterIn, request: Request, response: Response, db: sqlite3
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Филиал не найден")
 
     cursor = db.execute(
-        "INSERT INTO users (email, password_hash, name, role, branch_id) VALUES (?, ?, ?, ?, ?)",
-        (data.email.lower(), auth.hash_password(data.password), data.name.strip(), role, data.branch_id),
+        """INSERT INTO users (email, password_hash, name, first_name, last_name, middle_name,
+                              role, branch_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (data.email.lower(), auth.hash_password(data.password),
+         compose_full_name(data.first_name, data.last_name, data.middle_name) or data.name.strip(),
+         data.first_name.strip(), data.last_name.strip(), data.middle_name.strip(),
+         role, data.branch_id),
     )
     user_id = cursor.lastrowid
 
@@ -183,10 +192,20 @@ def update_me(
     db: sqlite3.Connection = Depends(get_db),
 ):
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
-    if not updates:
-        return user_payload(user, _branch_of(db, user["branch_id"]))
-    sets = ", ".join(f"{k} = ?" for k in updates)
-    db.execute(f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), user["id"]))
+    if updates:
+        sets = ", ".join(f"{k} = ?" for k in updates)
+        db.execute(f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), user["id"]))
+        # name — кэш отображаемого ФИО: пересобираем из частей при любой правке
+        # профиля. Пустой результат (аккаунт без ФИО) оставляет прежнее name —
+        # у аккаунтов, созданных до разделения, оно заполнено разовым именем.
+        if any(k in updates for k in ("first_name", "last_name", "middle_name")):
+            fresh = db.execute(
+                "SELECT first_name, last_name, middle_name, name FROM users WHERE id = ?",
+                (user["id"],),
+            ).fetchone()
+            full = compose_full_name(fresh["first_name"], fresh["last_name"], fresh["middle_name"])
+            if full != fresh["name"]:
+                db.execute("UPDATE users SET name = ? WHERE id = ?", (full, user["id"]))
     db.commit()  # см. комментарий в register
     fresh = db.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
     return user_payload(fresh, _branch_of(db, fresh["branch_id"]))

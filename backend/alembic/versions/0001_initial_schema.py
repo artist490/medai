@@ -13,7 +13,9 @@ TABLES = (
         phone TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '')""",
     """CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', age INTEGER,
+        password_hash TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',
+        first_name TEXT NOT NULL DEFAULT '', last_name TEXT NOT NULL DEFAULT '',
+        middle_name TEXT NOT NULL DEFAULT '', age INTEGER,
         sex TEXT CHECK (sex IN ('male', 'female') OR sex IS NULL), height_cm REAL,
         role TEXT NOT NULL DEFAULT 'patient' CHECK (role IN ('patient', 'doctor')),
         branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
