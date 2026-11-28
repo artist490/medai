@@ -195,7 +195,7 @@ medai/
 │   │   ├── database.py           # SQLite WAL: users, branches, patient_cards, visits, measurements…
 │   │   ├── auth.py               # pbkdf2 + bearer-токены
 │   │   ├── schemas.py            # Pydantic-модели с валидацией диапазонов
-│   │   ├── routers/              # auth · measurements · stats · goals · documents · analytics · doctor · medcard · visits · chat
+│   │   ├── routers/              # auth · measurements · stats · goals · documents · analytics · doctor · medcard · visits · notes · notifications · orders · symptom_notes · chat
 │   │   └── services/
 │   │       ├── rules.py          # движок правил (нормы, комбинации, риск)
 │   │       ├── llm.py            # OpenAI-совместимый адаптер + сводка пациента
@@ -225,15 +225,38 @@ medai/
 | GET | `/api/visits/mine` | приёмы пациента |
 | PUT | `/api/doctor/visits/{id}` | завершить приём (заключение врача) |
 | GET | `/api/doctor/patients` | пул филиала с сигналами (риск, опросник, приёмы) |
+| GET | `/api/doctor/patients/export.csv` | CSV-выгрузка пула пациентов филиала |
+| GET | `/api/doctor/patients/{id}` | карточка пациента: замеры + разборы |
+| GET | `/api/doctor/patients/{id}/visits` | приёмы пациента |
+| GET | `/api/doctor/patients/{id}/documents` | документы пациента филиала |
+| GET | `/api/doctor/patients/{id}/documents/{doc}/download` | скачать документ пациента |
+| GET | `/api/doctor/patients/{id}/documents/{doc}/ocr` | текст распознанного бланка пациента |
+| GET/POST | `/api/doctor/patients/{id}/symptoms` | дневник самочувствия пациента (только чтение) |
+| GET/POST | `/api/doctor/patients/{id}/orders` | направления пациента; POST /api/doctor/orders/{id}/cancel — отмена |
+| POST | `/api/doctor/analyses/{id}/notes` | комментарий врача к разбору |
 | POST | `/api/doctor/patients/{id}/summary` | ИИ-сводка пациента к приёму |
 | POST | `/api/chat/send` | агентный чат (пациент/врач) |
 | GET | `/api/chat/history` | история чата |
 | GET/PUT | `/api/goals` | цели пациента: шаги, сон, вода, вес |
 | POST | `/api/measurements/repeat` | быстрый дневник: повтор последнего замера (утро/вечер) |
-| POST/GET | `/api/documents` | загрузка и список документов пациента (PDF/фото до 8 МБ) |
+| POST/GET | `/api/documents` | загрузка и список документов пациента (PDF/фото до 8 МБ, можно несколько за раз) |
 | GET | `/api/documents/{id}/download` | скачать документ |
+| GET/PATCH/DELETE | `/api/documents/{id}` | правка названия/категории, удаление |
+| POST/GET | `/api/documents/{id}/ocr` | серверное распознавание (LiteParse локально) |
+| GET | `/api/documents/lab-keys` | показатели, распознанные в документах пациента |
+| GET | `/api/documents/lab-trend?key=` | динамика показателя по датам |
+| GET | `/api/notes/mine` | все заметки врача по разборам пациента |
+| GET/POST | `/api/symptoms(/mine, /{id})` | дневник самочувствия (Е2) |
+| GET/POST | `/api/orders/mine, /{id}/complete` | направления врача: чеклист пациента (Е3) |
+| GET | `/api/notifications` | уведомления (пациенту — заметки/приёмы, врачу — сигналы) |
+| POST | `/api/notifications/seen` | отметить уведомления просмотренными |
+| PUT | `/api/auth/me/password` | смена пароля (прочие сессии отзываются) |
+| PUT | `/api/auth/me/email` | смена email (с текущим паролем) |
 | GET | `/api/stats` | ряды данных для графиков динамики |
 | GET | `/api/doctor/signals` | непрочитанные красные флаги филиала |
 | POST | `/api/doctor/analyses/{id}/seen` | врач отметил разбор разобранным |
+| PATCH | `/api/visits/{id}` | правка планового приёма пациентом |
+| POST | `/api/visits/{id}/cancel` | отмена приёма пациентом |
+| DELETE | `/api/chat` | очистить историю чата |
 | GET | `/api/analytics` | аналитика филиала: риски, активность, stale-пациенты |
 | GET | `/api/health` | `{ok, llm_enabled}` |
