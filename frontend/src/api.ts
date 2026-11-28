@@ -1,5 +1,5 @@
 // API-клиент: HttpOnly-сессия + CSRF; Bearer не хранится в браузерном storage.
-import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DoctorNoteItem, DocumentItem, DoctorSignal, Goals, LabTrendPoint, Measurement, MedCard, MedCardInput, NotificationItem, OcrResult, PatientRow, Stats, User, Visit } from './types'
+import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DoctorNoteItem, DoctorOrder, DocumentItem, DoctorSignal, Goals, LabTrendPoint, Measurement, MedCard, MedCardInput, NotificationItem, OcrResult, PatientRow, Stats, SymptomNote, User, Visit } from './types'
 
 const TOKEN_KEY = 'medai_token'
 
@@ -360,6 +360,60 @@ export async function fetchPatientDocumentOcr(
   patientId: number | string, docId: number,
 ): Promise<OcrResult> {
   return request(`/api/doctor/patients/${patientId}/documents/${docId}/ocr`)
+}
+
+// ---------- дневник самочувствия (Е2) ----------
+
+export async function fetchSymptomNotes(): Promise<{ items: SymptomNote[] }> {
+  return request('/api/symptoms/mine')
+}
+
+export async function addSymptomNote(input: {
+  recorded_at?: string
+  wellbeing: number
+  text: string
+}): Promise<SymptomNote> {
+  return request('/api/symptoms', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export async function deleteSymptomNote(id: number): Promise<void> {
+  return request<void>(`/api/symptoms/${id}`, { method: 'DELETE' })
+}
+
+export async function fetchPatientSymptoms(
+  patientId: number | string,
+): Promise<{ items: SymptomNote[] }> {
+  return request(`/api/doctor/patients/${patientId}/symptoms`)
+}
+
+// ---------- направления врача (Е3) ----------
+
+export async function fetchMyOrders(): Promise<{ items: DoctorOrder[] }> {
+  return request('/api/orders/mine')
+}
+
+export async function completeOrder(id: number): Promise<DoctorOrder> {
+  return request(`/api/orders/${id}/complete`, { method: 'POST' })
+}
+
+export async function fetchPatientOrders(
+  patientId: number | string,
+): Promise<{ items: DoctorOrder[] }> {
+  return request(`/api/doctor/patients/${patientId}/orders`)
+}
+
+export async function createPatientOrder(
+  patientId: number | string,
+  input: { title: string; category?: string },
+): Promise<DoctorOrder> {
+  return request(`/api/doctor/patients/${patientId}/orders`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function cancelPatientOrder(orderId: number): Promise<DoctorOrder> {
+  return request(`/api/doctor/orders/${orderId}/cancel`, { method: 'POST' })
 }
 
 // ---------- уведомления (колокольчик, Б1) ----------

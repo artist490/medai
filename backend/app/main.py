@@ -19,6 +19,8 @@ from .routers import measurements as measurements_router
 from .routers import medcard as medcard_router
 from .routers import notes as notes_router
 from .routers import notifications as notifications_router
+from .routers import orders as orders_router
+from .routers import symptom_notes as symptom_notes_router
 from .routers import stats as stats_router
 from .routers import visits as visits_router
 from .security import SecurityMiddleware
@@ -60,6 +62,8 @@ app.include_router(measurements_router.router)
 app.include_router(medcard_router.router)
 app.include_router(notes_router.router)
 app.include_router(notifications_router.router)
+app.include_router(orders_router.router)
+app.include_router(symptom_notes_router.router)
 app.include_router(stats_router.router)
 app.include_router(visits_router.router)
 

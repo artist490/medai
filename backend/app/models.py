@@ -218,6 +218,38 @@ class ChatMessage(Base):
     )
 
 
+class SymptomNote(Base):
+    """Дневник самочувствия (Е2): дата, самочувствие 1–5, текст."""
+    __tablename__ = "symptom_notes"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    recorded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    wellbeing = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("wellbeing BETWEEN 1 AND 5", name="ck_symptom_wellbeing"),
+    )
+
+
+class DoctorOrder(Base):
+    """Направление врача (Е3): «сдать анализ X» — чеклист пациенту."""
+    __tablename__ = "doctor_orders"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    doctor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    doctor_name = Column(String, nullable=False, default="")
+    title = Column(String, nullable=False)
+    category = Column(String, nullable=False, default="")
+    status = Column(String, nullable=False, default="planned")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('planned', 'done', 'cancelled')", name="ck_orders_status"),
+    )
+
+
 class AuditLog(Base):
     __tablename__ = "audit_log"
     id = Column(Integer, primary_key=True, autoincrement=True)

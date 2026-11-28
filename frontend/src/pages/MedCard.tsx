@@ -19,7 +19,9 @@ import DoctorNotesBlock from './medcard/DoctorNotesBlock'
 import DocumentsTab from './medcard/DocumentsTab'
 import GoalsEditor from './medcard/GoalsEditor'
 import LabTrends from './medcard/LabTrends'
+import OrdersBlock from './medcard/OrdersBlock'
 import PressureDiary from './medcard/PressureDiary'
+import SymptomDiary from './medcard/SymptomDiary'
 import VisitCard from './medcard/VisitCard'
 import VisitForm from './medcard/VisitForm'
 import { TABS } from './medcard/shared'
@@ -216,6 +218,9 @@ export default function MedCard() {
               </div>
             </section>
 
+            {/* Направления врача (Е3): чеклист «сдать анализ X» */}
+            <OrdersBlock />
+
             {/* Полный список заметок врача по разборам (A2), новые сверху */}
             <DoctorNotesBlock />
           </>
@@ -291,6 +296,9 @@ export default function MedCard() {
 
             {/* Динамика показателей анализов (Д4) — рядом с графиками замеров */}
             <LabTrends />
+
+            {/* Дневник самочувствия (Е2) */}
+            <SymptomDiary />
 
             {/* Мои цели */}
             <section className="panel">

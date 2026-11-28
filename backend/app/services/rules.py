@@ -39,6 +39,30 @@ class RuleResult:
 
 # ---------------------------------------------------------------- пороги ----
 
+# Возрастные группы порогов (Е4, TECH_DEBT_AUDIT F032): rules.py выбирает по
+# возрасту пациента. Изменения против взрослой группы клинически консервативны:
+# у 65+ пульс 55–59 и ИМТ 22–28 чаще вариант нормы (ESC 2018, WHO older adults).
+AGE_BANDS: Dict[int, Dict[str, float]] = {
+    # взрослые (по умолчанию)
+    0: {
+        "pulse_warn_below": 60, "pulse_alarm_below": 50,
+        "bmi_ok_low": 18.5, "bmi_ok_high": 25.0, "bmi_under_alarm": 16.0,
+    },
+    # пожилые 65+
+    65: {
+        "pulse_warn_below": 55, "pulse_alarm_below": 50,
+        "bmi_ok_low": 22.0, "bmi_ok_high": 28.0, "bmi_under_alarm": 16.0,
+    },
+}
+
+
+def age_band(age: Optional[int]) -> Dict[str, float]:
+    """Пороги для возрастной группы: 65+ → пожилые, остальные — взрослые."""
+    if age is not None and age >= 65:
+        return AGE_BANDS[65]
+    return AGE_BANDS[0]
+
+
 def _bp_finding(systolic: Optional[float], diastolic: Optional[float]) -> Optional[Finding]:
     """Классификация АД по ESC/ESH (2023). Для категории берём худший показатель."""
     if systolic is None and diastolic is None:
@@ -99,23 +123,25 @@ def _bp_finding(systolic: Optional[float], diastolic: Optional[float]) -> Option
                    "alarm", "Очень высокое давление! Возможен гипертонический криз — срочно к врачу", norm)
 
 
-def _pulse_finding(pulse: Optional[float]) -> Optional[Finding]:
+def _pulse_finding(pulse: Optional[float], age: Optional[int] = None) -> Optional[Finding]:
     if pulse is None:
         return None
-    if pulse < 50:
+    band = age_band(age)
+    norm = "60–100"
+    if pulse < band["pulse_alarm_below"]:
         return Finding("pulse", "Пульс", f"{pulse:g}", "уд/мин", "alarm",
-                       "Выраженная брадикардия — обратитесь к врачу", "60–100")
-    if pulse < 60:
+                       "Выраженная брадикардия — обратитесь к врачу", norm)
+    if pulse < band["pulse_warn_below"]:
         return Finding("pulse", "Пульс", f"{pulse:g}", "уд/мин", "warn",
-                       "Пульс ниже нормы — если вы не спортсмен, сообщите врачу", "60–100")
+                       "Пульс ниже нормы — если вы не спортсмен, сообщите врачу", norm)
     if pulse <= 100:
         return Finding("pulse", "Пульс", f"{pulse:g}", "уд/мин", "ok",
-                       "Пульс в норме", "60–100")
+                       "Пульс в норме", norm)
     if pulse <= 120:
         return Finding("pulse", "Пульс", f"{pulse:g}", "уд/мин", "warn",
-                       "Учащённый пульс: кофеин, стресс или нагрузка — отдохните и перемерьте", "60–100")
+                       "Учащённый пульс: кофеин, стресс или нагрузка — отдохните и перемерьте", norm)
     return Finding("pulse", "Пульс", f"{pulse:g}", "уд/мин", "alarm",
-                   "Сильно учащённый пульс (тахикардия) — обратитесь к врачу", "60–100")
+                   "Сильно учащённый пульс (тахикардия) — обратитесь к врачу", norm)
 
 
 def _temp_finding(temp: Optional[float]) -> Optional[Finding]:
@@ -153,22 +179,22 @@ def _spo2_finding(spo2: Optional[float]) -> Optional[Finding]:
                    "Сатурация в норме", "95–100")
 
 
-def _bmi_finding(bmi: Optional[float]) -> Optional[Finding]:
+def _bmi_finding(bmi: Optional[float], age: Optional[int] = None) -> Optional[Finding]:
     if bmi is None:
         return None
-    if bmi < 16:
+    band = age_band(age)
+    norm = f"{band['bmi_ok_low']:g}–{band['bmi_ok_high'] - 0.1:g}"
+    if bmi < band["bmi_under_alarm"]:
         msg, st = "Выраженный дефицит массы — обратитесь к врачу", "alarm"
-    elif bmi < 18.5:
+    elif bmi < band["bmi_ok_low"]:
         msg, st = "Недостаточный вес — добавьте калорийности рациону", "warn"
-    elif bmi < 25:
+    elif bmi < band["bmi_ok_high"]:
         msg, st = "ИМТ в норме — отличный результат", "ok"
-    elif bmi < 30:
-        msg, st = "Избыточная масса — помогут питание и шаги", "warn"
     elif bmi < 35:
-        msg, st = "Ожирение 1 степени — обсудите с врачом план снижения веса", "warn"
+        msg, st = "Избыточная масса — помогут питание и шаги", "warn"
     else:
         msg, st = "Ожирение 2+ степени — важно обратиться к врачу", "alarm"
-    return Finding("bmi", "ИМТ", f"{bmi:g}", "кг/м²", st, msg, "18.5–24.9")
+    return Finding("bmi", "ИМТ", f"{bmi:g}", "кг/м²", st, msg, norm)
 
 
 def _sleep_finding(sleep: Optional[float]) -> Optional[Finding]:
@@ -258,25 +284,27 @@ def calc_bmi(height_cm: Optional[float], weight_kg: Optional[float]) -> Optional
     return None
 
 
-def analyze(indicators: dict, height_cm: Optional[float] = None) -> RuleResult:
+def analyze(indicators: dict, height_cm: Optional[float] = None,
+            age: Optional[int] = None) -> RuleResult:
     """Анализ набора показателей. indicators — только заполненные поля.
 
     Ключи: systolic, diastolic, pulse, temperature, spo2, sleep_hours,
-    steps, water_ml, weight_kg. height_cm — рост из профиля пользователя.
+    steps, water_ml, weight_kg. height_cm — рост, age — возраст из профиля:
+    пороги пульса и ИМТ выбираются по возрастной группе (Е4).
     """
     findings: List[Finding] = []
 
     bp = _bp_finding(indicators.get("systolic"), indicators.get("diastolic"))
     if bp:
         findings.append(bp)
-    for f in (_pulse_finding(indicators.get("pulse")),
+    for f in (_pulse_finding(indicators.get("pulse"), age),
               _temp_finding(indicators.get("temperature")),
               _spo2_finding(indicators.get("spo2"))):
         if f:
             findings.append(f)
 
     bmi = calc_bmi(height_cm, indicators.get("weight_kg"))
-    bmi_f = _bmi_finding(bmi)
+    bmi_f = _bmi_finding(bmi, age)
     if bmi_f:
         findings.append(bmi_f)
 

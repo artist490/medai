@@ -93,12 +93,26 @@ export default function DoctorPatients() {
     [items, matchesQuery],
   )
 
+  async function downloadCsv() {
+    const resp = await fetch('/api/doctor/patients/export.csv', { credentials: 'same-origin' })
+    if (!resp.ok) return
+    const blob = await resp.blob()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'patients.csv'
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   return (
     <div className="flex flex-col gap-6 stagger">
       <PageHeader
         eyebrow={user?.branch ? `Филиал · ${user.branch.city}` : undefined}
         title="Пациенты клиники"
         sub="Сверху — те, кому нужен разбор. Остальные отсортированы по последнему замеру."
+        actions={<button className="btn btn-ghost btn-sm" onClick={downloadCsv}>
+          <Icon name="download" size={14} /> CSV
+        </button>}
       />
 
       {error && <div className="text-[12.5px] text-coral-dark">{error}</div>}

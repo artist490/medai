@@ -14,7 +14,9 @@ def run_analysis(measurement: sqlite3.Row, user: sqlite3.Row) -> dict:
     """Полный анализ измерения. Возвращает словарь для сохранения в analyses."""
     indicators = {k: measurement[k] for k in INDICATOR_FIELDS if measurement[k] is not None}
 
-    rule_result = rules.analyze(indicators, height_cm=user["height_cm"]).to_dict()
+    rule_result = rules.analyze(
+        indicators, height_cm=user["height_cm"], age=user["age"],
+    ).to_dict()
 
     # F034: ПДн (имя, пол, возраст) во внешний LLM не уходят —
     # вместо них обезличенная подпись «Пациент N, X лет».

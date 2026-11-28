@@ -16,8 +16,8 @@ import type { CardFormState } from '../components/CardAnamnesis'
 import RiskSystems from '../components/RiskSystems'
 import PageHeader from '../components/PageHeader'
 import { Skeleton, SkeletonCard, SkeletonRows } from '../components/Skeleton'
-import { categoryLabel } from './medcard/shared'
-import type { DocumentItem, Measurement, MedCard, OcrResult, User, DoctorNote, Visit, VisitStatus } from '../types'
+import { categoryLabel, DOC_CATEGORIES } from './medcard/shared'
+import type { DoctorOrder, DocumentItem, Measurement, MedCard, OcrResult, SymptomNote, User, DoctorNote, Visit, VisitStatus } from '../types'
 
 const riskBadgeClass = {
   green: 'badge-green',
@@ -327,6 +327,10 @@ function MedcardTab({ patientId, items, card, onCardSaved }: {
           </button>
         </div>
       </div>
+
+      {/* Направления врача (Е3) и дневник самочувствия (Е2) */}
+      <OrdersSection patientId={patientId} />
+      <SymptomsSection patientId={patientId} />
     </div>
   )
 }
@@ -561,6 +565,145 @@ function DocumentsDoctorTab({ patientId }: { patientId: string }) {
                   )}
                 </div>
               )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------- Дневник самочувствия пациента (Е2, только чтение) ----------
+
+const WELLBEING_LABELS = ['Очень плохо', 'Плохо', 'Средне', 'Хорошо', 'Отлично']
+
+function SymptomsSection({ patientId }: { patientId: string }) {
+  const [notes, setNotes] = useState<SymptomNote[] | null>(null)
+
+  useEffect(() => {
+    api.fetchPatientSymptoms(patientId).then((d) => setNotes(d.items)).catch(() => setNotes([]))
+  }, [patientId])
+
+  if (!notes || notes.length === 0) return null
+
+  return (
+    <div className="panel">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h2 className="text-[14px] font-medium text-ink">Дневник самочувствия</h2>
+        <span className="text-[11.5px] text-ink-soft">· {notes.length}</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {notes.map((n) => (
+          <div key={n.id} className="flip-card">
+            <div className="flex flex-wrap items-center gap-2 text-[11.5px] text-ink-soft tabular-nums">
+              <span>{n.recorded_at.slice(0, 16).replace('T', ' ')}</span>
+              <span className="badge badge-teal">{WELLBEING_LABELS[n.wellbeing - 1]}</span>
+            </div>
+            <p className="text-[13px] leading-relaxed text-ink whitespace-pre-wrap mt-1.5">{n.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------- Направления врача (Е3): «сдать анализ X» ----------
+
+function OrdersSection({ patientId }: { patientId: string }) {
+  const [orders, setOrders] = useState<DoctorOrder[] | null>(null)
+  const [title, setTitle] = useState('')
+  const [category, setCategory] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  function load() {
+    api.fetchPatientOrders(patientId).then((d) => setOrders(d.items)).catch(() => setOrders([]))
+  }
+
+  useEffect(() => { load() }, [patientId])
+
+  async function create(e: FormEvent) {
+    e.preventDefault()
+    if (!title.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      const order = await api.createPatientOrder(patientId, {
+        title: title.trim(),
+        category: category || undefined,
+      })
+      setOrders((prev) => prev ? [order, ...prev] : [order])
+      setTitle('')
+      setCategory('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось создать направление')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function cancel(order: DoctorOrder) {
+    const done = await api.cancelPatientOrder(order.id).catch(() => null)
+    if (done) setOrders((prev) => prev?.map((o) => (o.id === done.id ? done : o)) ?? prev)
+  }
+
+  const planned = orders?.filter((o) => o.status === 'planned') ?? []
+  const history = orders?.filter((o) => o.status !== 'planned') ?? []
+
+  return (
+    <div className="panel">
+      <h2 className="text-[14px] font-medium text-ink mb-1">Направления</h2>
+      <p className="text-[12px] text-ink-soft mb-4">
+        «Сдать анализ X» — чеклист появится у пациента в медкарте. Категория подскажет,
+        какой бланк загрузить в Документы.
+      </p>
+
+      <form onSubmit={create} className="flex flex-wrap items-end gap-2">
+        <div className="flex-1 min-w-[220px]">
+          <label className="flip-label" htmlFor="order-title">Что сдать</label>
+          <input id="order-title" className="flip-input" maxLength={200} required
+                 placeholder="Общий анализ крови, ТТГ…"
+                 value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div className="min-w-[180px]">
+          <label className="flip-label" htmlFor="order-category">Категория бланка</label>
+          <select id="order-category" className="flip-input" value={category}
+                  onChange={(e) => setCategory(e.target.value)}>
+            <option value="">Не указана</option>
+            {DOC_CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+        <button className="btn btn-gold" disabled={busy || !title.trim()}>
+          {busy ? 'Создаём…' : 'Создать направление'}
+        </button>
+      </form>
+      {error && <div className="text-[12.5px] text-coral-dark mt-2">{error}</div>}
+
+      {orders !== null && orders.length > 0 && (
+        <div className="flex flex-col gap-2 mt-4">
+          {planned.map((o) => (
+            <div key={o.id} className="flip-card flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[13.5px] font-medium text-ink">{o.title}</div>
+                <div className="text-[11.5px] text-ink-soft mt-0.5">
+                  {o.doctor_name || 'Врач'} · запись от {o.created_at.slice(0, 10)}
+                  {o.category && <> · «{categoryLabel(o.category)}»</>}
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-sm text-coral" onClick={() => cancel(o)}>
+                Отменить
+              </button>
+            </div>
+          ))}
+          {history.map((o) => (
+            <div key={o.id} className={`flip-card ${o.status === 'cancelled' ? 'opacity-60' : ''}`}>
+              <div className="text-[13px] text-ink-soft">
+                <span className="text-ink font-medium">{o.title}</span>
+                {' — '}{o.status === 'done' ? 'выполнено пациентом' : 'отменено'}
+                {o.completed_at && <> · {o.completed_at.slice(0, 10)}</>}
+              </div>
             </div>
           ))}
         </div>

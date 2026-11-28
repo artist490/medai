@@ -1,16 +1,18 @@
 """Роутер врача: общий пул пациентов клиники, детали и комментарии к анализам."""
+import csv
+import io
 import json
 import sqlite3
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from .. import auth
 from ..database import get_db
-from ..schemas import NoteIn, VisitCloseIn
+from ..schemas import NoteIn, OrderIn, VisitCloseIn
 from ..security import SlidingRateLimiter
 from ..services import llm as llm_service
-from ..services import ocr, signals
+from ..services import doc_categories, ocr, signals
 from ..services.audit import record
 from ..services.payloads import (
     ORDER_SQL,
@@ -136,6 +138,73 @@ def list_patients(
     items.sort(key=lambda x: x["last_measurement_at"] or "", reverse=True)
     items.sort(key=lambda x: not x["requires_attention"])
     return {"items": items}
+
+
+@router.get("/patients/export.csv")
+def export_patients_csv(
+    user: sqlite3.Row = Depends(auth.get_current_doctor),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """CSV-выгрузка пула пациентов филиала (Е6), Excel-совместимая (BOM, ';').
+
+    Маршрут объявлен до /patients/{patient_id}: иначе FastAPI пытался бы
+    прочесть «export.csv» как int и отвечал бы 422.
+    """
+    rows = db.execute(
+        f"""SELECT {PATIENT_FIELDS} FROM users
+           WHERE role = 'patient' AND branch_id IS ? ORDER BY name, id""",
+        (user["branch_id"],),
+    ).fetchall()
+    planned = {
+        r["patient_id"]: r["c"]
+        for r in db.execute(
+            """SELECT v.patient_id, COUNT(*) AS c FROM visits v
+               WHERE v.patient_id IN ({}) AND v.status = 'planned'
+               GROUP BY v.patient_id""".format(", ".join(str(r["id"]) for r in rows) or "NULL"),
+        ).fetchall()
+    }
+    risks: dict[int, str] = {}
+    for r in db.execute(
+        """SELECT m.user_id, a.risk_level, m.recorded_at FROM analyses a
+           JOIN measurements m ON m.id = a.measurement_id
+           WHERE m.user_id IN ({})
+           ORDER BY m.recorded_at DESC, m.id DESC""".format(", ".join(str(r["id"]) for r in rows) or "NULL"),
+    ).fetchall():
+        risks.setdefault(r["user_id"], r["risk_level"])
+    last_meas: dict[int, str] = {}
+    for r in db.execute(
+        """SELECT user_id, MAX(recorded_at) AS last_at FROM measurements
+           WHERE user_id IN ({}) GROUP BY user_id""".format(", ".join(str(r["id"]) for r in rows) or "NULL"),
+    ).fetchall():
+        last_meas[r["user_id"]] = r["last_at"]
+
+    risk_ru = {"green": "Норма", "yellow": "Внимание", "red": "Тревога"}
+    sex_ru = {"male": "мужской", "female": "женский"}
+
+    out = io.StringIO()
+    writer = csv.writer(out, delimiter=";", lineterminator="\n")
+    writer.writerow(("ФИО", "Email", "Телефон", "Возраст", "Пол", "Рост",
+                     "Последний замер", "Последний риск", "Плановые приёмы", "Регистрация"))
+    for r in rows:
+        writer.writerow((
+            r["name"] or r["email"],
+            r["email"],
+            r["phone"] if "phone" in r.keys() else "",
+            r["age"] or "",
+            sex_ru.get(r["sex"], "") if r["sex"] else "",
+            r["height_cm"] or "",
+            last_meas.get(r["id"], ""),
+            risk_ru.get(risks.get(r["id"], ""), ""),
+            planned.get(r["id"], 0),
+            (r["created_at"] or "")[:10],
+        ))
+    content = "\ufeff" + out.getvalue()  # UTF-8 BOM: Excel открывает кириллицу
+    return Response(
+        content=content.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="patients.csv"',
+                 "Cache-Control": "private, no-store"},
+    )
 
 
 @router.get("/patients/{patient_id}")
@@ -412,6 +481,101 @@ def complete_visit(
     db.commit()
     row = db.execute(f"{VISIT_SELECT} WHERE v.id = ?", (visit_id,)).fetchone()
     return visit_payload(row)
+
+
+# ---------- Дневник самочувствия (Е2) и направления (Е3) ----------
+
+@router.get("/patients/{patient_id}/symptoms")
+def patient_symptoms(
+    patient_id: int,
+    user: sqlite3.Row = Depends(auth.get_current_doctor),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Дневник самочувствия пациента филиала — только чтение."""
+    _branch_patient(db, patient_id, user)
+    rows = db.execute(
+        "SELECT id, recorded_at, wellbeing, text FROM symptom_notes "
+        "WHERE user_id = ? ORDER BY id DESC LIMIT 20",
+        (patient_id,),
+    ).fetchall()
+    return {"items": [dict(r) for r in rows]}
+
+
+@router.get("/patients/{patient_id}/orders")
+def patient_orders(
+    patient_id: int,
+    user: sqlite3.Row = Depends(auth.get_current_doctor),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Направления пациента филиала: плановые сверху, затем история."""
+    _branch_patient(db, patient_id, user)
+    rows = db.execute(
+        """SELECT id, doctor_name, title, category, status, created_at, completed_at
+           FROM doctor_orders WHERE patient_id = ?
+           ORDER BY CASE status WHEN 'planned' THEN 0 ELSE 1 END, id DESC""",
+        (patient_id,),
+    ).fetchall()
+    return {"items": [dict(r) for r in rows]}
+
+
+@router.post("/patients/{patient_id}/orders", status_code=201)
+def create_order(
+    patient_id: int,
+    data: OrderIn,
+    user: sqlite3.Row = Depends(auth.get_current_doctor),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Врач создаёт направление: «сдать анализ X», категория нужного бланка."""
+    _branch_patient(db, patient_id, user)
+    category = data.category.strip()
+    if category:
+        known = {c.key for c in doc_categories.DOC_CATEGORIES} | {doc_categories.OTHER.key}
+        if category not in known:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Неизвестная категория")
+    cursor = db.execute(
+        """INSERT INTO doctor_orders (patient_id, doctor_id, doctor_name, title, category)
+           VALUES (?, ?, ?, ?, ?)""",
+        (patient_id, user["id"], user["name"].strip() or "Врач", data.title.strip(), category),
+    )
+    record(db, "order.create", user_id=user["id"], entity="patient", entity_id=patient_id,
+           details={"order_id": int(cursor.lastrowid or 0), "category": category})
+    db.commit()
+    row = db.execute(
+        """SELECT id, doctor_name, title, category, status, created_at, completed_at
+           FROM doctor_orders WHERE id = ?""",
+        (cursor.lastrowid,),
+    ).fetchone()
+    return dict(row)
+
+
+@router.post("/orders/{order_id}/cancel")
+def cancel_order(
+    order_id: int,
+    user: sqlite3.Row = Depends(auth.get_current_doctor),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Врач отменяет плановое направление."""
+    row = db.execute(
+        """SELECT o.id, o.status FROM doctor_orders o
+           JOIN users u ON u.id = o.patient_id
+           WHERE o.id = ? AND u.role = 'patient' AND u.branch_id IS ?""",
+        (order_id, user["branch_id"]),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Направление не найдено")
+    if row["status"] != "planned":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Направление уже обработано")
+    db.execute(
+        "UPDATE doctor_orders SET status = 'cancelled', completed_at = NULL WHERE id = ?",
+        (order_id,),
+    )
+    db.commit()
+    fresh = db.execute(
+        """SELECT id, doctor_name, title, category, status, created_at, completed_at
+           FROM doctor_orders WHERE id = ?""",
+        (order_id,),
+    ).fetchone()
+    return dict(fresh)
 
 
 # ---------- ИИ-сводка пациента ----------

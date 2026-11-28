@@ -169,6 +169,25 @@ export interface LabTrendPoint {
   status: string | null
 }
 
+// Дневник самочувствия (Е2)
+export interface SymptomNote {
+  id: number
+  recorded_at: string
+  wellbeing: number  // 1–5
+  text: string
+}
+
+// Направление врача (Е3)
+export interface DoctorOrder {
+  id: number
+  doctor_name: string
+  title: string
+  category: string
+  status: 'planned' | 'done' | 'cancelled'
+  created_at: string
+  completed_at: string | null
+}
+
 export interface BranchAnalytics {
   branch_city: string | null
   patients_total: number

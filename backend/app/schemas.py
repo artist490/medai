@@ -117,6 +117,19 @@ class VisitCloseIn(BaseModel):
     recommendations: str = Field(default="", max_length=2000)
 
 
+class SymptomNoteIn(BaseModel):
+    """Запись дневника самочувствия (Е2): дата, самочувствие 1–5, текст."""
+    recorded_at: str = Field(default="", max_length=10)  # YYYY-MM-DD или пусто — сейчас
+    wellbeing: int = Field(ge=1, le=5)
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class OrderIn(BaseModel):
+    """Направление врача (Е3): «сдать анализ X», категория нужного бланка."""
+    title: str = Field(min_length=1, max_length=200)
+    category: str = Field(default="", max_length=20)
+
+
 class DocumentPatchIn(BaseModel):
     """Правка документа: название и/или категория.
 

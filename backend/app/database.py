@@ -142,6 +142,29 @@ CREATE TABLE IF NOT EXISTS visits (
     created_at      TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at      TEXT
 );
+
+-- Дневник самочувствия (Е2): записи пациента о состоянии между приёмами.
+-- Не путать с жалобами приёма (visits.complaints): это регулярный дневник.
+CREATE TABLE IF NOT EXISTS symptom_notes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recorded_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    wellbeing   INTEGER NOT NULL CHECK (wellbeing BETWEEN 1 AND 5),
+    text        TEXT NOT NULL
+);
+
+-- Направления врача (Е3): «сдать анализ X» — чеклист пациенту в медкарте
+CREATE TABLE IF NOT EXISTS doctor_orders (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    doctor_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    doctor_name  TEXT NOT NULL DEFAULT '',
+    title        TEXT NOT NULL,
+    category     TEXT NOT NULL DEFAULT '',  -- нужная категория бланка (doc_categories.py)
+    status       TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'done', 'cancelled')),
+    created_at   TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    completed_at TEXT
+);
 """
 
 # Индексы под горячие запросы (см. TECH_DEBT_AUDIT.md): пул врача, аналитика,
@@ -158,6 +181,8 @@ CREATE INDEX IF NOT EXISTS idx_visits_patient         ON visits (patient_id, sta
 CREATE INDEX IF NOT EXISTS idx_doctor_notes_analysis  ON doctor_notes (analysis_id);
 CREATE INDEX IF NOT EXISTS idx_audit_user_time        ON audit_log (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_entity           ON audit_log (entity, entity_id);
+CREATE INDEX IF NOT EXISTS idx_symptom_notes_user     ON symptom_notes (user_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_doctor_orders_patient  ON doctor_orders (patient_id, status);
 """
 
 # Федеральная сеть «Спектр-диагностика»: города и телефоны с spdmed.ru
