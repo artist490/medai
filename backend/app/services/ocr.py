@@ -3,7 +3,6 @@
 Документы не отправляются в Hugging Face, внешний OCR API или LLM. Модель
 загружается заранее через `lit models pull ocria-nano` после проверки лицензии.
 """
-import json
 import logging
 import os
 import signal

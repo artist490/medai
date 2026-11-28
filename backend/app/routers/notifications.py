@@ -13,7 +13,7 @@ import json
 import sqlite3
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
 from .. import auth
 from ..database import get_db

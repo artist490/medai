@@ -39,7 +39,9 @@ class TestAgeNorms:
         """Пульс 57 у 70-летнего — вариант нормы; у 40-летнего — внимание."""
         senior = rules.analyze({"pulse": 57}, age=70)
         adult = rules.analyze({"pulse": 57}, age=40)
-        pulse_of = lambda r: next(f for f in r.findings if f.key == "pulse")
+
+        def pulse_of(r):
+            return next(f for f in r.findings if f.key == "pulse")
         assert pulse_of(senior).status == "ok"
         assert pulse_of(adult).status == "warn"
 
@@ -54,7 +56,9 @@ class TestAgeNorms:
         """ИМТ 25.7: у 40-летнего — избыточная масса, у 70-летнего — норма."""
         adult = rules.analyze({"weight_kg": 70}, height_cm=165, age=40)
         senior = rules.analyze({"weight_kg": 70}, height_cm=165, age=70)
-        bmi_of = lambda r: next(f for f in r.findings if f.key == "bmi")
+
+        def bmi_of(r):
+            return next(f for f in r.findings if f.key == "bmi")
         assert bmi_of(adult).status == "warn"
         assert bmi_of(senior).status == "ok"
         assert bmi_of(senior).norm == "22–27.9"

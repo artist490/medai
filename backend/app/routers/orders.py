@@ -12,7 +12,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from .. import auth
 from ..database import get_db
-from ..services.audit import record
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 

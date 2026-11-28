@@ -11,8 +11,8 @@ from .. import auth
 from ..database import get_db
 from ..schemas import NoteIn, OrderIn, VisitCloseIn
 from ..security import SlidingRateLimiter
-from ..services import llm as llm_service
 from ..services import doc_categories, ocr, signals
+from ..services import llm as llm_service
 from ..services.audit import record
 from ..services.payloads import (
     ORDER_SQL,

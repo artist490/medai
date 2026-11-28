@@ -3,7 +3,9 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from sqlalchemy import engine_from_config, pool, inspect as sa_inspect, text as sa_text
+from sqlalchemy import engine_from_config, pool
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import text as sa_text
 
 from alembic import context
 

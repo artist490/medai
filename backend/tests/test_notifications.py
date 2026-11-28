@@ -1,7 +1,6 @@
 """Колокольчик уведомлений (Б1—Б3): подсчёт непрочитанных, сброс при просмотре,
 изоляция ролей. Derived-запрос — состояние проверяем через API, не через таблицу.
 """
-import io
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path

@@ -20,8 +20,8 @@ from .routers import medcard as medcard_router
 from .routers import notes as notes_router
 from .routers import notifications as notifications_router
 from .routers import orders as orders_router
-from .routers import symptom_notes as symptom_notes_router
 from .routers import stats as stats_router
+from .routers import symptom_notes as symptom_notes_router
 from .routers import visits as visits_router
 from .security import SecurityMiddleware
 
