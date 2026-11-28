@@ -9,10 +9,19 @@ import { useAuth } from '../auth'
 import { brand } from '../brand'
 import { Icon } from './Icon'
 import type { IconName } from './Icon'
+import type { NotificationItem } from '../types'
 import AvatarDoctor from './AvatarDoctor'
 import AvatarPatient from './AvatarPatient'
 
 type NavItem = { to: string; label: string; icon: IconName }
+
+// Иконка элемента колокольчика по типу уведомления (Б2)
+const NOTIF_ICON: Record<NotificationItem['type'], IconName> = {
+  note: 'doc',
+  visit_done: 'check',
+  visit_tomorrow: 'calendar',
+  signal: 'alarm',
+}
 
 const patientNav: NavItem[] = [
   { to: '/', label: 'Обзор', icon: 'home' },
@@ -71,34 +80,39 @@ function BarLink({ to, label, icon, end }: {
 
 export default function Layout() {
   const { user, logout } = useAuth()
-  const [signalCount, setSignalCount] = useState(0)
+  // Колокольчик (Б1): у пациента — заметки врача, завершённые приёмы, приём
+  // завтра; у врача — непрочитанные сигналы, как раньше. Один эндпоинт.
+  const [notif, setNotif] = useState<{ unread: number; items: NotificationItem[] }>({ unread: 0, items: [] })
+  const [notifOpen, setNotifOpen] = useState(false)
+  const notifButtonRef = useRef<HTMLButtonElement>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    if (user?.role !== 'doctor') return
-    const load = () => api.fetchSignals().then((d) => setSignalCount(d.unread)).catch(() => {})
+    if (!user) return
+    const load = () => api.fetchNotifications().then(setNotif).catch(() => {})
     load()
-    // Сигналы врача обновляются сами: новый красный замер появится без перезагрузки
+    // Обновляется само: новая заметка врача или красный замер — без перезагрузки
     const timer = setInterval(load, 60_000)
     return () => clearInterval(timer)
   }, [user])
   const navigate = useNavigate()
   const location = useLocation()
   const [query, setQuery] = useState('')
-  // Меню аватара закрывается при смене маршрута
-  useEffect(() => { setUserMenuOpen(false) }, [location.pathname])
+  // Меню аватара и колокольчик закрываются при смене маршрута
+  useEffect(() => { setUserMenuOpen(false); setNotifOpen(false) }, [location.pathname])
   useEffect(() => {
-    if (!userMenuOpen) return
+    if (!userMenuOpen && !notifOpen) return
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       event.preventDefault()
       setUserMenuOpen(false)
+      setNotifOpen(false)
       userMenuButtonRef.current?.focus()
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [userMenuOpen])
+  }, [userMenuOpen, notifOpen])
   // Перетекающий индикатор активного пункта: сайдбар и мобильный бар
   const navRef = useRef<HTMLElement>(null)
   const navRect = useFlowRect(navRef, '.sidebar-link.active', location.pathname)
@@ -113,6 +127,17 @@ export default function Layout() {
     if (!window.confirm('Выйти из аккаунта?')) return
     await logout()
     navigate('/login')
+  }
+
+  function openNotifs() {
+    const next = !notifOpen
+    setNotifOpen(next)
+    // Открыл список → просмотрено. У пациента счётчик сбросится сразу;
+    // у врача сигналы закрываются разбором красного замера, «как сейчас».
+    if (next && notif.unread > 0) {
+      api.markNotificationsSeen().catch(() => {})
+        .finally(() => { api.fetchNotifications().then(setNotif).catch(() => {}) })
+    }
   }
 
   function submitSearch(e: FormEvent) {
@@ -171,9 +196,9 @@ export default function Layout() {
               >
                 <span className="sidebar-icon"><Icon name={item.icon} size={18} /></span>
                 <span className="truncate">{item.label}</span>
-                {item.to === '/patients' && signalCount > 0 && (
+                {item.to === '/patients' && notif.unread > 0 && (
                   <span className="ml-auto text-[11px] font-medium text-coral-dark tabular-nums">
-                    {signalCount}
+                    {notif.unread}
                   </span>
                 )}
               </NavLink>
@@ -219,17 +244,59 @@ export default function Layout() {
             </form>
 
             <div className="ml-auto flex items-center gap-1">
-              {isDoctor && signalCount > 0 && (
+              {/* Колокольчик (Б2): бейдж с числом и выпадающий список, клик ведёт к цели */}
+              <div className="relative">
                 <button
                   className="topbar-icon"
-                  title="Новые сигналы: требуются разборы"
-                  aria-label="Сигналы"
-                  onClick={() => navigate('/patients')}
+                  ref={notifButtonRef}
+                  title="Уведомления"
+                  aria-label="Уведомления"
+                  aria-haspopup="menu"
+                  aria-expanded={notifOpen}
+                  onClick={openNotifs}
                 >
-                  <Icon name="alarm" size={19} />
-                  <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-coral" aria-hidden />
+                  <Icon name="bell" size={19} />
+                  {notif.unread > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-coral text-white text-[10px] font-semibold leading-4 tabular-nums text-center" aria-hidden>
+                      {notif.unread > 9 ? '9+' : notif.unread}
+                    </span>
+                  )}
                 </button>
-              )}
+                {notifOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40 cursor-default" onClick={() => setNotifOpen(false)} aria-hidden />
+                    <div
+                      role="menu"
+                      aria-label="Уведомления"
+                      className="absolute right-0 top-[40px] z-50 w-[320px] max-w-[calc(100vw-24px)] bg-white border border-line rounded-lg shadow-float p-1 flex flex-col"
+                    >
+                      <div className="text-[12px] font-semibold text-ink-soft uppercase tracking-[0.04em] px-3 pt-2 pb-1">
+                        Уведомления
+                      </div>
+                      {notif.items.length === 0 ? (
+                        <p className="text-[13px] text-ink-soft px-3 py-4">Пока ничего нового</p>
+                      ) : (
+                        notif.items.map((item) => (
+                          <button
+                            key={item.id}
+                            role="menuitem"
+                            className="text-left px-3 py-2.5 rounded hover:bg-[#f4f6f5] transition-quick flex items-start gap-2.5"
+                            onClick={() => { setNotifOpen(false); navigate(item.target) }}
+                          >
+                            <Icon name={NOTIF_ICON[item.type] ?? 'bell'} size={15} className="mt-0.5 text-teal-dark shrink-0" />
+                            <span className="min-w-0">
+                              <span className="block text-[13px] text-ink leading-snug">{item.text}</span>
+                              <span className="block text-[11px] text-ink-soft tabular-nums mt-0.5">
+                                {item.created_at.slice(0, 16).replace('T', ' ')}
+                              </span>
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
               {/* Аватар: меню профиля (профиль / выход) вместо мгновенного logout */}
               <div className="relative">
                 {isDoctor ? (
@@ -328,8 +395,10 @@ export default function Layout() {
               >
                 <span className="relative">
                   <Icon name="alarm" size={19} />
-                  {signalCount > 0 && (
-                    <span className="absolute -top-1 -right-1.5 w-1.5 h-1.5 rounded-full bg-coral" aria-hidden />
+                  {notif.unread > 0 && (
+                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-coral text-white text-[9px] font-semibold leading-[14px] tabular-nums text-center" aria-hidden>
+                      {notif.unread > 9 ? '9+' : notif.unread}
+                    </span>
                   )}
                 </span>
                 <span className="whitespace-nowrap">Сигналы</span>

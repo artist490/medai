@@ -1,5 +1,5 @@
 // API-клиент: HttpOnly-сессия + CSRF; Bearer не хранится в браузерном storage.
-import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DoctorNoteItem, DocumentItem, DoctorSignal, Goals, Measurement, MedCard, MedCardInput, OcrResult, PatientRow, Stats, User, Visit } from './types'
+import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DoctorNoteItem, DocumentItem, DoctorSignal, Goals, Measurement, MedCard, MedCardInput, NotificationItem, OcrResult, PatientRow, Stats, User, Visit } from './types'
 
 const TOKEN_KEY = 'medai_token'
 
@@ -322,6 +322,17 @@ export async function startDocumentOcr(id: number): Promise<OcrResult> {
 
 export async function fetchDocumentOcr(id: number): Promise<OcrResult> {
   return request(`/api/documents/${id}/ocr`)
+}
+
+// ---------- уведомления (колокольчик, Б1) ----------
+
+export async function fetchNotifications(): Promise<{ unread: number; items: NotificationItem[] }> {
+  return request('/api/notifications')
+}
+
+/** Список уведомлений просмотрен: пациенту сбрасывает счётчик. */
+export async function markNotificationsSeen(): Promise<void> {
+  return request<void>('/api/notifications/seen', { method: 'POST' })
 }
 
 // ---------- сигналы и аналитика врача ----------

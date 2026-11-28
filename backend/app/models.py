@@ -42,6 +42,7 @@ class User(Base):
     role = Column(String, nullable=False, default="patient")  # CHECK в миграции
     branch_id = Column(Integer, ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
     phone = Column(String, nullable=False, default="")  # контактный телефон
+    notifications_seen_at = Column(DateTime, nullable=True)  # открытие колокольчика
     disabled = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 

@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
     role          TEXT NOT NULL DEFAULT 'patient' CHECK (role IN ('patient', 'doctor')),
     branch_id     INTEGER REFERENCES branches(id) ON DELETE SET NULL,
     phone         TEXT NOT NULL DEFAULT '',   -- контактный телефон, видит филиал
+    notifications_seen_at TEXT,               -- последнее открытие колокольчика (Б1)
     disabled      INTEGER NOT NULL DEFAULT 0,  -- 1 = доступ отозван (tools/disable_user.py)
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -294,6 +295,8 @@ def _migrate(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE users ADD COLUMN middle_name TEXT NOT NULL DEFAULT ''")
     if "phone" not in columns:
         db.execute("ALTER TABLE users ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
+    if "notifications_seen_at" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN notifications_seen_at TEXT")
     if _users_need_rebuild(db):
         _rebuild_users(db)
     card_columns = {row["name"] for row in db.execute("PRAGMA table_info(patient_cards)").fetchall()}

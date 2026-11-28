@@ -130,6 +130,15 @@ export interface DoctorSignal {
   summary: string
 }
 
+// Элемент колокольчика (GET /api/notifications, Б1): derived-запрос без таблицы
+export interface NotificationItem {
+  id: string
+  type: 'note' | 'visit_done' | 'visit_tomorrow' | 'signal'
+  text: string
+  created_at: string
+  target: string
+}
+
 export interface BranchAnalytics {
   branch_city: string | null
   patients_total: number
