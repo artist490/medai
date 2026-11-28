@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from .. import auth
 from ..database import db_session, get_db
-from ..schemas import BranchChangeIn, LoginIn, ProfileIn, RegisterIn
+from ..schemas import BranchChangeIn, EmailChangeIn, LoginIn, PasswordChangeIn, ProfileIn, RegisterIn
 from ..security import SESSION_COOKIE, SlidingRateLimiter, clear_auth_cookies, csrf_cookie, session_cookie
 from ..services.audit import record
 from ..services.payloads import compose_full_name
@@ -21,6 +21,7 @@ _login_limiter = SlidingRateLimiter(5, 15 * 60)
 _login_ip_limiter = SlidingRateLimiter(60, 15 * 60)
 _register_limiter = SlidingRateLimiter(5, 60 * 60)
 _branch_change_limiter = SlidingRateLimiter(5, 15 * 60)
+_credentials_limiter = SlidingRateLimiter(5, 15 * 60)  # брутфорс-гвард смены пароля/email (Г1, Г2)
 _DUMMY_PASSWORD_HASH = auth.hash_password(secrets.token_urlsafe(32))
 
 # Телефон храним как введённый, но не принимаем произвольный текст (A3).
@@ -256,3 +257,72 @@ def change_branch(
     db.commit()
     fresh = db.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
     return user_payload(fresh, branch)
+
+
+def _session_token(request: Request, credentials=Depends(auth.bearer_scheme)) -> Optional[str]:
+    """Токен текущей сессии: cookie для браузера, Bearer для машинных клиентов."""
+    if credentials:
+        return credentials.credentials
+    return request.cookies.get(SESSION_COOKIE)
+
+
+@router.put("/me/password")
+def change_password(
+    data: PasswordChangeIn,
+    request: Request,
+    user: sqlite3.Row = Depends(auth.get_current_user),
+    db: sqlite3.Connection = Depends(get_db),
+    token: Optional[str] = Depends(_session_token),
+):
+    """Смена пароля (Г1): старый пароль подтверждает владение аккаунтом.
+
+    После смены прочие сессии отзываются — остаётся только текущая: если
+    пароль подобрали, злоумышленник теряет доступ даже при живом cookie.
+    """
+    if not _credentials_limiter.allow(f"password|{user['id']}"):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Слишком много попыток — подождите 15 минут")
+    if not auth.verify_password(data.current_password, user["password_hash"]):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Неверный текущий пароль")
+    if data.new_password == data.current_password:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Новый пароль совпадает со старым")
+    db.execute(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+        (auth.hash_password(data.new_password), user["id"]),
+    )
+    if token:
+        db.execute("DELETE FROM sessions WHERE user_id = ? AND token <> ?",
+                   (user["id"], token))
+    record(db, "auth.password_change", user_id=user["id"], entity="user", entity_id=user["id"],
+           ip=_ip(request), user_agent=request.headers.get("user-agent"))
+    db.commit()
+    return {"ok": True}
+
+
+@router.put("/me/email")
+def change_email(
+    data: EmailChangeIn,
+    request: Request,
+    user: sqlite3.Row = Depends(auth.get_current_user),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Смена email (Г2): только с текущим паролем; занятый адрес — 409.
+
+    Сессии не отзываем: cookie остаётся действительным, вход идёт по
+    новому адресу со следующим логином.
+    """
+    if not _credentials_limiter.allow(f"email|{user['id']}"):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Слишком много попыток — подождите 15 минут")
+    if not auth.verify_password(data.current_password, user["password_hash"]):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Неверный текущий пароль")
+    new_email = data.email.lower()
+    if new_email == user["email"].lower():
+        return user_payload(user, _branch_of(db, user["branch_id"]))
+    exists = db.execute("SELECT id FROM users WHERE email = ?", (new_email,)).fetchone()
+    if exists:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Пользователь с таким email уже есть")
+    db.execute("UPDATE users SET email = ? WHERE id = ?", (new_email, user["id"]))
+    record(db, "auth.email_change", user_id=user["id"], entity="user", entity_id=user["id"],
+           ip=_ip(request), user_agent=request.headers.get("user-agent"))
+    db.commit()
+    fresh = db.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+    return user_payload(fresh, _branch_of(db, fresh["branch_id"]))

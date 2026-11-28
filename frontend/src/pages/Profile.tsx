@@ -8,7 +8,7 @@ import * as api from '../api'
 import { Icon } from '../components/Icon'
 import BranchMap from '../components/BranchMap'
 import PageHeader from '../components/PageHeader'
-import type { Branch } from '../types'
+import type { Branch, User } from '../types'
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max)
 
@@ -41,6 +41,121 @@ function bmiStatus(bmi: number): { label: string; note: string; warn: boolean } 
 }
 
 const RING_C = 2 * Math.PI * 52
+
+// Секция «Безопасность» (Г3): смена пароля и email с подтверждением текущим
+// паролем. Сервер отзывает прочие сессии после смены пароля.
+function SecuritySection({ user, onEmailChanged }: {
+  user: User
+  onEmailChanged: (user: User) => void
+}) {
+  const [curPassword, setCurPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [repeat, setRepeat] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [pwMsg, setPwMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [emMsg, setEmMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [pwBusy, setPwBusy] = useState(false)
+  const [emBusy, setEmBusy] = useState(false)
+
+  async function submitPassword(e: FormEvent) {
+    e.preventDefault()
+    if (newPassword !== repeat) {
+      setPwMsg({ kind: 'err', text: 'Пароли не совпадают' })
+      return
+    }
+    setPwBusy(true)
+    setPwMsg(null)
+    try {
+      await api.changePassword(curPassword, newPassword)
+      setPwMsg({ kind: 'ok', text: 'Пароль изменён. Другие сессии завершены.' })
+      setCurPassword(''); setNewPassword(''); setRepeat('')
+    } catch (err) {
+      setPwMsg({ kind: 'err', text: err instanceof Error ? err.message : 'Не удалось сменить пароль' })
+    } finally {
+      setPwBusy(false)
+    }
+  }
+
+  async function submitEmail(e: FormEvent) {
+    e.preventDefault()
+    setEmBusy(true)
+    setEmMsg(null)
+    try {
+      const updated = await api.changeEmail(curPassword, newEmail.trim())
+      onEmailChanged(updated)
+      setEmMsg({ kind: 'ok', text: 'Email обновлён' })
+      setNewEmail('')
+    } catch (err) {
+      setEmMsg({ kind: 'err', text: err instanceof Error ? err.message : 'Не удалось сменить email' })
+    } finally {
+      setEmBusy(false)
+    }
+  }
+
+  return (
+    <section className="panel">
+      <div className="flex items-baseline justify-between gap-3 mb-1">
+        <h2 className="text-[14px] font-medium text-ink">Безопасность</h2>
+        <p className="text-[11.5px] text-ink-soft">Вход в аккаунт</p>
+      </div>
+
+      <form onSubmit={submitPassword} className="flex flex-col gap-3 mt-4 max-w-md">
+        <div className="text-[13px] font-medium text-ink">Пароль</div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className="flip-label" htmlFor="sec-cur">Текущий пароль</label>
+            <input id="sec-cur" className="flip-input" type="password" autoComplete="current-password"
+                   required value={curPassword} onChange={(e) => setCurPassword(e.target.value)} />
+          </div>
+          <div>
+            <label className="flip-label" htmlFor="sec-new">Новый пароль</label>
+            <input id="sec-new" className="flip-input" type="password" autoComplete="new-password"
+                   required minLength={12} placeholder="Не короче 12 символов"
+                   value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+          </div>
+        </div>
+        <div className="max-w-[240px]">
+          <label className="flip-label" htmlFor="sec-repeat">Повторите новый</label>
+          <input id="sec-repeat" className="flip-input" type="password" autoComplete="new-password"
+                 required value={repeat} onChange={(e) => setRepeat(e.target.value)} />
+        </div>
+        {pwMsg && (
+          <div className={`text-[12.5px] ${pwMsg.kind === 'ok' ? 'text-teal-dark' : 'text-coral-dark'}`}>
+            {pwMsg.text}
+          </div>
+        )}
+        <button className="btn btn-gold w-fit" disabled={pwBusy}>
+          {pwBusy ? 'Сохраняем…' : 'Сменить пароль'}
+        </button>
+      </form>
+
+      <form onSubmit={submitEmail} className="flex flex-col gap-3 mt-6 pt-6 border-t border-line max-w-md">
+        <div className="text-[13px] font-medium text-ink">Email</div>
+        <p className="text-[12px] text-ink-soft">Сейчас: {user.email}</p>
+        <div>
+          <label className="flip-label" htmlFor="sec-email-password">Текущий пароль</label>
+          <input id="sec-email-password" className="flip-input" type="password" autoComplete="current-password"
+                 required value={curPassword} onChange={(e) => setCurPassword(e.target.value)} />
+        </div>
+        <div>
+          <label className="flip-label" htmlFor="sec-email">Новый email</label>
+          <input id="sec-email" className="flip-input" type="email" autoComplete="email" required
+                 placeholder="you@example.com" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+        </div>
+        {emMsg && (
+          <div className={`text-[12.5px] ${emMsg.kind === 'ok' ? 'text-teal-dark' : 'text-coral-dark'}`}>
+            {emMsg.text}
+          </div>
+        )}
+        <button className="btn btn-ghost w-fit" disabled={emBusy || !newEmail.trim()}>
+          {emBusy ? 'Сохраняем…' : 'Сменить email'}
+        </button>
+        <p className="flip-hint">Восстановление доступа по почте пока не подключено —
+          запомните новый email. Потеряли доступ: обратитесь в клинику.</p>
+      </form>
+    </section>
+  )
+}
 
 // Координаты филиалов — по фактическим адресам клиник (geocoded 2026-11-15)
 const CITY_COORDS: Record<string, [number, number]> = {
@@ -445,7 +560,6 @@ export default function Profile() {
           <h2 className="text-[14px] font-medium text-ink">Филиал</h2>
           <p className="text-[11.5px] text-ink-soft">Для записи и результатов</p>
         </div>
-
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] items-stretch">
           <div className="relative rounded-md overflow-hidden border border-line z-0">
             {branchCity && CITY_COORDS[branchCity] && CITY_SLUG[branchCity] ? (
@@ -530,6 +644,9 @@ export default function Profile() {
           <p className="flip-hint mt-4">Смена филиала врача выполняется администратором клиники.</p>
         )}
       </section>
+
+      {/* Безопасность (Г3): пароль и email */}
+      {user && <SecuritySection user={user} onEmailChanged={setUser} />}
 
       {/* Панель сохранения: в потоке страницы, под картой филиала */}
       <div className="flex flex-wrap items-center justify-between gap-3 border border-line rounded-lg bg-white px-4 py-3">

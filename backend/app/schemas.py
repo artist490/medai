@@ -39,6 +39,18 @@ class BranchChangeIn(BaseModel):
     current_password: str = Field(min_length=1, max_length=128)
 
 
+class PasswordChangeIn(BaseModel):
+    """Смена пароля (Г1): подтверждение старым паролем, минимум как при регистрации."""
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=12, max_length=128)
+
+
+class EmailChangeIn(BaseModel):
+    """Смена email (Г2): только с текущим паролем; занятый адрес — 409."""
+    current_password: str = Field(min_length=1, max_length=128)
+    email: EmailStr
+
+
 class MeasurementIn(BaseModel):
     """Все поля необязательны — но хотя бы одно должно быть заполнено."""
     systolic: Optional[float] = Field(default=None, ge=50, le=280)

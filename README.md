@@ -154,6 +154,26 @@ PlusVibe — внешний обработчик данных: во всех т�
 Комбинации: жар + учащённый пульс → инфекция; давление + пульс → стресс/кофеин;
 недосып + высокое давление; лишний вес + низкая активность; гипотония + обезвоживание.
 
+## Бэкапы (Г4)
+
+Копия БД делается штатным Online Backup SQLite — согласованно даже при
+работающем сервере (WAL):
+
+```bash
+python tools/backup_db.py                  # копия в tools/backup/, ротация до 14 копий
+python tools/backup_db.py --keep 30        # хранить 30 копий
+python tools/backup_db.py --verify         # открыть последнюю копию и посчитать строки
+```
+
+Ночное расписание:
+
+- **cron** (Linux): `30 3 * * * cd /srv/medai && python tools/backup_db.py`
+- **Task Scheduler** (Windows):
+  `schtasks /Create /TN "MedAI backup" /SC DAILY /ST 03:30 /TR "python C:\srv\medai\tools\backup_db.py"`
+
+Копии содержат медицинские данные — храните каталог рядом с БД или на
+зашифрованном диске, наружу не выгружайте.
+
 ## Тесты
 
 ```bash

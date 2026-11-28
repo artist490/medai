@@ -120,6 +120,22 @@ export async function changeBranch(branchId: number, currentPassword: string): P
   })
 }
 
+// ---------- безопасность (Г1, Г2) ----------
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  return request<void>('/api/auth/me/password', {
+    method: 'PUT',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  })
+}
+
+export async function changeEmail(currentPassword: string, email: string): Promise<User> {
+  return request<User>('/api/auth/me/email', {
+    method: 'PUT',
+    body: JSON.stringify({ current_password: currentPassword, email }),
+  })
+}
+
 // ---------- measurements ----------
 
 export interface MeasurementInput {
