@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from .. import auth, config
 from ..database import get_db
 from ..schemas import DocumentPatchIn
-from ..services import doc_categories, ocr
+from ..services import doc_categories, lab_parse, ocr
 from ..services.audit import record
 from ..services.payloads import doc_payload
 
@@ -123,6 +123,53 @@ def list_documents(user: sqlite3.Row = Depends(auth.get_current_user),
         (user["id"],),
     ).fetchall()
     return {"items": [doc_payload(r) for r in rows]}
+
+
+# ---------- Структурированные показатели (Д3, Д4) ----------
+
+@router.get("/lab-keys")
+def lab_keys(
+    user: sqlite3.Row = Depends(auth.get_current_user),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Показатели, распознанные хотя бы в одном документе пациента — для графика."""
+    rows = db.execute(
+        """SELECT DISTINCT json_extract(j.value, '$.key') AS key
+           FROM documents d, json_each(d.lab_values, '$.items') j
+           WHERE d.user_id = ? AND d.lab_values IS NOT NULL""",
+        (user["id"],),
+    ).fetchall()
+    items = [
+        {"key": r["key"], "label": lab_parse.LAB_KEY_LABELS[r["key"]]}
+        for r in rows
+        if r["key"] in lab_parse.LAB_KEY_LABELS
+    ]
+    items.sort(key=lambda x: x["label"])
+    return {"items": items}
+
+
+@router.get("/lab-trend")
+def lab_trend(
+    key: str,
+    user: sqlite3.Row = Depends(auth.get_current_user),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Динамика показателя по датам из всех распознанных документов пациента."""
+    if key not in lab_parse.LAB_KEY_LABELS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Неизвестный показатель")
+    rows = db.execute(
+        """SELECT d.uploaded_at, d.title,
+                  json_extract(j.value, '$.value') AS value,
+                  json_extract(j.value, '$.unit') AS unit,
+                  json_extract(j.value, '$.status') AS status
+           FROM documents d, json_each(d.lab_values, '$.items') j
+           WHERE d.user_id = ? AND json_extract(j.value, '$.key') = ?
+             AND d.ocr_status = 'ready' AND d.lab_values IS NOT NULL
+             AND json_extract(j.value, '$.value') IS NOT NULL
+           ORDER BY d.uploaded_at, d.id""",
+        (user["id"], key),
+    ).fetchall()
+    return {"key": key, "label": lab_parse.LAB_KEY_LABELS[key], "items": [dict(r) for r in rows]}
 
 
 @router.patch("/{doc_id}")

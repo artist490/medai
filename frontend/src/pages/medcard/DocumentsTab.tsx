@@ -9,7 +9,68 @@ import EmptyArt from '../../components/EmptyArt'
 import OcrText from '../../components/OcrText'
 import { Skeleton } from '../../components/Skeleton'
 import { DOC_CATEGORIES } from './shared'
-import type { DocumentItem, OcrResult } from '../../types'
+import type { DocumentItem, LabValue, OcrResult } from '../../types'
+
+// Статус показателя — тихая точка + текст (не пилюли), по ai-design правилам
+const LAB_STATUS: Record<LabValue['status'], { dot: string; text: string }> = {
+  normal: { dot: '#2e7d5b', text: 'в норме' },
+  high: { dot: '#b07a4a', text: 'выше нормы' },
+  low: { dot: '#b07a4a', text: 'ниже нормы' },
+  unknown: { dot: '#9aa8a2', text: 'норма не указана' },
+}
+
+function LabValuesTable({ lab }: { lab: { items: LabValue[]; unparsed: number } }) {
+  return (
+    <div className="mt-3 pl-[30px]">
+      <table className="data-table text-[13px]">
+        <thead>
+          <tr>
+            <th>Показатель</th>
+            <th className="!text-right">Значение</th>
+            <th className="hidden sm:table-cell">Норма</th>
+            <th className="hidden sm:table-cell">Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lab.items.map((v) => {
+            const st = LAB_STATUS[v.status] ?? LAB_STATUS.unknown
+            return (
+              <tr key={v.key}>
+                <td className="font-medium">{v.label}</td>
+                <td className="!text-right tabular-nums">
+                  {v.value}{v.unit ? ` ${v.unit}` : ''}
+                </td>
+                <td className="hidden sm:table-cell text-ink-soft tabular-nums">{v.norm_text || '—'}</td>
+                <td className="hidden sm:table-cell">
+                  <span className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-soft">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: st.dot }} aria-hidden />
+                    {st.text}
+                  </span>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      {/* Мобильный статус под значением: колонки статуса/нормы скрыты на узких экранах */}
+      <div className="sm:hidden mt-1 flex flex-col gap-0.5">
+        {lab.items.map((v) => {
+          const st = LAB_STATUS[v.status] ?? LAB_STATUS.unknown
+          return (
+            <span key={v.key} className="text-[11.5px] text-ink-soft inline-flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: st.dot }} aria-hidden />
+              {v.label} — {st.text}
+            </span>
+          )
+        })}
+      </div>
+      {lab.unparsed > 0 && (
+        <p className="flip-hint mt-2">Не распознано строк: {lab.unparsed}. Показатели берутся
+          из распознанного текста как есть — цифры OCR не исправляются.</p>
+      )}
+    </div>
+  )
+}
 
 function groupedDocs(docs: DocumentItem[]): Array<{ key: string; label: string; docs: DocumentItem[] }> {
   const groups = new Map<string, DocumentItem[]>()
@@ -34,6 +95,7 @@ export default function DocumentsTab() {
   const [ocrBusy, setOcrBusy] = useState(false)
   const [editing, setEditing] = useState<{ id: number; title: string; category: string } | null>(null)
   const [editBusy, setEditBusy] = useState(false)
+  const [labOpenId, setLabOpenId] = useState<number | null>(null)
 
   useEffect(() => {
     if (ocrDocId === null || !ocr || !['pending', 'processing'].includes(ocr.status)) return
@@ -256,7 +318,8 @@ export default function DocumentsTab() {
             </div>
             <div className="divide-y divide-[#eef4f3]">
               {group.docs.map((d) => (
-                <div key={d.id} className="py-3 flex items-center gap-3">
+                <div key={d.id} className="py-3">
+                <div className="flex items-center gap-3">
                   <span className="emoji-box"><Icon name="doc" size={18} /></span>
                   {editing?.id === d.id ? (
                     <div className="min-w-0 flex-1 flex flex-col gap-2">
@@ -311,6 +374,12 @@ export default function DocumentsTab() {
                               aria-label={'Распознать ' + d.title}>
                         <Icon name="sparkle" size={16} />
                       </button>
+                      {d.lab_values && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => setLabOpenId(labOpenId === d.id ? null : d.id)}
+                                title="Распознанные показатели" aria-label={'Показатели ' + d.title}>
+                          <Icon name="chart" size={16} />
+                        </button>
+                      )}
                       <button className="btn btn-ghost btn-sm" onClick={() => download(d)} aria-label={'Скачать ' + d.title}>
                         <Icon name="download" size={16} />
                       </button>
@@ -319,6 +388,8 @@ export default function DocumentsTab() {
                       </button>
                     </>
                   )}
+                </div>
+                {labOpenId === d.id && d.lab_values && <LabValuesTable lab={d.lab_values} />}
                 </div>
               ))}
             </div>

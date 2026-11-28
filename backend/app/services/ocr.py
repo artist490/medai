@@ -3,6 +3,7 @@
 Документы не отправляются в Hugging Face, внешний OCR API или LLM. Модель
 загружается заранее через `lit models pull ocria-nano` после проверки лицензии.
 """
+import json
 import logging
 import os
 import signal
@@ -13,7 +14,7 @@ from pathlib import Path
 
 from .. import config
 from ..database import db_session
-from . import doc_categories, ocr_postprocess
+from . import doc_categories, lab_parse, ocr_postprocess
 from .audit import record
 
 logger = logging.getLogger("medai.ocr")
@@ -181,24 +182,25 @@ def process_one(document_id: int | None = None) -> bool:
             # Категория и авто-название считаются из очищенного текста бланка;
             # ручное название (title_source='user') не перезаписывается.
             category = doc_categories.classify(clean_text)
+            lab_json = lab_parse.store_json(lab_parse.parse(clean_text))
             titled = False
             if title_source == "auto":
                 auto_title = doc_categories.suggest_title(clean_text, category, uploaded_at)
                 db.execute(
                     """UPDATE documents SET ocr_status='ready', ocr_text=?, ocr_text_clean=?,
                        ocr_error=NULL, ocr_finished_at=datetime('now', 'localtime'),
-                       category=?, title=?
+                       category=?, title=?, lab_values=?
                        WHERE id=? AND ocr_status='processing'""",
-                    (text, clean_text, category.key, auto_title, doc_id),
+                    (text, clean_text, category.key, auto_title, lab_json, doc_id),
                 )
                 titled = True
             else:
                 db.execute(
                     """UPDATE documents SET ocr_status='ready', ocr_text=?, ocr_text_clean=?,
                        ocr_error=NULL, ocr_finished_at=datetime('now', 'localtime'),
-                       category=?
+                       category=?, lab_values=?
                        WHERE id=? AND ocr_status='processing'""",
-                    (text, clean_text, category.key, doc_id),
+                    (text, clean_text, category.key, lab_json, doc_id),
                 )
             record(db, "document.ocr.ready", user_id=job["user_id"], entity="document", entity_id=doc_id)
             # В аудит — только размеры, без содержимого документа.
@@ -268,12 +270,34 @@ def backfill_categories() -> int:
     return len(rows)
 
 
+def backfill_lab_values() -> int:
+    """Структурирует показатели готовым документам без lab_values (Д2).
+
+    Идемпотентно: lab_values IS NULL — не обработан; после парсинга остаётся
+    JSON (возможно, с пустым items) — повторный прогон ничего не находит.
+    """
+    with db_session() as db:
+        rows = db.execute(
+            """SELECT id, ocr_text_clean FROM documents
+               WHERE ocr_status='ready'
+                 AND ocr_text_clean IS NOT NULL AND ocr_text_clean <> ''
+                 AND lab_values IS NULL"""
+        ).fetchall()
+        for row in rows:
+            db.execute(
+                "UPDATE documents SET lab_values=? WHERE id=?",
+                (lab_parse.store_json(lab_parse.parse(row["ocr_text_clean"])), row["id"]),
+            )
+    return len(rows)
+
+
 def worker_loop() -> None:
     """Один процесс/worker на сервере; API не выполняет OCR в своём потоке."""
     _stopping.clear()
     recover_interrupted()
     backfill_postprocessed()
     backfill_categories()
+    backfill_lab_values()
     while not _stopping.is_set():
         if not config.ocr_enabled() or not process_one():
             _stopping.wait(2)

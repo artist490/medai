@@ -18,6 +18,7 @@ import BookingMenu from './medcard/BookingMenu'
 import DoctorNotesBlock from './medcard/DoctorNotesBlock'
 import DocumentsTab from './medcard/DocumentsTab'
 import GoalsEditor from './medcard/GoalsEditor'
+import LabTrends from './medcard/LabTrends'
 import PressureDiary from './medcard/PressureDiary'
 import VisitCard from './medcard/VisitCard'
 import VisitForm from './medcard/VisitForm'
@@ -287,6 +288,9 @@ export default function MedCard() {
               )}
               <PressureDiary items={items} />
             </section>
+
+            {/* Динамика показателей анализов (Д4) — рядом с графиками замеров */}
+            <LabTrends />
 
             {/* Мои цели */}
             <section className="panel">

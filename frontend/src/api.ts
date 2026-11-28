@@ -1,5 +1,5 @@
 // API-клиент: HttpOnly-сессия + CSRF; Bearer не хранится в браузерном storage.
-import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DoctorNoteItem, DocumentItem, DoctorSignal, Goals, Measurement, MedCard, MedCardInput, NotificationItem, OcrResult, PatientRow, Stats, User, Visit } from './types'
+import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DoctorNoteItem, DocumentItem, DoctorSignal, Goals, LabTrendPoint, Measurement, MedCard, MedCardInput, NotificationItem, OcrResult, PatientRow, Stats, User, Visit } from './types'
 
 const TOKEN_KEY = 'medai_token'
 
@@ -338,6 +338,16 @@ export async function startDocumentOcr(id: number): Promise<OcrResult> {
 
 export async function fetchDocumentOcr(id: number): Promise<OcrResult> {
   return request(`/api/documents/${id}/ocr`)
+}
+
+// ---------- структурированные показатели (Д3, Д4) ----------
+
+export async function fetchLabKeys(): Promise<{ items: Array<{ key: string; label: string }> }> {
+  return request('/api/documents/lab-keys')
+}
+
+export async function fetchLabTrend(key: string): Promise<{ key: string; label: string; items: LabTrendPoint[] }> {
+  return request(`/api/documents/lab-trend?key=${encodeURIComponent(key)}`)
 }
 
 // ---------- документы пациента у врача (В1—В4) ----------

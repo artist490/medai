@@ -43,6 +43,8 @@ SYSTEM_PROMPT_PATIENT = """Ты — ассистент здоровья феде
 Когда вопрос про результаты анализов (кровь, биохимия, выписки) — посмотри
 list_my_documents и прочитай нужный документ через read_my_document, затем
 объясни показатели простыми словами и отметь те, что выходят за норму.
+Для распознанных показателей удобнее get_my_lab_values (последние значения)
+и compare_my_lab_documents («сравни анализы от 12.10 и 27.11»).
 """ + PROMPT_RULES
 
 SYSTEM_PROMPT_DOCTOR = """Ты — ассистент врача сети клиник «Спектр-Диагностика».
@@ -137,6 +139,25 @@ PATIENT_TOOLS = [
             "date_from": {"type": "string", "description": "Начало периода, YYYY-MM-DD"},
             "date_to": {"type": "string", "description": "Конец периода, YYYY-MM-DD"},
         }, "required": ["date_from"]},
+    }},
+    {"type": "function", "function": {
+        "name": "get_my_lab_values",
+        "description": "Распознанные показатели анализов (кровь, биохимия): последнее "
+                       "значение, норма и отклонение по каждому показателю; с key — "
+                       "история одного показателя по датам",
+        "parameters": {"type": "object", "properties": {
+            "key": {"type": "string", "description": "Ключ показателя (hemoglobin, glucose, "
+                    "esr…); без него — последние значения всех показателей"},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "compare_my_lab_documents",
+        "description": "Сравнение показателей двух распознанных анализов по id из "
+                       "list_my_documents: значения и изменение между документами",
+        "parameters": {"type": "object", "properties": {
+            "document_id_1": {"type": "integer", "description": "id первого документа (более ранний)"},
+            "document_id_2": {"type": "integer", "description": "id второго документа (более поздний)"},
+        }, "required": ["document_id_1", "document_id_2"]},
     }},
 ]
 
@@ -436,6 +457,106 @@ def _search_measurements(db: sqlite3.Connection, user: sqlite3.Row, args: dict) 
     return _rows_to_json(rows)
 
 
+def _my_lab_values(db: sqlite3.Connection, user: sqlite3.Row, args: dict) -> str:
+    """Распознанные показатели (Д5): история одного или последние по всем."""
+    from . import lab_parse
+
+    key = str(args.get("key") or "")
+    if key in lab_parse.LAB_KEY_LABELS:
+        rows = db.execute(
+            """SELECT d.uploaded_at, d.title,
+                      json_extract(j.value, '$.value') AS value,
+                      json_extract(j.value, '$.unit') AS unit,
+                      json_extract(j.value, '$.norm_text') AS norm_text,
+                      json_extract(j.value, '$.status') AS status
+               FROM documents d, json_each(d.lab_values, '$.items') j
+               WHERE d.user_id = ? AND json_extract(j.value, '$.key') = ?
+                 AND d.ocr_status = 'ready' AND json_extract(j.value, '$.value') IS NOT NULL
+               ORDER BY d.uploaded_at DESC, d.id DESC LIMIT 20""",
+            (user["id"], key),
+        ).fetchall()
+        return json.dumps({
+            "key": key,
+            "label": lab_parse.LAB_KEY_LABELS[key],
+            "items": [dict(r) for r in rows],
+        }, ensure_ascii=False)
+
+    # Последнее значение каждого показателя: документы новыми сверху,
+    # первый по ключу и есть свежий.
+    rows = db.execute(
+        """SELECT json_extract(j.value, '$.key') AS key,
+                  json_extract(j.value, '$.label') AS label,
+                  json_extract(j.value, '$.value') AS value,
+                  json_extract(j.value, '$.unit') AS unit,
+                  json_extract(j.value, '$.norm_text') AS norm_text,
+                  json_extract(j.value, '$.status') AS status,
+                  d.uploaded_at
+           FROM documents d, json_each(d.lab_values, '$.items') j
+           WHERE d.user_id = ? AND d.ocr_status = 'ready'
+             AND json_extract(j.value, '$.value') IS NOT NULL
+           ORDER BY d.uploaded_at DESC, d.id DESC""",
+        (user["id"],),
+    ).fetchall()
+    latest: dict[str, dict] = {}
+    for r in rows:
+        if r["key"] in lab_parse.LAB_KEY_LABELS:
+            latest.setdefault(r["key"], dict(r))
+    items = sorted(latest.values(), key=lambda x: x["label"])
+    return json.dumps({"items": items}, ensure_ascii=False)
+
+
+def _compare_lab_documents(db: sqlite3.Connection, user: sqlite3.Row, args: dict) -> str:
+    """Сравнение показателей двух распознанных документов («сравни анализы»)."""
+    ids = []
+    for arg in ("document_id_1", "document_id_2"):
+        try:
+            ids.append(int(args.get(arg)))
+        except (TypeError, ValueError):
+            return json.dumps({"error": "нужны document_id_1 и document_id_2 из списка документов"},
+                              ensure_ascii=False)
+    docs = []
+    for doc_id in ids:
+        row = db.execute(
+            """SELECT id, title, uploaded_at, lab_values FROM documents
+               WHERE id = ? AND user_id = ? AND ocr_status = 'ready' AND lab_values IS NOT NULL""",
+            (doc_id, user["id"]),
+        ).fetchone()
+        if row is None:
+            return json.dumps({"error": "документ не найден или не распознан"},
+                              ensure_ascii=False)
+        docs.append(row)
+    parsed = []
+    for row in docs:
+        try:
+            parsed.append(json.loads(row["lab_values"]))
+        except (json.JSONDecodeError, TypeError):
+            parsed.append({"items": [], "unparsed": 0})
+
+    by_key: dict[str, dict] = {}
+    for item in parsed[0].get("items", []):
+        by_key[item["key"]] = {"label": item["label"], "unit": item["unit"],
+                               "v1": item["value"], "status1": item["status"],
+                               "norm1": item.get("norm_text", "")}
+    for item in parsed[1].get("items", []):
+        entry = by_key.setdefault(item["key"],
+                                  {"label": item["label"], "unit": item["unit"], "v1": None,
+                                   "status1": None, "norm1": ""})
+        entry.update({"v2": item["value"], "status2": item["status"],
+                      "norm2": item.get("norm_text", "")})
+    items = []
+    for entry in by_key.values():
+        delta = None
+        if entry.get("v1") is not None and entry.get("v2") is not None:
+            delta = round(entry["v2"] - entry["v1"], 3)
+        items.append({**entry, "delta": delta})
+    items.sort(key=lambda x: x["label"])
+    return json.dumps({
+        "doc1": {"title": docs[0]["title"], "uploaded_at": docs[0]["uploaded_at"]},
+        "doc2": {"title": docs[1]["title"], "uploaded_at": docs[1]["uploaded_at"]},
+        "items": items,
+    }, ensure_ascii=False)
+
+
 PATIENT_EXECUTORS: dict[str, Callable] = {
     "get_profile": lambda db, user, args: _get_profile(db, user, args),
     "get_recent_measurements": lambda db, user, args: _recent_measurements(db, user["id"], args),
@@ -451,6 +572,8 @@ PATIENT_EXECUTORS: dict[str, Callable] = {
     "read_my_document": lambda db, user, args: _document_text(
         db, user["id"], args.get("document_id"), audit_user_id=user["id"]),
     "search_measurements": _search_measurements,
+    "get_my_lab_values": _my_lab_values,
+    "compare_my_lab_documents": _compare_lab_documents,
 }
 
 

@@ -160,6 +160,15 @@ export interface NotificationItem {
   target: string
 }
 
+// Точка динамики показателя (GET /api/documents/lab-trend, Д4)
+export interface LabTrendPoint {
+  uploaded_at: string
+  title: string
+  value: number
+  unit: string | null
+  status: string | null
+}
+
 export interface BranchAnalytics {
   branch_city: string | null
   patients_total: number
