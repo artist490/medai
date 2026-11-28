@@ -1,6 +1,5 @@
 """SQLAlchemy модели, зеркалирующие текущую схему SQLite (для Alembic autogenerate)."""
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     CheckConstraint,
@@ -12,7 +11,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase
 
@@ -43,6 +41,7 @@ class User(Base):
     height_cm = Column(Float, nullable=True)
     role = Column(String, nullable=False, default="patient")  # CHECK в миграции
     branch_id = Column(Integer, ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
+    phone = Column(String, nullable=False, default="")  # контактный телефон
     disabled = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 

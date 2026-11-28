@@ -22,6 +22,7 @@ export interface User {
   sex: 'male' | 'female' | null
   height_cm: number | null
   role: Role
+  phone: string          // контактный телефон, виден врачу филиала
   branch: Branch | null
 }
 
@@ -47,6 +48,13 @@ export interface DoctorNote {
   doctor_name: string
   text: string
   created_at: string
+}
+
+// Заметка врача в полном списке пациента (GET /api/notes/mine, A2)
+export interface DoctorNoteItem extends DoctorNote {
+  analysis_id: number
+  risk_level: RiskLevel
+  recorded_at: string
 }
 
 export interface Analysis {
@@ -94,6 +102,10 @@ export interface DocumentItem {
   mime: string
   size: number
   uploaded_at: string
+  /** Ключ категории из справочника doc_categories.py; '' = ещё не классифицирован. */
+  category: string
+  /** 'user' — ручное название не перезаписывается; 'auto' — подставляется из OCR. */
+  title_source: 'user' | 'auto'
   ocr: OcrResult
 }
 

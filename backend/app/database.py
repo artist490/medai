@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
     height_cm     REAL,
     role          TEXT NOT NULL DEFAULT 'patient' CHECK (role IN ('patient', 'doctor')),
     branch_id     INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+    phone         TEXT NOT NULL DEFAULT '',   -- контактный телефон, видит филиал
     disabled      INTEGER NOT NULL DEFAULT 0,  -- 1 = доступ отозван (tools/disable_user.py)
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -204,7 +205,9 @@ CREATE TABLE IF NOT EXISTS documents (
     ocr_engine  TEXT,
     ocr_started_at TEXT,
     ocr_finished_at TEXT,
-    ocr_attempts INTEGER NOT NULL DEFAULT 0
+    ocr_attempts INTEGER NOT NULL DEFAULT 0,
+    category     TEXT NOT NULL DEFAULT '',
+    title_source TEXT NOT NULL DEFAULT 'auto'
 );
 """
 
@@ -289,6 +292,8 @@ def _migrate(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE users ADD COLUMN last_name TEXT NOT NULL DEFAULT ''")
     if "middle_name" not in columns:
         db.execute("ALTER TABLE users ADD COLUMN middle_name TEXT NOT NULL DEFAULT ''")
+    if "phone" not in columns:
+        db.execute("ALTER TABLE users ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
     if _users_need_rebuild(db):
         _rebuild_users(db)
     card_columns = {row["name"] for row in db.execute("PRAGMA table_info(patient_cards)").fetchall()}
@@ -316,6 +321,9 @@ def _migrate(db: sqlite3.Connection) -> None:
         doc_columns = {row["name"] for row in db.execute("PRAGMA table_info(documents)").fetchall()}
     if doc_columns and "ocr_text_clean" not in doc_columns:
         db.execute("ALTER TABLE documents ADD COLUMN ocr_text_clean TEXT")
+    if doc_columns and "category" not in doc_columns:
+        db.execute("ALTER TABLE documents ADD COLUMN category TEXT NOT NULL DEFAULT ''")
+        db.execute("ALTER TABLE documents ADD COLUMN title_source TEXT NOT NULL DEFAULT 'auto'")
     invite_columns = {row["name"] for row in db.execute("PRAGMA table_info(invite_codes)").fetchall()}
     if invite_columns and "expires_at" not in invite_columns:
         db.execute("ALTER TABLE invite_codes ADD COLUMN expires_at TEXT")

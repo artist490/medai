@@ -1,6 +1,5 @@
 """Tests for the medical rules engine and analyze orchestrator."""
-import pytest
-from app.services import rules, analyze
+from app.services import rules
 from app.services.llm import patient_alias
 
 

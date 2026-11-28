@@ -8,10 +8,12 @@ import json
 import sqlite3
 from typing import Optional
 
+from . import ocr
+
 # ---------- Общие SQL-заготовки ----------
 
 # Поля пациента, отдаваемые наружу (без password_hash и служебных колонок)
-PATIENT_FIELDS = "id, email, name, age, sex, height_cm, role, created_at"
+PATIENT_FIELDS = "id, email, name, age, sex, height_cm, role, created_at, phone"
 
 # Джойн имени врача — пациенту приятно видеть, кто принимал
 VISIT_SELECT = """
@@ -42,7 +44,36 @@ def compose_full_name(first_name: str, last_name: str, middle_name: str) -> str:
 
 
 def patient_payload(p: sqlite3.Row) -> dict:
-    return {k: p[k] for k in ("id", "email", "name", "age", "sex", "height_cm", "created_at")}
+    keys = set(p.keys())
+    phone = p["phone"] if "phone" in keys else ""
+    return {k: p[k] for k in ("id", "email", "name", "age", "sex", "height_cm", "created_at")} | {
+        "phone": phone,
+    }
+
+
+# ---------- Документы ----------
+
+def doc_payload(row: sqlite3.Row) -> dict:
+    """Список/карточка документа: метаданные + статус OCR + прозрачность врача.
+
+    Колонки появились миграцией (doctor_viewed_at, lab_values) — guard для
+    строк, прочитанных до init_db в тестах, как у period в measurement_payload.
+    """
+    keys = set(row.keys())
+    lab_raw = row["lab_values"] if "lab_values" in keys else None
+    lab = None
+    if lab_raw:
+        try:
+            lab = json.loads(lab_raw)
+        except (json.JSONDecodeError, TypeError):
+            lab = None
+    return {k: row[k] for k in ("id", "title", "filename", "mime", "size", "uploaded_at")} | {
+        "category": row["category"] if "category" in keys else "",
+        "title_source": row["title_source"] if "title_source" in keys else "auto",
+        "doctor_viewed_at": row["doctor_viewed_at"] if "doctor_viewed_at" in keys else None,
+        "lab_values": lab,
+        "ocr": ocr.ocr_payload(row),
+    }
 
 
 # ---------- Измерения и анализы ----------

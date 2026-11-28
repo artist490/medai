@@ -8,12 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from .. import auth
 from ..database import get_db
 from ..schemas import NoteIn, VisitCloseIn
+from ..security import SlidingRateLimiter
 from ..services import llm as llm_service
 from ..services import signals
 from ..services.audit import record
-from ..security import SlidingRateLimiter
-
-_summary_limiter = SlidingRateLimiter(20, 3600)
 from ..services.payloads import (
     ORDER_SQL,
     PATIENT_FIELDS,
@@ -26,6 +24,8 @@ from ..services.payloads import (
 )
 
 router = APIRouter(prefix="/api/doctor", tags=["doctor"])
+
+_summary_limiter = SlidingRateLimiter(20, 3600)
 
 
 @router.get("/patients")

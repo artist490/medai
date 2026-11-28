@@ -104,6 +104,7 @@ export default function Profile() {
   const [lastName, setLastName] = useState(user?.last_name ?? '')
   const [firstName, setFirstName] = useState(user?.first_name ?? '')
   const [middleName, setMiddleName] = useState(user?.middle_name ?? '')
+  const [phone, setPhone] = useState(user?.phone ?? '')
   const [sex, setSex] = useState<'male' | 'female' | ''>(user?.sex ?? '')
   const [age, setAge] = useState(user?.age ?? 0)
   const [height, setHeight] = useState(user?.height_cm ?? 0)
@@ -155,6 +156,7 @@ export default function Profile() {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         middle_name: middleName.trim(),
+        phone: phone.trim(),
         age: age > 0 ? age : null,
         sex: sex || null,
         height_cm: height > 0 ? height : null,
@@ -254,6 +256,20 @@ export default function Profile() {
                 value={middleName}
                 onChange={(e) => setMiddleName(e.target.value)}
               />
+            </div>
+
+            <div>
+              <label className="flip-label" htmlFor="p-phone">Контактный телефон</label>
+              <input
+                id="p-phone"
+                className="flip-input"
+                type="tel"
+                autoComplete="tel"
+                placeholder="+7 (___) ___-__-__"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+              <p className="flip-hint">Нужен филиалу, чтобы связаться по результатам. Видят только врачи вашего филиала.</p>
             </div>
 
             <div>

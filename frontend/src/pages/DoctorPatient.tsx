@@ -559,6 +559,12 @@ export default function DoctorPatient() {
             <dt className="text-[11px] text-ink-soft">Email</dt>
             <dd className="text-ink mt-0.5">{patient.email}</dd>
           </div>
+          {patient.phone && (
+            <div>
+              <dt className="text-[11px] text-ink-soft">Телефон</dt>
+              <dd className="text-ink mt-0.5 tabular-nums">{patient.phone}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-[11px] text-ink-soft">Возраст</dt>
             <dd className="text-ink mt-0.5 tabular-nums">{patient.age ?? '—'}</dd>

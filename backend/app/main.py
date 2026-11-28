@@ -7,12 +7,6 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-# Windows: тип для .mjs берётся из реестра и часто оказывается text/plain —
-# с nosniff браузер отказывается исполнять такой модульный воркер MapLibre
-# (карта инициализируется, но тайлы не рисуются). Регистрируем явно.
-mimetypes.add_type("text/javascript", ".mjs")
-mimetypes.add_type("text/javascript", ".js")
-
 from . import config
 from .database import init_db
 from .routers import analytics as analytics_router
@@ -23,9 +17,17 @@ from .routers import documents as documents_router
 from .routers import goals as goals_router
 from .routers import measurements as measurements_router
 from .routers import medcard as medcard_router
+from .routers import notes as notes_router
 from .routers import stats as stats_router
 from .routers import visits as visits_router
 from .security import SecurityMiddleware
+
+# Windows: тип для .mjs берётся из реестра и часто оказывается text/plain —
+# с nosniff браузер отказывается исполнять такой модульный воркер MapLibre
+# (карта инициализируется, но тайлы не рисуются). Регистрируем явно.
+mimetypes.add_type("text/javascript", ".mjs")
+mimetypes.add_type("text/javascript", ".js")
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -55,6 +57,7 @@ app.include_router(goals_router.router)
 app.include_router(doctor_router.router)
 app.include_router(measurements_router.router)
 app.include_router(medcard_router.router)
+app.include_router(notes_router.router)
 app.include_router(stats_router.router)
 app.include_router(visits_router.router)
 

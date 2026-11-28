@@ -1,13 +1,13 @@
 """Pytest fixtures for backend tests."""
-import sqlite3
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.database import init_db, get_db
-from app.services import rules, analyze
+from app.database import init_db
+from app.services import rules
 from app.services.llm import patient_alias
 
 
@@ -50,9 +50,10 @@ def db_session(db_path):
     
     # Re-import to pick up new path
     import importlib
+
     import app.database
     importlib.reload(app.database)
-    from app.database import init_db, db_session as db_sess
+    from app.database import db_session as db_sess
     
     init_db()
     with db_sess() as conn:

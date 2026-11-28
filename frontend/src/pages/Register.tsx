@@ -13,6 +13,7 @@ export default function Register() {
   const [lastName, setLastName] = useState('')
   const [firstName, setFirstName] = useState('')
   const [middleName, setMiddleName] = useState('')
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
@@ -64,7 +65,7 @@ export default function Register() {
       const user = await api.register(
         email.trim(), password,
         firstName.trim(), lastName.trim(), middleName.trim(),
-        inviteCode.trim() || undefined, Number(branchId),
+        inviteCode.trim() || undefined, Number(branchId), phone.trim() || undefined,
       )
       setUser(user)
       navigate('/')
@@ -138,6 +139,21 @@ export default function Register() {
                 placeholder="Иванович"
                 value={middleName}
                 onChange={(e) => setMiddleName(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="flip-label" htmlFor="phone">
+                Телефон <span className="text-ink-soft font-normal">(если хотите, чтобы филиал мог позвонить)</span>
+              </label>
+              <input
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                className="flip-input"
+                placeholder="+7 (___) ___-__-__"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
               />
             </div>
 

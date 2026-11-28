@@ -102,7 +102,7 @@ class TestRedactDocument:
 
 class TestPatientAnalyses:
     def test_read_own_document_text(self, client):
-        p = _register(client, "analyses-own@test.ru")
+        _register(client, "analyses-own@test.ru")
         doc_id = _add_document("analyses-own@test.ru", LAB_TEXT)
         user = _user_row("analyses-own@test.ru")
 
@@ -203,7 +203,7 @@ class TestPatientAnalyses:
 
 class TestDoctorAnalyses:
     def test_doctor_reads_patient_document(self, client):
-        d = _doctor(client, "analyses-doc@test.ru", branch_id=1)
+        _doctor(client, "analyses-doc@test.ru", branch_id=1)
         _register(client, "analyses-pat@test.ru", branch_id=1)
         doc_id = _add_document("analyses-pat@test.ru", LAB_TEXT)
         doctor = _user_row("analyses-doc@test.ru")
@@ -243,7 +243,7 @@ class TestDoctorAnalyses:
     def test_doctor_analyses_history(self, client):
         p = _register(client, "analyses-hp@test.ru", branch_id=1)
         client.post("/api/measurements", json={"systolic": 190, "diastolic": 120}, headers=_auth(p))
-        d = _doctor(client, "analyses-hd@test.ru", branch_id=1)
+        _doctor(client, "analyses-hd@test.ru", branch_id=1)
         doctor = _user_row("analyses-hd@test.ru")
         patient = _user_row("analyses-hp@test.ru")
         db = database.connect()

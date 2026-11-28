@@ -34,7 +34,7 @@ def _upload(c, headers):
         "file": ("analysis.png", io.BytesIO(b"\x89PNG\r\n\x1a\nTEST"), "image/png"),
     })
     assert r.status_code == 201, r.text
-    return r.json()
+    return r.json()[0]  # мультизагрузка: ответ — список, здесь один файл
 
 
 def test_ocr_disabled_and_private(client):
@@ -142,3 +142,159 @@ def test_interrupted_job_recovers(client, monkeypatch):
     ocr.recover_interrupted()
     result = client.get(f"/api/documents/{doc['id']}/ocr", headers=owner).json()
     assert result["status"] == "pending"
+
+
+# ---------- Категоризация и авто-названия (DOC_CATEGORIES_PLAN.md) ----------
+
+BLANK_MARKDOWN = (
+    "# Общий анализ крови\n\n| Показатель | Значение |\n"
+    "|---|---|\n| Гемоглобин | 145 г/л |\n| СОЭ | 12 мм/ч |"
+)
+
+
+def test_upload_title_source_and_auto_enqueue(client):
+    """Пустое название → title_source='auto'; ручное → 'user' и не перезаписывается."""
+    owner = _register(client, "ocr-titles@test.ru")
+    auto = _upload(client, owner)
+    assert auto["title_source"] == "auto"
+    r = client.post("/api/documents", headers=owner, files={
+        "file": ("scan.png", io.BytesIO(b"\x89PNG\r\n\x1a\nTEST"), "image/png"),
+    }, data={"title": "Моё название"})
+    assert r.status_code == 201
+    manual = r.json()[0]  # мультизагрузка: ответ — список
+    assert manual["title_source"] == "user"
+    assert manual["title"] == "Моё название"
+
+
+def test_worker_classifies_and_titled_auto(client, monkeypatch):
+    """После OCR: категория по бланку, авто-название — заголовок бланка."""
+    owner = _register(client, "ocr-classify@test.ru")
+    doc = _upload(client, owner)
+    assert doc["title_source"] == "auto"
+    monkeypatch.setattr(config, "OCR_ENABLED", True)
+    monkeypatch.setattr(config, "_ocr_model_installed", lambda: True)
+    monkeypatch.setattr(ocr, "_run_liteparse", lambda source: BLANK_MARKDOWN)
+    ocr.enqueue(doc["id"])
+    assert ocr.process_one(doc["id"]) is True
+    with database.db_session() as db:
+        row = db.execute("SELECT category, title FROM documents WHERE id=?", (doc["id"],)).fetchone()
+    assert row["category"] == "blood"
+    assert row["title"] == "Общий анализ крови"
+
+
+def test_worker_keeps_user_title(client, monkeypatch):
+    """Ручное название переживает OCR; категория всё равно выставляется."""
+    owner = _register(client, "ocr-keep@test.ru")
+    r = client.post("/api/documents", headers=owner, files={
+        "file": ("scan.png", io.BytesIO(b"\x89PNG\r\n\x1a\nTEST"), "image/png"),
+    }, data={"title": "Ручное название"})
+    assert r.status_code == 201
+    doc = r.json()[0]  # мультизагрузка: ответ — список
+    monkeypatch.setattr(config, "OCR_ENABLED", True)
+    monkeypatch.setattr(config, "_ocr_model_installed", lambda: True)
+    monkeypatch.setattr(ocr, "_run_liteparse", lambda source: BLANK_MARKDOWN)
+    ocr.enqueue(doc["id"])
+    assert ocr.process_one(doc["id"]) is True
+    with database.db_session() as db:
+        row = db.execute("SELECT category, title, title_source FROM documents WHERE id=?", (doc["id"],)).fetchone()
+    assert row["category"] == "blood"
+    assert row["title"] == "Ручное название"
+    assert row["title_source"] == "user"
+
+
+def test_backfill_categories_is_idempotent(client, monkeypatch):
+    """Готовые до внедрения документы получают категорию и (auto) название."""
+    owner = _register(client, "ocr-backcat@test.ru")
+    doc = _upload(client, owner)
+    with database.db_session() as db:
+        db.execute(
+            "UPDATE documents SET ocr_status='ready', ocr_text_clean=? WHERE id=?",
+            ("Общий анализ крови\n\nГемоглобин 145 г/л", doc["id"]),
+        )
+    assert ocr.backfill_categories() == 1
+    with database.db_session() as db:
+        row = db.execute("SELECT category, title FROM documents WHERE id=?", (doc["id"],)).fetchone()
+    assert row["category"] == "blood"
+    assert row["title"] == "Общий анализ крови"
+    # Идемпотентно: второй прогон ничего не находит.
+    assert ocr.backfill_categories() == 0
+
+
+def test_backfill_categories_keeps_user_title(client, monkeypatch):
+    owner = _register(client, "ocr-backcat2@test.ru")
+    r = client.post("/api/documents", headers=owner, files={
+        "file": ("scan.png", io.BytesIO(b"\x89PNG\r\n\x1a\nTEST"), "image/png"),
+    }, data={"title": "Мой бланк"})
+    assert r.status_code == 201
+    doc = r.json()[0]  # мультизагрузка: ответ — список
+    with database.db_session() as db:
+        db.execute(
+            "UPDATE documents SET ocr_status='ready', ocr_text_clean=? WHERE id=?",
+            ("МРТ головного мозга", doc["id"]),
+        )
+    assert ocr.backfill_categories() == 1
+    with database.db_session() as db:
+        row = db.execute("SELECT category, title FROM documents WHERE id=?", (doc["id"],)).fetchone()
+    assert row["category"] == "imaging"
+    assert row["title"] == "Мой бланк"
+
+
+# ---------- Ручная правка названия и категории (PATCH /api/documents/{id}) ----------
+
+class TestDocumentEdit:
+    def test_rename_sets_user_source_and_survives_ocr(self, client, monkeypatch):
+        owner = _register(client, "edit-rename@test.ru")
+        doc = _upload(client, owner)
+        assert doc["title_source"] == "auto"
+        resp = client.patch(f"/api/documents/{doc['id']}",
+                            json={"title": "Правильное название"}, headers=owner)
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["title"] == "Правильное название"
+        assert body["title_source"] == "user"
+
+        monkeypatch.setattr(config, "OCR_ENABLED", True)
+        monkeypatch.setattr(config, "_ocr_model_installed", lambda: True)
+        monkeypatch.setattr(ocr, "_run_liteparse", lambda source: BLANK_MARKDOWN)
+        ocr.enqueue(doc["id"])
+        assert ocr.process_one(doc["id"]) is True
+        with database.db_session() as db:
+            row = db.execute("SELECT title, title_source, category FROM documents WHERE id=?", (doc["id"],)).fetchone()
+        assert row["title"] == "Правильное название"
+        assert row["title_source"] == "user"
+        assert row["category"] == "blood"
+
+    def test_category_change_and_reclassify(self, client, monkeypatch):
+        owner = _register(client, "edit-cat@test.ru")
+        doc = _upload(client, owner)
+        r = client.patch(f"/api/documents/{doc['id']}", json={"category": "imaging"}, headers=owner)
+        assert r.status_code == 200
+        assert r.json()["category"] == "imaging"
+
+        # Готовим распознанный текст и сбрасываем категорию — сервер
+        # переклассифицирует по нему прямо в PATCH.
+        monkeypatch.setattr(config, "OCR_ENABLED", True)
+        monkeypatch.setattr(config, "_ocr_model_installed", lambda: True)
+        monkeypatch.setattr(ocr, "_run_liteparse", lambda source: BLANK_MARKDOWN)
+        ocr.enqueue(doc["id"])
+        assert ocr.process_one(doc["id"]) is True
+
+        r = client.patch(f"/api/documents/{doc['id']}", json={"category": ""}, headers=owner)
+        assert r.status_code == 200
+        assert r.json()["category"] == "blood"
+
+    def test_unknown_category_and_empty_title_rejected(self, client):
+        owner = _register(client, "edit-bad@test.ru")
+        doc = _upload(client, owner)
+        assert client.patch(f"/api/documents/{doc['id']}",
+                            json={"category": "космос"}, headers=owner).status_code == 422
+        assert client.patch(f"/api/documents/{doc['id']}",
+                            json={"title": "   "}, headers=owner).status_code == 422
+        assert client.patch(f"/api/documents/{doc['id']}", json={}, headers=owner).status_code == 422
+
+    def test_other_user_cannot_edit(self, client):
+        owner = _register(client, "edit-owner@test.ru")
+        doc = _upload(client, owner)
+        stranger = _register(client, "edit-stranger@test.ru")
+        assert client.patch(f"/api/documents/{doc['id']}",
+                            json={"title": "чужое"}, headers=stranger).status_code == 404

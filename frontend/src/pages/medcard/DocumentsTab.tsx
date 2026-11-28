@@ -1,14 +1,37 @@
 // Документы: загрузка, список, скачивание (F008).
 // Загрузка работает через общий request() — после фикса F001 (multipart без
 // JSON-заголовка) документы реально доходят до сервера.
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from '../../api'
-import { uploadDocument } from '../../api'
+import { uploadDocuments } from '../../api'
 import { Icon } from '../../components/Icon'
 import EmptyArt from '../../components/EmptyArt'
 import OcrText from '../../components/OcrText'
 import { Skeleton } from '../../components/Skeleton'
 import type { DocumentItem, OcrResult } from '../../types'
+
+// Порядок групп = порядок справочника doc_categories.py; other последним.
+const DOC_CATEGORIES: Array<{ key: string; label: string }> = [
+  { key: 'blood', label: 'Кровь' },
+  { key: 'hormones', label: 'Гормоны и биохимия' },
+  { key: 'urine', label: 'Моча' },
+  { key: 'stool', label: 'Кал' },
+  { key: 'smears', label: 'Мазки и цитология' },
+  { key: 'imaging', label: 'МРТ, КТ, УЗИ и рентген' },
+  { key: 'function', label: 'ЭКГ и функциональная диагностика' },
+  { key: 'other', label: 'Прочее' },
+]
+
+function groupedDocs(docs: DocumentItem[]): Array<{ key: string; label: string; docs: DocumentItem[] }> {
+  const groups = new Map<string, DocumentItem[]>()
+  for (const d of docs) {
+    const key = DOC_CATEGORIES.some((c) => c.key === d.category) ? d.category : 'other'
+    groups.set(key, [...(groups.get(key) ?? []), d])
+  }
+  return DOC_CATEGORIES
+    .filter((c) => groups.has(c.key))
+    .map((c) => ({ key: c.key, label: c.label, docs: groups.get(c.key) ?? [] }))
+}
 
 export default function DocumentsTab() {
   const [docs, setDocs] = useState<DocumentItem[] | null>(null)
@@ -20,6 +43,8 @@ export default function DocumentsTab() {
   const [ocrDocId, setOcrDocId] = useState<number | null>(null)
   const [ocr, setOcr] = useState<OcrResult | null>(null)
   const [ocrBusy, setOcrBusy] = useState(false)
+  const [editing, setEditing] = useState<{ id: number; title: string; category: string } | null>(null)
+  const [editBusy, setEditBusy] = useState(false)
 
   useEffect(() => {
     if (ocrDocId === null || !ocr || !['pending', 'processing'].includes(ocr.status)) return
@@ -27,6 +52,11 @@ export default function DocumentsTab() {
       api.fetchDocumentOcr(ocrDocId).then((result) => {
         setOcr(result)
         setDocs((prev) => prev?.map((d) => d.id === ocrDocId ? { ...d, ocr: result } : d) ?? prev)
+        // После готовности OCR сервер мог выставить категорию и авто-название —
+        // тихо обновляем список целиком (скелетон не показываем).
+        if (result.status === 'ready') {
+          api.fetchDocuments().then((d) => setDocs(d.items)).catch(() => {})
+        }
       }).catch((e) => setError(e instanceof Error ? e.message : 'Не удалось проверить OCR'))
     }, 2000)
     return () => window.clearTimeout(timer)
@@ -58,23 +88,41 @@ export default function DocumentsTab() {
 
   useEffect(() => {
     loadDocs()
-     
+
   }, [])
 
-  async function upload() {
-    const file = fileRef.current?.files?.[0]
-    if (!file) return
+  // Мультизагрузка (A1) и вставка из буфера: скриншот бланка → Ctrl+V → документ
+  const uploadFiles = useCallback(async (files: File[], pasteTitle: string) => {
+    if (files.length === 0) return
     setBusy(true)
     setError('')
     try {
-      const doc = await uploadDocument(file, title)
-      setDocs((prev) => prev ? [doc, ...prev] : [doc])
+      const created = await uploadDocuments(files, pasteTitle)
+      setDocs((prev) => prev ? [...created, ...prev] : created)
       setTitle('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось загрузить')
     } finally {
       setBusy(false)
     }
+  }, [])
+
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      if (busy) return
+      const files = Array.from(e.clipboardData?.files ?? []).filter((f) =>
+        ['image/png', 'image/jpeg', 'image/webp'].includes(f.type))
+      if (files.length === 0) return
+      e.preventDefault()
+      void uploadFiles(files, '')
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [busy, uploadFiles])
+
+  async function upload() {
+    const files = Array.from(fileRef.current?.files ?? [])
+    await uploadFiles(files, title)
   }
 
   async function download(doc: DocumentItem) {
@@ -96,6 +144,28 @@ export default function DocumentsTab() {
     setDocs((prev) => prev ? prev.filter((d) => d.id !== doc.id) : prev)
   }
 
+  function startEdit(doc: DocumentItem) {
+    setEditing({ id: doc.id, title: doc.title, category: doc.category || 'other' })
+  }
+
+  async function saveEdit() {
+    if (!editing) return
+    setEditBusy(true)
+    setError('')
+    try {
+      const updated = await api.editDocument(editing.id, {
+        title: editing.title,
+        category: editing.category,
+      })
+      setDocs((prev) => prev ? prev.map((d) => d.id === updated.id ? updated : d) : prev)
+      setEditing(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось сохранить')
+    } finally {
+      setEditBusy(false)
+    }
+  }
+
   function fmtSize(n: number): string {
     if (n > 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' МБ'
     return Math.max(1, Math.round(n / 1024)) + ' КБ'
@@ -109,6 +179,7 @@ export default function DocumentsTab() {
         <input
           type="file"
           accept=".pdf,.png,.jpg,.jpeg,.webp"
+          multiple
           className="flip-input !py-2"
           ref={(el) => { fileRef.current = el }}
         />
@@ -124,7 +195,9 @@ export default function DocumentsTab() {
         <button className="btn btn-gold w-fit" disabled={busy}>
           {busy ? 'Загружаем…' : 'Загрузить документ'}
         </button>
-        <div className="flip-hint">PDF или фото до 8 МБ. Документы видны только вам.
+        <div className="flip-hint">PDF или фото до 8 МБ, можно несколько файлов сразу.
+          Скриншот бланка можно просто вставить из буфера — Ctrl+V.
+          Название необязательно — подставим из распознанного текста.
           OCR выполняется локально на сервере клиники, без внешнего API.</div>
       </form>
 
@@ -185,31 +258,77 @@ export default function DocumentsTab() {
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-[#eef4f3]">
-          {docs.map((d) => (
-            <div key={d.id} className="py-3 flex items-center gap-3">
-              <span className="emoji-box"><Icon name="doc" size={18} /></span>
-              <div className="min-w-0">
-                <div className="text-sm font-bold text-[#1b2622] truncate">{d.title}</div>
-                <div className="text-xs text-ink-soft">
-                  {fmtSize(d.size)} · {d.uploaded_at.slice(0, 16).replace('T', ' ')}
-                </div>
-              </div>
-              <button className="btn btn-ghost btn-sm ml-auto" onClick={() => recognize(d)}
-                      disabled={ocrBusy || (!d.ocr.enabled && d.ocr.status !== 'ready')}
-                      title={d.ocr.status === 'ready' ? 'Показать распознанный текст' : d.ocr.enabled ? 'Распознать на сервере клиники' : 'Серверный OCR не включён'}
-                      aria-label={'Распознать ' + d.title}>
-                <Icon name="sparkle" size={16} />
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => download(d)} aria-label={'Скачать ' + d.title}>
-                <Icon name="download" size={16} />
-              </button>
-              <button className="btn btn-ghost btn-sm text-coral" onClick={() => remove(d)} aria-label={'Удалить ' + d.title}>
-                <Icon name="trash" size={16} />
-              </button>
+        groupedDocs(docs).map((group) => (
+          <section key={group.key}>
+            <div className="flex items-center gap-2 mb-1 mt-2">
+              <h3 className="text-sm font-extrabold text-teal-dark">{group.label}</h3>
+              <span className="text-xs font-semibold text-ink-soft">· {group.docs.length}</span>
             </div>
-          ))}
-        </div>
+            <div className="divide-y divide-[#eef4f3]">
+              {group.docs.map((d) => (
+                <div key={d.id} className="py-3 flex items-center gap-3">
+                  <span className="emoji-box"><Icon name="doc" size={18} /></span>
+                  {editing?.id === d.id ? (
+                    <div className="min-w-0 flex-1 flex flex-col gap-2">
+                      <input
+                        className="flip-input !py-1.5 text-sm"
+                        value={editing.title}
+                        maxLength={200}
+                        aria-label="Название документа"
+                        onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveEdit() }}
+                      />
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flip-input !py-1.5 text-sm max-w-[240px]"
+                          value={editing.category}
+                          aria-label="Категория документа"
+                          onChange={(e) => setEditing({ ...editing, category: e.target.value })}
+                        >
+                          {DOC_CATEGORIES.map((c) => (
+                            <option key={c.key} value={c.key}>{c.label}</option>
+                          ))}
+                        </select>
+                        <button className="btn btn-teal btn-sm" disabled={editBusy || !editing.title.trim()}
+                                onClick={saveEdit}>
+                          {editBusy ? 'Сохраняем…' : 'Сохранить'}
+                        </button>
+                        <button className="btn btn-ghost btn-sm" disabled={editBusy}
+                                onClick={() => setEditing(null)}>Отмена</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-[#1b2622] truncate">{d.title}</div>
+                        <div className="text-xs text-ink-soft">
+                          {fmtSize(d.size)} · {d.uploaded_at.slice(0, 16).replace('T', ' ')}
+                        </div>
+                      </div>
+                      <button className="btn btn-ghost btn-sm ml-auto" onClick={() => startEdit(d)}
+                              title="Переименовать или сменить категорию"
+                              aria-label={'Править ' + d.title}>
+                        <Icon name="edit" size={16} />
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => recognize(d)}
+                              disabled={ocrBusy || (!d.ocr.enabled && d.ocr.status !== 'ready')}
+                              title={d.ocr.status === 'ready' ? 'Показать распознанный текст' : d.ocr.enabled ? 'Распознать на сервере клиники' : 'Серверный OCR не включён'}
+                              aria-label={'Распознать ' + d.title}>
+                        <Icon name="sparkle" size={16} />
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => download(d)} aria-label={'Скачать ' + d.title}>
+                        <Icon name="download" size={16} />
+                      </button>
+                      <button className="btn btn-ghost btn-sm text-coral" onClick={() => remove(d)} aria-label={'Удалить ' + d.title}>
+                        <Icon name="trash" size={16} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        ))
       )}
     </div>
   )

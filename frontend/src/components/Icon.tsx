@@ -14,6 +14,7 @@ export type IconName =
   | 'lock' | 'login' | 'arrow' | 'send' | 'sparkle'
   | 'user-plus' | 'male' | 'female' | 'care'
   | 'close' | 'chevron' | 'chevron-left' | 'doc' | 'download' | 'calendar'
+  | 'edit'
 
 // 24×24, stroke 1.7, скруглённые концы — единая пластика всего набора
 const glyphs: Record<IconName, ReactNode> = {
@@ -257,6 +258,12 @@ const glyphs: Record<IconName, ReactNode> = {
   ),
   doc: (
     <path d="M7 3.5h7l4 4v13H7z M14 3.5v4h4 M9.5 12h5 M9.5 15.5h5" />
+  ),
+  edit: (
+    <>
+      <path d="M4.5 19.5l1.2-4.1L16.9 4.2a1.9 1.9 0 0 1 2.7 0l.2.2a1.9 1.9 0 0 1 0 2.7L8.6 18.3l-4.1 1.2z" />
+      <path d="M14.6 6.5l3 3" />
+    </>
   ),
   calendar: (
     <>

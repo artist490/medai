@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .. import config
 from ..database import db_session
-from . import ocr_postprocess
+from . import doc_categories, ocr_postprocess
 from .audit import record
 
 logger = logging.getLogger("medai.ocr")
@@ -83,7 +83,7 @@ def recover_interrupted() -> None:
 def _claim(document_id: int | None = None) -> dict | None:
     with db_session() as db:
         row = db.execute(
-            """SELECT id, user_id, filename, mime, data FROM documents
+            """SELECT id, user_id, filename, mime, data, title_source, uploaded_at FROM documents
                WHERE ocr_status='pending' AND (? IS NULL OR id=?)
                ORDER BY id LIMIT 1""",
             (document_id, document_id),
@@ -138,6 +138,9 @@ def process_one(document_id: int | None = None) -> bool:
     if job is None:
         return False
     doc_id = job["id"]
+    # Колонки появились миграцией; на строках из старой БД — безопасные дефолты.
+    title_source = _row_value(job, "title_source", "auto")
+    uploaded_at = str(_row_value(job, "uploaded_at", "") or "")
     try:
         suffix = Path(str(job["filename"])).suffix.lower()
         if suffix not in {".pdf", ".png", ".jpg", ".webp"}:
@@ -175,17 +178,36 @@ def process_one(document_id: int | None = None) -> bool:
             if len(clean_text) > config.OCR_MAX_TEXT:
                 clean_text = clean_text[:config.OCR_MAX_TEXT]
         with db_session() as db:
-            db.execute(
-                """UPDATE documents SET ocr_status='ready', ocr_text=?, ocr_text_clean=?,
-                   ocr_error=NULL, ocr_finished_at=datetime('now', 'localtime')
-                   WHERE id=? AND ocr_status='processing'""",
-                (text, clean_text, doc_id),
-            )
+            # Категория и авто-название считаются из очищенного текста бланка;
+            # ручное название (title_source='user') не перезаписывается.
+            category = doc_categories.classify(clean_text)
+            titled = False
+            if title_source == "auto":
+                auto_title = doc_categories.suggest_title(clean_text, category, uploaded_at)
+                db.execute(
+                    """UPDATE documents SET ocr_status='ready', ocr_text=?, ocr_text_clean=?,
+                       ocr_error=NULL, ocr_finished_at=datetime('now', 'localtime'),
+                       category=?, title=?
+                       WHERE id=? AND ocr_status='processing'""",
+                    (text, clean_text, category.key, auto_title, doc_id),
+                )
+                titled = True
+            else:
+                db.execute(
+                    """UPDATE documents SET ocr_status='ready', ocr_text=?, ocr_text_clean=?,
+                       ocr_error=NULL, ocr_finished_at=datetime('now', 'localtime'),
+                       category=?
+                       WHERE id=? AND ocr_status='processing'""",
+                    (text, clean_text, category.key, doc_id),
+                )
             record(db, "document.ocr.ready", user_id=job["user_id"], entity="document", entity_id=doc_id)
             # В аудит — только размеры, без содержимого документа.
             record(db, "document.ocr.postprocess", user_id=job["user_id"],
                    entity="document", entity_id=doc_id,
                    details=ocr_postprocess.analyze(text))
+            # Категория без содержимого документа.
+            record(db, "document.classify", user_id=job["user_id"], entity="document",
+                   entity_id=doc_id, details={"category": category.key, "titled": titled})
     except Exception as exc:
         # В БД/логи не попадает текст документа, stderr или временные пути.
         logger.warning("OCR документа %s не выполнен: %s", doc_id, exc)
@@ -218,11 +240,40 @@ def backfill_postprocessed() -> int:
     return len(rows)
 
 
+def backfill_categories() -> int:
+    """Классифицирует готовые документы без категории (идемпотентно).
+
+    Готовым до внедрения документам ставится категория по очищенному тексту;
+    документы с title_source='auto' заодно получают название из бланка.
+    """
+    with db_session() as db:
+        rows = db.execute(
+            """SELECT id, ocr_text_clean, title_source, uploaded_at FROM documents
+               WHERE ocr_status='ready'
+                 AND ocr_text_clean IS NOT NULL AND ocr_text_clean <> ''
+                 AND category = ''"""
+        ).fetchall()
+        for row in rows:
+            category = doc_categories.classify(row["ocr_text_clean"])
+            if _row_value(row, "title_source", "auto") == "auto":
+                db.execute(
+                    "UPDATE documents SET category=?, title=? WHERE id=?",
+                    (category.key,
+                     doc_categories.suggest_title(row["ocr_text_clean"], category,
+                                                  str(_row_value(row, "uploaded_at", "") or "")),
+                     row["id"]),
+                )
+            else:
+                db.execute("UPDATE documents SET category=? WHERE id=?", (category.key, row["id"]))
+    return len(rows)
+
+
 def worker_loop() -> None:
     """Один процесс/worker на сервере; API не выполняет OCR в своём потоке."""
     _stopping.clear()
     recover_interrupted()
     backfill_postprocessed()
+    backfill_categories()
     while not _stopping.is_set():
         if not config.ocr_enabled() or not process_one():
             _stopping.wait(2)

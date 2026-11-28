@@ -79,7 +79,7 @@ class TestDocuments:
         files = {"file": ("mri.pdf", io.BytesIO(b"%PDF-1.4 test"), "application/pdf")}
         r = client.post("/api/documents", data={"title": "МРТ головы"}, files=files, headers=h)
         assert r.status_code == 201, r.text
-        doc = r.json()
+        doc = r.json()[0]  # мультизагрузка: ответ — список, здесь один файл
         assert doc["title"] == "МРТ головы" and doc["size"] > 0
 
         lst = client.get("/api/documents", headers=h).json()["items"]
@@ -103,14 +103,14 @@ class TestDocuments:
         evil_name = {"file": ("bad\r\nname.png", io.BytesIO(b"\x89PNG\r\n\x1a\nDATA"), "image/png")}
         uploaded = client.post("/api/documents", files=evil_name, headers=_auth(p))
         assert uploaded.status_code == 201
-        assert "\r" not in uploaded.json()["filename"] and "\n" not in uploaded.json()["filename"]
+        assert "\r" not in uploaded.json()[0]["filename"] and "\n" not in uploaded.json()[0]["filename"]
 
     def test_private_documents(self, client):
         p = _register(client, "d3@test.ru")
         h = _auth(p)
         doc = client.post("/api/documents",
                           files={"file": ("a.png", io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"PNGDATA"), "image/png")},
-                          headers=h).json()
+                          headers=h).json()[0]  # мультизагрузка: ответ — список
         other = _register(client, "d4@test.ru")
         r = client.get(f"/api/documents/{doc['id']}/download", headers=_auth(other))
         assert r.status_code == 404

@@ -12,8 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from .. import auth
 from ..database import get_db
 from ..schemas import MedCardIn
-from ..services.signals import ALARM_SURVEY_KEYS
 from ..services.audit import record
+from ..services.signals import ALARM_SURVEY_KEYS
 
 router = APIRouter(prefix="/api/medcard", tags=["medcard"])
 

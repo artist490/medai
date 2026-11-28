@@ -15,6 +15,7 @@ import FlowTabs from '../components/FlowTabs'
 import { Skeleton, SkeletonCard } from '../components/Skeleton'
 import AnamnesisForm from './medcard/AnamnesisForm'
 import BookingMenu from './medcard/BookingMenu'
+import DoctorNotesBlock from './medcard/DoctorNotesBlock'
 import DocumentsTab from './medcard/DocumentsTab'
 import GoalsEditor from './medcard/GoalsEditor'
 import PressureDiary from './medcard/PressureDiary'
@@ -213,6 +214,9 @@ export default function MedCard() {
                 ))}
               </div>
             </section>
+
+            {/* Полный список заметок врача по разборам (A2), новые сверху */}
+            <DoctorNotesBlock />
           </>
         )}
 

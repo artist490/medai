@@ -151,3 +151,19 @@ def test_analyze_reports_sizes_without_content():
     result = ocr_postprocess.analyze(raw)
     assert result == {"chars_raw": 14, "chars_clean": 10, "changed": True}
     assert "145" not in str(result)
+
+
+class TestStressBlankRules:
+    """Правки из стресс-теста плотного бланка (КЛ-7742/26, 2026-11-28)."""
+
+    def test_glued_gdl_fixed_after_digit(self):
+        assert "33,1 г/дл" in ocr_postprocess.clean("MCHC 33,1 гдл")
+
+    def test_result_norma_header_unglued(self):
+        out = ocr_postprocess.clean("Показатель        РезультаНорма")
+        assert "РезультаНорма" not in out
+        assert "Результат" in out and "Норма" in out
+
+    def test_superscript_glue_never_rewrites_digits(self):
+        # Инвариант модуля: «1049/л» — это может быть число 1049; цифры не трогаем.
+        assert "1049/л" in ocr_postprocess.clean("Тромбоциты 1049/л")

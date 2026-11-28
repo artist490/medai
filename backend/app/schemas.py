@@ -10,6 +10,7 @@ class RegisterIn(BaseModel):
     first_name: str = Field(default="", max_length=64)   # имя
     last_name: str = Field(default="", max_length=64)    # фамилия
     middle_name: str = Field(default="", max_length=64)  # отчество (опционально)
+    phone: str = Field(default="", max_length=32)        # контактный телефон (опционально)
     name: str = Field(default="", max_length=64)  # легаси: разовое имя из клиентов до разделения ФИО
     invite_code: Optional[str] = Field(default=None, max_length=64)  # код приглашения для врачей
     # Филиал обязателен на сервере для любой роли (С.3): без него 422 — иначе
@@ -26,6 +27,7 @@ class ProfileIn(BaseModel):
     first_name: Optional[str] = Field(default=None, max_length=64)
     last_name: Optional[str] = Field(default=None, max_length=64)
     middle_name: Optional[str] = Field(default=None, max_length=64)
+    phone: Optional[str] = Field(default=None, max_length=32)  # контактный телефон
     age: Optional[int] = Field(default=None, ge=1, le=120)
     sex: Optional[Literal["male", "female"]] = None
     height_cm: Optional[float] = Field(default=None, ge=50, le=250)
@@ -101,3 +103,14 @@ class VisitCloseIn(BaseModel):
     """Заключение врача по приёму."""
     conclusion: str = Field(min_length=1, max_length=2000)
     recommendations: str = Field(default="", max_length=2000)
+
+
+class DocumentPatchIn(BaseModel):
+    """Правка документа: название и/или категория.
+
+    Ручное название переводит документ в title_source='user' — OCR больше
+    его не перезаписывает. Пустая категория означает «переклассифицируй
+    по распознанному тексту».
+    """
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    category: Optional[str] = Field(default=None, max_length=20)

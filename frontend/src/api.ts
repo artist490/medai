@@ -1,5 +1,5 @@
 // API-клиент: HttpOnly-сессия + CSRF; Bearer не хранится в браузерном storage.
-import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DocumentItem, DoctorSignal, Goals, Measurement, MedCard, MedCardInput, OcrResult, PatientRow, Stats, User, Visit } from './types'
+import type { Branch, BranchAnalytics, ChatMessage, DoctorNote, DoctorNoteItem, DocumentItem, DoctorSignal, Goals, Measurement, MedCard, MedCardInput, OcrResult, PatientRow, Stats, User, Visit } from './types'
 
 const TOKEN_KEY = 'medai_token'
 
@@ -66,7 +66,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export async function register(
   email: string, password: string,
   firstName: string, lastName: string, middleName: string,
-  inviteCode?: string, branchId?: number,
+  inviteCode?: string, branchId?: number, phone?: string,
 ) {
   const data = await request<{ user: User }>('/api/auth/register', {
     method: 'POST',
@@ -77,6 +77,7 @@ export async function register(
       first_name: firstName,
       last_name: lastName,
       middle_name: middleName,
+      ...(phone ? { phone } : {}),
       ...(inviteCode ? { invite_code: inviteCode } : {}),
       ...(branchId ? { branch_id: branchId } : {}),
     }),
@@ -178,6 +179,12 @@ export async function addDoctorNote(analysisId: number, text: string): Promise<D
     method: 'POST',
     body: JSON.stringify({ text }),
   })
+}
+
+// ---------- заметки врача пациенту ----------
+
+export async function fetchMyNotes(): Promise<{ items: DoctorNoteItem[] }> {
+  return request('/api/notes/mine')
 }
 
 // ---------- медкарта ----------
@@ -284,10 +291,12 @@ export async function repeatLastMeasurement(period: 'morning' | 'evening'): Prom
 
 // ---------- документы ----------
 
-export async function uploadDocument(file: File, title: string): Promise<DocumentItem> {
+/** Мультизагрузка: несколько файлов за один запрос; ответ — список в порядке запроса. */
+export async function uploadDocuments(files: File[], title: string): Promise<DocumentItem[]> {
   const fd = new FormData()
-  fd.append('file', file)
-  fd.append('title', title)
+  for (const file of files) fd.append('file', file)
+  // Название имеет смысл для одного файла: при пачке каждый назовётся из бланка
+  fd.append('title', files.length === 1 ? title : '')
   return request('/api/documents', { method: 'POST', body: fd })
 }
 
@@ -297,6 +306,14 @@ export async function fetchDocuments(): Promise<{ items: DocumentItem[] }> {
 
 export async function deleteDocument(id: number): Promise<void> {
   return request<void>(`/api/documents/${id}`, { method: 'DELETE' })
+}
+
+/** Правка названия и/или категории: ручное название переживает пере-OCR. */
+export async function editDocument(
+  id: number,
+  patch: { title?: string; category?: string },
+): Promise<DocumentItem> {
+  return request(`/api/documents/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
 }
 
 export async function startDocumentOcr(id: number): Promise<OcrResult> {

@@ -1,4 +1,5 @@
 """Роутер авторизации и профиля."""
+import re
 import secrets
 import sqlite3
 from datetime import datetime, timezone
@@ -9,8 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from .. import auth
 from ..database import db_session, get_db
 from ..schemas import BranchChangeIn, LoginIn, ProfileIn, RegisterIn
-from ..security import (SESSION_COOKIE, SlidingRateLimiter, clear_auth_cookies,
-                        csrf_cookie, session_cookie)
+from ..security import SESSION_COOKIE, SlidingRateLimiter, clear_auth_cookies, csrf_cookie, session_cookie
 from ..services.audit import record
 from ..services.payloads import compose_full_name
 
@@ -22,6 +22,17 @@ _login_ip_limiter = SlidingRateLimiter(60, 15 * 60)
 _register_limiter = SlidingRateLimiter(5, 60 * 60)
 _branch_change_limiter = SlidingRateLimiter(5, 15 * 60)
 _DUMMY_PASSWORD_HASH = auth.hash_password(secrets.token_urlsafe(32))
+
+# Телефон храним как введённый, но не принимаем произвольный текст (A3).
+_PHONE_RE = re.compile(r"^[0-9+()\-\s]{5,32}$")
+
+
+def _clean_phone(value: Optional[str]) -> str:
+    phone = (value or "").strip()
+    if phone and not _PHONE_RE.fullmatch(phone):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "Телефон: только цифры, пробелы и символы + ( ) -")
+    return phone
 
 
 def _ip(request: Request) -> str:
@@ -61,6 +72,7 @@ def user_payload(user: sqlite3.Row, branch: Optional[sqlite3.Row] = None) -> dic
         "sex": user["sex"],
         "height_cm": user["height_cm"],
         "role": user["role"],
+        "phone": user["phone"] if "phone" in user.keys() else "",
         "branch": branch_payload(branch),
     }
 
@@ -116,12 +128,12 @@ def register(data: RegisterIn, request: Request, response: Response, db: sqlite3
 
     cursor = db.execute(
         """INSERT INTO users (email, password_hash, name, first_name, last_name, middle_name,
-                              role, branch_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                              phone, role, branch_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (data.email.lower(), auth.hash_password(data.password),
          compose_full_name(data.first_name, data.last_name, data.middle_name) or data.name.strip(),
          data.first_name.strip(), data.last_name.strip(), data.middle_name.strip(),
-         role, data.branch_id),
+         _clean_phone(data.phone), role, data.branch_id),
     )
     user_id = cursor.lastrowid
 
@@ -192,6 +204,8 @@ def update_me(
     db: sqlite3.Connection = Depends(get_db),
 ):
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
+    if "phone" in updates:
+        updates["phone"] = _clean_phone(updates["phone"])
     if updates:
         sets = ", ".join(f"{k} = ?" for k in updates)
         db.execute(f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), user["id"]))
