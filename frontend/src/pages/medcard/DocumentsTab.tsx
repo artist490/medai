@@ -8,19 +8,8 @@ import { Icon } from '../../components/Icon'
 import EmptyArt from '../../components/EmptyArt'
 import OcrText from '../../components/OcrText'
 import { Skeleton } from '../../components/Skeleton'
+import { DOC_CATEGORIES } from './shared'
 import type { DocumentItem, OcrResult } from '../../types'
-
-// Порядок групп = порядок справочника doc_categories.py; other последним.
-const DOC_CATEGORIES: Array<{ key: string; label: string }> = [
-  { key: 'blood', label: 'Кровь' },
-  { key: 'hormones', label: 'Гормоны и биохимия' },
-  { key: 'urine', label: 'Моча' },
-  { key: 'stool', label: 'Кал' },
-  { key: 'smears', label: 'Мазки и цитология' },
-  { key: 'imaging', label: 'МРТ, КТ, УЗИ и рентген' },
-  { key: 'function', label: 'ЭКГ и функциональная диагностика' },
-  { key: 'other', label: 'Прочее' },
-]
 
 function groupedDocs(docs: DocumentItem[]): Array<{ key: string; label: string; docs: DocumentItem[] }> {
   const groups = new Map<string, DocumentItem[]>()
@@ -198,7 +187,8 @@ export default function DocumentsTab() {
         <div className="flip-hint">PDF или фото до 8 МБ, можно несколько файлов сразу.
           Скриншот бланка можно просто вставить из буфера — Ctrl+V.
           Название необязательно — подставим из распознанного текста.
-          OCR выполняется локально на сервере клиники, без внешнего API.</div>
+          OCR выполняется локально на сервере клиники, без внешнего API.
+          Документы видны вам и врачу вашего филиала.</div>
       </form>
 
       {ocrDocId !== null && ocr && (ocr.status !== 'disabled' || !ocr.enabled) && (
@@ -253,8 +243,8 @@ export default function DocumentsTab() {
           <EmptyArt className="mx-auto mb-2" />
           <p className="text-base font-bold text-[#1b2622]">Документов пока нет</p>
           <p className="text-sm text-ink-soft max-w-sm mt-1">
-            Загрузите первый результат исследования — он будет виден только вам
-            и всегда под рукой в медкарте.
+            Загрузите первый результат исследования — он всегда под рукой в медкарте
+            и виден врачу вашего филиала на приёме.
           </p>
         </div>
       ) : (
@@ -304,6 +294,11 @@ export default function DocumentsTab() {
                         <div className="text-xs text-ink-soft">
                           {fmtSize(d.size)} · {d.uploaded_at.slice(0, 16).replace('T', ' ')}
                         </div>
+                        {d.doctor_viewed_at && (
+                          <div className="text-[11px] text-ink-soft mt-0.5">
+                            врач открывал: {d.doctor_viewed_at.slice(0, 16).replace('T', ' ')}
+                          </div>
+                        )}
                       </div>
                       <button className="btn btn-ghost btn-sm ml-auto" onClick={() => startEdit(d)}
                               title="Переименовать или сменить категорию"

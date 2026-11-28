@@ -324,6 +324,18 @@ export async function fetchDocumentOcr(id: number): Promise<OcrResult> {
   return request(`/api/documents/${id}/ocr`)
 }
 
+// ---------- документы пациента у врача (В1—В4) ----------
+
+export async function fetchPatientDocuments(patientId: number | string): Promise<{ items: DocumentItem[] }> {
+  return request(`/api/doctor/patients/${patientId}/documents`)
+}
+
+export async function fetchPatientDocumentOcr(
+  patientId: number | string, docId: number,
+): Promise<OcrResult> {
+  return request(`/api/doctor/patients/${patientId}/documents/${docId}/ocr`)
+}
+
 // ---------- уведомления (колокольчик, Б1) ----------
 
 export async function fetchNotifications(): Promise<{ unread: number; items: NotificationItem[] }> {

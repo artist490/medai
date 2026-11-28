@@ -208,7 +208,9 @@ CREATE TABLE IF NOT EXISTS documents (
     ocr_finished_at TEXT,
     ocr_attempts INTEGER NOT NULL DEFAULT 0,
     category     TEXT NOT NULL DEFAULT '',
-    title_source TEXT NOT NULL DEFAULT 'auto'
+    title_source TEXT NOT NULL DEFAULT 'auto',
+    doctor_viewed_at TEXT,            -- последний раз врач филиала открывал документ (В4)
+    lab_values   TEXT                 -- JSON распознанных показателей (Д2, services/lab_parse.py)
 );
 """
 
@@ -327,6 +329,10 @@ def _migrate(db: sqlite3.Connection) -> None:
     if doc_columns and "category" not in doc_columns:
         db.execute("ALTER TABLE documents ADD COLUMN category TEXT NOT NULL DEFAULT ''")
         db.execute("ALTER TABLE documents ADD COLUMN title_source TEXT NOT NULL DEFAULT 'auto'")
+    if doc_columns and "doctor_viewed_at" not in doc_columns:
+        db.execute("ALTER TABLE documents ADD COLUMN doctor_viewed_at TEXT")
+    if doc_columns and "lab_values" not in doc_columns:
+        db.execute("ALTER TABLE documents ADD COLUMN lab_values TEXT")
     invite_columns = {row["name"] for row in db.execute("PRAGMA table_info(invite_codes)").fetchall()}
     if invite_columns and "expires_at" not in invite_columns:
         db.execute("ALTER TABLE invite_codes ADD COLUMN expires_at TEXT")

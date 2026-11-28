@@ -175,6 +175,8 @@ class Document(Base):
     ocr_text_clean = Column(Text, nullable=True)  # результат постобработки
     ocr_status = Column(String, nullable=True)  # pending | done | failed
     ocr_error = Column(Text, nullable=True)
+    doctor_viewed_at = Column(DateTime, nullable=True)  # врач филиала открывал документ
+    lab_values = Column(Text, nullable=True)  # JSON показателей (services/lab_parse.py)
 
     __table_args__ = (
         Index("ix_documents_user_uploaded", "user_id", "uploaded_at"),

@@ -106,7 +106,28 @@ export interface DocumentItem {
   category: string
   /** 'user' — ручное название не перезаписывается; 'auto' — подставляется из OCR. */
   title_source: 'user' | 'auto'
+  /** Последний раз врач филиала открывал документ (В4: «врач открывал: дата»). */
+  doctor_viewed_at: string | null
+  /** Распознанные показатели (Д2, services/lab_parse.py); null = парсер ничего не нашёл. */
+  lab_values: LabValues | null
   ocr: OcrResult
+}
+
+// Структурированные показатели бланка (Д): детерминированный парсер,
+// распознаём только подтверждённые пары, остальное — «не распознано».
+export interface LabValue {
+  key: string
+  label: string
+  value: string
+  unit: string
+  norm_text: string
+  norm_low: number | null
+  norm_high: number | null
+  status: 'normal' | 'high' | 'low' | 'unknown'
+}
+export interface LabValues {
+  items: LabValue[]
+  unparsed: number
 }
 
 export type OcrStatus = 'disabled' | 'pending' | 'processing' | 'ready' | 'failed'

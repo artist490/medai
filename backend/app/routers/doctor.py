@@ -10,13 +10,14 @@ from ..database import get_db
 from ..schemas import NoteIn, VisitCloseIn
 from ..security import SlidingRateLimiter
 from ..services import llm as llm_service
-from ..services import signals
+from ..services import ocr, signals
 from ..services.audit import record
 from ..services.payloads import (
     ORDER_SQL,
     PATIENT_FIELDS,
     VISIT_SELECT,
     analysis_payload,
+    doc_payload,
     measurement_payload,
     notes_for,
     patient_payload,
@@ -296,6 +297,86 @@ def patient_visits(
         (patient_id,),
     ).fetchall()
     return {"items": [visit_payload(r) for r in rows]}
+
+
+# ---------- Документы пациента (В1—В4) ----------
+
+def _branch_document(db: sqlite3.Connection, patient_id: int, doc_id: int,
+                     doctor: sqlite3.Row) -> sqlite3.Row:
+    """Документ пациента филиала — единый гвард для карточки/скачивания."""
+    _branch_patient(db, patient_id, doctor)
+    row = db.execute(
+        "SELECT * FROM documents WHERE id = ? AND user_id = ?",
+        (doc_id, patient_id),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Документ не найден")
+    return row
+
+
+def _mark_viewed(db: sqlite3.Connection, doc_id: int, patient_id: int,
+                 doctor: sqlite3.Row) -> None:
+    """Врач открыл содержимое документа: факт в аудит и пациенту (В4)."""
+    db.execute(
+        "UPDATE documents SET doctor_viewed_at = datetime('now', 'localtime') WHERE id = ?",
+        (doc_id,),
+    )
+    record(db, "document.viewed_by_doctor", user_id=doctor["id"], entity="document",
+           entity_id=doc_id, details={"patient_id": patient_id})
+
+
+@router.get("/patients/{patient_id}/documents")
+def patient_documents(
+    patient_id: int,
+    user: sqlite3.Row = Depends(auth.get_current_doctor),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Документы пациента филиала: список с категориями и статусом распознавания."""
+    _branch_patient(db, patient_id, user)
+    rows = db.execute(
+        """SELECT * FROM documents WHERE user_id = ?
+           ORDER BY uploaded_at DESC, id DESC""",
+        (patient_id,),
+    ).fetchall()
+    record(db, "patient.documents.read", user_id=user["id"], entity="patient", entity_id=patient_id)
+    db.commit()
+    return {"items": [doc_payload(r) for r in rows]}
+
+
+@router.get("/patients/{patient_id}/documents/{doc_id}/download")
+def patient_document_download(
+    patient_id: int,
+    doc_id: int,
+    user: sqlite3.Row = Depends(auth.get_current_doctor),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Скачивание документа пациента филиала: гвард филиала + аудит просмотра."""
+    row = _branch_document(db, patient_id, doc_id, user)
+    _mark_viewed(db, doc_id, patient_id, user)
+    db.commit()
+    from fastapi.responses import Response
+    name = (row["filename"] or "document").replace('"', "")
+    return Response(
+        content=row["data"],
+        media_type=row["mime"],
+        headers={"Content-Disposition": f'attachment; filename="{name}"',
+                 "Content-Security-Policy": "sandbox; default-src 'none'",
+                 "Cache-Control": "private, no-store"},
+    )
+
+
+@router.get("/patients/{patient_id}/documents/{doc_id}/ocr")
+def patient_document_ocr(
+    patient_id: int,
+    doc_id: int,
+    user: sqlite3.Row = Depends(auth.get_current_doctor),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Текст распознанного бланка для врача; открытие текста фиксируется."""
+    row = _branch_document(db, patient_id, doc_id, user)
+    _mark_viewed(db, doc_id, patient_id, user)
+    db.commit()
+    return ocr.ocr_payload(row, include_text=True)
 
 
 @router.put("/visits/{visit_id}")

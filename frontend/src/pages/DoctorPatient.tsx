@@ -10,12 +10,14 @@ import RiskBadge from '../components/RiskBadge'
 import { Icon } from '../components/Icon'
 import EmptyArt from '../components/EmptyArt'
 import AvatarPatient from '../components/AvatarPatient'
+import OcrText from '../components/OcrText'
 import { CardFormFields, CardView, defaultCardForm } from '../components/CardAnamnesis'
 import type { CardFormState } from '../components/CardAnamnesis'
 import RiskSystems from '../components/RiskSystems'
 import PageHeader from '../components/PageHeader'
 import { Skeleton, SkeletonCard, SkeletonRows } from '../components/Skeleton'
-import type { Measurement, MedCard, User, DoctorNote, Visit, VisitStatus } from '../types'
+import { categoryLabel } from './medcard/shared'
+import type { DocumentItem, Measurement, MedCard, OcrResult, User, DoctorNote, Visit, VisitStatus } from '../types'
 
 const riskBadgeClass = {
   green: 'badge-green',
@@ -35,12 +37,13 @@ const STATUS_INFO: Record<VisitStatus, { cls: string; label: string }> = {
   cancelled: { cls: 'badge', label: 'Отменён' },
 }
 
-type Tab = 'measurements' | 'medcard' | 'visits'
+type Tab = 'measurements' | 'medcard' | 'visits' | 'documents'
 
-const TABS: Array<{ key: Tab; label: string; icon: 'stethoscope' | 'care' | 'calendar' }> = [
+const TABS: Array<{ key: Tab; label: string; icon: 'stethoscope' | 'care' | 'calendar' | 'doc' }> = [
   { key: 'measurements', label: 'Замеры', icon: 'stethoscope' },
   { key: 'medcard', label: 'Медкарта', icon: 'care' },
   { key: 'visits', label: 'Приёмы', icon: 'calendar' },
+  { key: 'documents', label: 'Документы', icon: 'doc' },
 ]
 
 function shortDate(iso: string): string {
@@ -462,6 +465,110 @@ function VisitsTab({ visits, onVisits }: {
   )
 }
 
+// ---------- Вкладка «Документы» (В2): результаты исследований пациента ----------
+
+function DocumentsDoctorTab({ patientId }: { patientId: string }) {
+  const [docs, setDocs] = useState<DocumentItem[] | null>(null)
+  const [error, setError] = useState('')
+  const [openDoc, setOpenDoc] = useState<{ id: number; ocr: OcrResult } | null>(null)
+  const [textBusy, setTextBusy] = useState<number | null>(null)
+
+  function load() {
+    setError('')
+    setDocs(null)
+    api.fetchPatientDocuments(patientId)
+      .then((d) => setDocs(d.items))
+      .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось загрузить документы'))
+  }
+
+  useEffect(() => { load() }, [patientId])
+
+  async function showText(doc: DocumentItem) {
+    if (openDoc?.id === doc.id) { setOpenDoc(null); return }
+    setTextBusy(doc.id)
+    setError('')
+    try {
+      const ocr = await api.fetchPatientDocumentOcr(patientId, doc.id)
+      setOpenDoc({ id: doc.id, ocr })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось открыть текст')
+    } finally {
+      setTextBusy(null)
+    }
+  }
+
+  async function download(doc: DocumentItem) {
+    const resp = await fetch(`/api/doctor/patients/${patientId}/documents/${doc.id}/download`, {
+      credentials: 'same-origin',
+    })
+    if (!resp.ok) return
+    const blob = await resp.blob()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = doc.filename
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  function fmtSize(n: number): string {
+    if (n > 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' МБ'
+    return Math.max(1, Math.round(n / 1024)) + ' КБ'
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flip-hint">
+        Результаты исследований, загруженные пациентом. Открытие текста или скачивание
+        фиксируется — пациент видит, что врач открывал документ.
+      </div>
+      {error && <div className="text-[12.5px] text-coral-dark">{error}</div>}
+      {docs === null ? (
+        <SkeletonRows rows={3} />
+      ) : docs.length === 0 ? (
+        <div className="panel py-8 text-center text-[13px] text-ink-soft">
+          Пациент ещё не загрузил ни одного документа.
+        </div>
+      ) : (
+        <div className="panel divide-y divide-[#eef4f3]">
+          {docs.map((d) => (
+            <div key={d.id} className="py-3">
+              <div className="flex items-center gap-3">
+                <span className="emoji-box"><Icon name="doc" size={18} /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-[#1b2622] truncate">{d.title}</div>
+                  <div className="text-xs text-ink-soft">
+                    {categoryLabel(d.category)} · {fmtSize(d.size)} · {d.uploaded_at.slice(0, 16).replace('T', ' ')}
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" disabled={textBusy === d.id}
+                        onClick={() => showText(d)}
+                        title="Показать распознанный текст">
+                  {openDoc?.id === d.id ? 'Свернуть' : 'Текст'}
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => download(d)}
+                        aria-label={'Скачать ' + d.title}>
+                  <Icon name="download" size={16} />
+                </button>
+              </div>
+              {openDoc?.id === d.id && (
+                <div className="mt-3 pl-[30px]">
+                  {openDoc.ocr.status === 'ready' && openDoc.ocr.text ? (
+                    <OcrText text={openDoc.ocr.text} raw={openDoc.ocr.text_raw} />
+                  ) : (
+                    <p className="text-[13px] text-ink-soft">
+                      Документ ещё не распознан — пациент может запустить распознавание в медкарте.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ---------- Страница ----------
 
 export default function DoctorPatient() {
@@ -631,6 +738,7 @@ export default function DoctorPatient() {
       {tab === 'visits' && (
         <VisitsTab visits={visits} onVisits={setVisits} />
       )}
+      {tab === 'documents' && <DocumentsDoctorTab patientId={id!} />}
     </div>
   )
 }

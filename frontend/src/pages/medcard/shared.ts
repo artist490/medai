@@ -22,3 +22,20 @@ export function fmtDate(iso: string): string {
   const [y, m, d] = iso.slice(0, 10).split('-')
   return `${d}.${m}.${y}`
 }
+
+// Справочник категорий документов (дубликат doc_categories.py, порядок тот же);
+// общий для вкладки документов пациента и врача (F008: дубликаты — во shared)
+export const DOC_CATEGORIES: Array<{ key: string; label: string }> = [
+  { key: 'blood', label: 'Кровь' },
+  { key: 'hormones', label: 'Гормоны и биохимия' },
+  { key: 'urine', label: 'Моча' },
+  { key: 'stool', label: 'Кал' },
+  { key: 'smears', label: 'Мазки и цитология' },
+  { key: 'imaging', label: 'МРТ, КТ, УЗИ и рентген' },
+  { key: 'function', label: 'ЭКГ и функциональная диагностика' },
+  { key: 'other', label: 'Прочее' },
+]
+
+export function categoryLabel(key: string): string {
+  return DOC_CATEGORIES.find((c) => c.key === key)?.label ?? 'Прочее'
+}
